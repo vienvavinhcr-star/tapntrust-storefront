@@ -136,9 +136,16 @@
               <img class="step__product" src="assets/products/tapntrust-nfc-card-transparent.webp" alt="" width="1113" height="1413" loading="lazy">
               <div class="device device--tap">
                 <span class="device__speaker"></span>
-                <div class="device__screen">
-                  <span class="device__time">9:41</span>
-                  <span class="tap-ready"><b>Ready</b><small>Open review page</small></span>
+                <div class="device__screen phone-home">
+                  <div class="phone-status"><b>9:41</b><span>● ●●</span></div>
+                  <span class="phone-home__time">9:41</span>
+                  <span class="phone-home__date">Tuesday, 18 August</span>
+                  <span class="phone-home__wallpaper" aria-hidden="true"></span>
+                  <span class="nfc-sheet">
+                    <i class="nfc-sheet__icon" aria-hidden="true"></i>
+                    <span><b>NFC tag detected</b><small>Open your Google review page</small></span>
+                    <strong>Open</strong>
+                  </span>
                 </div>
               </div>
             </div>
@@ -150,15 +157,17 @@
             <div class="step__scene step__scene--open" aria-hidden="true">
               <div class="device device--front">
                 <span class="device__speaker"></span>
-                <div class="device__screen review-page">
-                  <span class="browser-bar"><i></i><b>Business review page</b></span>
-                  <span class="review-page__brand">Your business</span>
-                  <span class="review-page__stars">
-                    <span style="--star-index: 0">★</span><span style="--star-index: 1">★</span><span style="--star-index: 2">★</span><span style="--star-index: 3">★</span><span style="--star-index: 4">★</span>
-                  </span>
-                  <span class="review-page__line review-page__line--long"></span>
-                  <span class="review-page__line"></span>
-                  <span class="review-page__button">Write a review</span>
+                <div class="device__screen maps-place">
+                  <div class="phone-status phone-status--light"><b>9:41</b><span>● ●●</span></div>
+                  <div class="maps-place__bar"><i aria-hidden="true">‹</i><span>Your selected business</span><b aria-hidden="true">⋮</b></div>
+                  <div class="maps-place__hero"><span aria-hidden="true">⌖</span></div>
+                  <div class="maps-place__content">
+                    <strong>Your selected business</strong>
+                    <span class="maps-place__rating"><b>4.8</b><i class="maps-place__stars" aria-label="4.8 out of 5 stars"><span style="--star-index: 0">★</span><span style="--star-index: 1">★</span><span style="--star-index: 2">★</span><span style="--star-index: 3">★</span><span style="--star-index: 4">★</span></i><small>(214)</small></span>
+                    <small>Local business · Open</small>
+                    <div class="maps-place__actions"><span>⌁<small>Directions</small></span><span>⌕<small>Website</small></span><span>☎<small>Call</small></span></div>
+                    <span class="maps-place__button">Write a review</span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -170,14 +179,17 @@
             <div class="step__scene step__scene--choose" aria-hidden="true">
               <div class="device device--front device--choice">
                 <span class="device__speaker"></span>
-                <div class="device__screen choice-page">
-                  <span class="choice-page__title">Share your experience</span>
+                <div class="device__screen choice-page google-review-form">
+                  <div class="phone-status phone-status--dark"><b>9:41</b><span>● ●●</span></div>
+                  <div class="google-review-form__top"><span>‹ Maps</span><b aria-hidden="true">×</b></div>
+                  <span class="choice-page__title">Your selected business</span>
+                  <span class="google-review-form__account"><i aria-hidden="true">T</i><span><b>Your customer</b><small>Posting publicly across Google</small></span></span>
                   <span class="choice-page__stars">
                     <span style="--choice-star-index: 0">★</span><span style="--choice-star-index: 1">★</span><span style="--choice-star-index: 2">★</span><span style="--choice-star-index: 3">★</span><span style="--choice-star-index: 4">★</span>
                   </span>
+                  <span class="google-review-form__categories"><small>Service</small><i>★★★★★</i><small>Atmosphere</small><i>★★★★★</i></span>
                   <span class="choice-page__field"><span class="choice-page__typed" data-step-typing>Great products and friendly service.</span></span>
-                  <span class="choice-page__note">For your selected Google listing</span>
-                  <span class="choice-page__button">Submit</span>
+                  <span class="choice-page__button">Post</span>
                 </div>
               </div>
             </div>
@@ -422,8 +434,13 @@
             <p class="form-status" data-add-status aria-live="polite"></p>
           </form>
           <div class="checkout-assurance">
-            <span class="mini-lock" aria-hidden="true"></span>
-            <p><strong>Secure checkout with Shopify</strong></p>
+            <a class="checkout-assurance__shopify" href="https://www.shopify.com/" target="_blank" rel="noopener noreferrer" aria-label="Shopify">
+              <img src="assets/brand/shopify-logo.svg" alt="Shopify" width="304" height="87">
+            </a>
+            <p>
+              <strong>Secure checkout</strong>
+              <span>Payment details are entered only on Shopify’s encrypted checkout.</span>
+            </p>
           </div>
           <details class="order-policy-accordion">
             <summary>Shipping &amp; Returns<span aria-hidden="true"></span></summary>
@@ -458,7 +475,7 @@
           </figure>
           <figure class="placement-card">
             <div class="placement-card__image">
-              <img src="assets/marketing/placement-table.jpg" alt="TapNTrust review card adhered flat to a café dining table" width="810" height="1350" loading="lazy">
+              <img src="assets/marketing/placement-table-v2.jpg" alt="TapNTrust review card neatly aligned and adhered flat to a restaurant dining table" width="810" height="1350" loading="lazy">
             </div>
             <figcaption><strong>On a table</strong><span>Peel and stick flat</span></figcaption>
           </figure>
@@ -500,7 +517,7 @@
                 <figcaption><span>Café counter · Optional stand</span><strong>Beside the payment point</strong><blockquote>Visible while customers pay, collect their order or wait for a receipt.</blockquote></figcaption>
               </figure>
               <figure class="placement-card" data-placement-slide>
-                <div class="placement-card__image"><img src="assets/marketing/placement-table.jpg" alt="TapNTrust review card adhered flat to a café dining table" width="810" height="1350" loading="lazy"></div>
+                <div class="placement-card__image"><img src="assets/marketing/placement-table-v2.jpg" alt="TapNTrust review card neatly aligned and adhered flat to a restaurant dining table" width="810" height="1350" loading="lazy"></div>
                 <figcaption><span>Dining table · Self-adhesive</span><strong>Where guests finish their meal</strong><blockquote>A natural moment to tap while the experience is still fresh.</blockquote></figcaption>
               </figure>
               <figure class="placement-card" data-placement-slide>
@@ -744,7 +761,7 @@
       <div><h2>Help</h2><a href="contact.html">Contact</a><a href="shipping.html">Shipping</a><a href="returns.html">Returns</a></div>
       <div><h2>Legal</h2><a href="privacy.html">Privacy Policy</a><a href="terms.html">Terms</a></div>
     </div>
-    <div class="container footer__bottom"><p>© <span data-current-year></span> TapNTrust. All rights reserved.</p><p>TapNTrust is not affiliated with or endorsed by Google.</p></div>
+    <div class="container footer__bottom"><p>© <span data-current-year></span> TapNTrust. All rights reserved.</p></div>
   </footer>
 
   <aside class="mobile-buy-bar" data-mobile-buy-bar aria-label="Quick purchase" aria-hidden="true">
