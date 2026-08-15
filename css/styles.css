@@ -293,7 +293,7 @@ h3 { font-size: 1.3rem; }
 .device { position: relative; z-index: 3; width: 124px; height: 235px; padding: 7px; border: 2px solid #31496d; border-radius: 24px; background: #071b43; box-shadow: inset 0 0 0 1px #7687a0, 0 20px 30px rgba(3,18,50,.24); }
 .device::after { position: absolute; top: 70px; right: -4px; width: 3px; height: 34px; border-radius: 0 2px 2px 0; background: #21385f; content: ""; }
 .device__speaker { position: absolute; z-index: 2; top: 12px; left: 50%; width: 34px; height: 5px; border-radius: 5px; background: #071b43; transform: translateX(-50%); }
-.device__screen { position: relative; display: block; height: 100%; overflow: hidden; border-radius: 17px; background: #fff; }
+.device__screen { position: relative; display: block; height: 100%; overflow: hidden; border-radius: 17px; background: #fff; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 .device__time { position: absolute; top: 6px; left: 10px; color: #0a2049; font-size: .38rem; font-weight: 800; }
 .device--tap { position: absolute; right: 11%; bottom: 22px; width: 105px; height: 204px; transform: translate3d(0,0,0) rotate(8deg); transform-origin: 58% 92%; backface-visibility: hidden; contain: layout paint; will-change: transform; }
 .device--tap .device__screen { background: linear-gradient(165deg, #eef5ff, #fff 52%); }
