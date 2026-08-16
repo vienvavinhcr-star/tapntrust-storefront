@@ -253,6 +253,10 @@ function updatePackageValueDisplay() {
   const saving = Math.max(0, regularTotal - price);
   if (selectedPackage === 1) {
     summary.innerHTML = '<span class="package-comparison__icon" aria-hidden="true">✓</span><span class="package-comparison__copy"><strong>Single-card package selected.</strong></span>';
+  } else if (selectedPackage === 3) {
+    summary.innerHTML = `<span class="package-comparison__icon" aria-hidden="true">✓</span><span class="package-comparison__copy"><strong>3-card package saves ${formatMoney(saving)}</strong> and includes free standard shipping Australia-wide.</span>`;
+  } else if (selectedPackage === 5) {
+    summary.innerHTML = `<span class="package-comparison__icon" aria-hidden="true">✓</span><span class="package-comparison__copy"><strong>5-card package saves ${formatMoney(saving)}</strong> with free standard shipping and a free A$14.49 Counter Stand included.</span>`;
   } else {
     summary.innerHTML = `<span class="package-comparison__icon" aria-hidden="true">✓</span><span class="package-comparison__copy"><strong>${selectedPackage}-card package saves ${formatMoney(saving)}</strong> compared with buying ${selectedPackage} single cards.</span>`;
   }
@@ -449,6 +453,13 @@ function createPackageSelector(line) {
   return wrapper;
 }
 
+function packageCountForLine(line, catalog = cartActions.getState().catalog) {
+  if (line?.kind !== "primary") return null;
+  return catalog?.main?.variants?.find((variant) => variant.id === line.variantId)?.count
+    || Number(String(line.variantTitle || "").match(/\b(1|2|3|5)\b/)?.[1] || 0)
+    || null;
+}
+
 function createCartLine(line, currency) {
   const article = document.createElement("article");
   article.className = "cart-line";
@@ -491,6 +502,23 @@ function createCartLine(line, currency) {
     changeBusiness.dataset.lineAction = "change-business";
     changeBusiness.textContent = "Change business";
     details.append(changeBusiness);
+
+    const packageCount = packageCountForLine(line);
+    if (packageCount === 3 || packageCount === 5) {
+      const bundleNote = document.createElement("div");
+      bundleNote.className = "cart-line__product-note cart-line__product-note--bundle";
+      const bundleTitle = document.createElement("strong");
+      const bundleText = document.createElement("span");
+      if (packageCount === 5) {
+        bundleTitle.textContent = "Best Value bundle inclusions";
+        bundleText.textContent = "FREE standard shipping Australia-wide and one FREE A$14.49 Counter Stand are included.";
+      } else {
+        bundleTitle.textContent = "Sweet spot package";
+        bundleText.textContent = "Three customer touchpoints at A$24.98 per card, with FREE standard shipping Australia-wide.";
+      }
+      bundleNote.append(bundleTitle, bundleText);
+      details.append(bundleNote);
+    }
   }
 
   if (line.kind === "stand" || line.kind === "extra") {
@@ -596,8 +624,28 @@ function renderCart(cartState) {
   cartLines.replaceChildren(...lines.map((line) => createCartLine(line, cart.currency)));
   upsells.hidden = !lines.some((line) => line.kind === "primary");
 
+  const hasFiveCardBundle = lines.some((line) => packageCountForLine(line, cartState.catalog) === 5);
+  const standUpsell = document.querySelector('[data-upsell-card="stand"]');
+  const standDescription = standUpsell?.querySelector("[data-upsell-description]");
+  const standPrice = standUpsell?.querySelector("[data-upsell-price]");
+  standUpsell?.classList.toggle("upsell-card--included", hasFiveCardBundle);
+  if (standDescription) {
+    standDescription.textContent = hasFiveCardBundle
+      ? "Included FREE with your 5-card bundle"
+      : "Keep your card upright and visible.";
+  }
+  if (standPrice) {
+    if (hasFiveCardBundle) standPrice.innerHTML = "<del>A$14.49</del><span>FREE</span>";
+    else standPrice.textContent = "A$14.49";
+  }
+
   document.querySelectorAll("[data-upsell-add]").forEach((button) => {
     const kind = button.dataset.upsellAdd;
+    if (kind === "stand" && hasFiveCardBundle) {
+      button.disabled = true;
+      button.textContent = "Included";
+      return;
+    }
     const added = lines.some((line) => line.kind === kind);
     button.disabled = added;
     button.textContent = added ? "Added" : "Add";
