@@ -16,7 +16,7 @@
   <meta name="twitter:title" content="NFC Review Cards for Australian Businesses | TapNTrust">
   <meta name="twitter:description" content="Make it easier for customers to reach your review page with a simple NFC tap.">
   <link rel="icon" href="assets/brand/tapntrust-logo.png" type="image/png">
-  <link rel="stylesheet" href="css/styles.css?v=20260815-2">
+  <link rel="stylesheet" href="css/styles.css?v=20260816-3">
 </head>
 <body>
   <a class="skip-link" href="#main-content">Skip to main content</a>
@@ -32,11 +32,11 @@
   <div class="shipping-banner" aria-label="Free shipping offer">
     <div class="shipping-banner__track">
       <div class="shipping-banner__group">
-        <span>Free standard shipping on orders of A$60 or more</span><i aria-hidden="true">✦</i>
+        <span>Free standard shipping on orders of A$70 or more</span><i aria-hidden="true">✦</i>
         <span>Australia-wide delivery</span><i aria-hidden="true">✦</i>
       </div>
       <div class="shipping-banner__group" aria-hidden="true">
-        <span>Free standard shipping on orders of A$60 or more</span><i>✦</i>
+        <span>Free standard shipping on orders of A$70 or more</span><i>✦</i>
         <span>Australia-wide delivery</span><i>✦</i>
       </div>
     </div>
@@ -340,7 +340,8 @@
                 <span class="package-option__total"><span>Total</span><strong class="package-option__price">A$59.95</strong><del data-compare-price>A$79.90</del></span>
                 <span class="package-option__benefit" data-save-amount>You save A$19.95</span>
               </button>
-              <button class="package-option" type="button" data-package="3" data-price="74.95" aria-pressed="false">
+              <button class="package-option package-option--sweet-spot" type="button" data-package="3" data-price="74.95" aria-pressed="false">
+                <span class="package-option__badge">Sweet spot</span>
                 <span class="package-option__top">
                   <span class="package-option__count"><strong>3</strong> cards</span>
                   <span class="package-option__saving" data-save-percent>Save 37%</span>
@@ -348,6 +349,13 @@
                 <span class="package-option__unit"><strong data-unit-price>A$24.98</strong><small>per card</small></span>
                 <span class="package-option__total"><span>Total</span><strong class="package-option__price">A$74.95</strong><del data-compare-price>A$119.85</del></span>
                 <span class="package-option__benefit" data-save-amount>You save A$44.90</span>
+                <span class="package-option__inclusions package-option__inclusions--shipping" aria-label="Included with the 3-card bundle">
+                  <span class="package-option__inclusions-title">Included with your bundle</span>
+                  <span class="package-option__inclusion">
+                    <span class="package-option__inclusion-icon" aria-hidden="true">✓</span>
+                    <span><strong>FREE STANDARD SHIPPING</strong><small>Australia-wide</small></span>
+                  </span>
+                </span>
               </button>
               <button class="package-option package-option--value" type="button" data-package="5" data-price="109.95" aria-pressed="false">
                 <span class="package-option__badge">Best value</span>
@@ -358,6 +366,17 @@
                 <span class="package-option__unit"><strong data-unit-price>A$21.99</strong><small>per card</small></span>
                 <span class="package-option__total"><span>Total</span><strong class="package-option__price">A$109.95</strong><del data-compare-price>A$199.75</del></span>
                 <span class="package-option__benefit" data-save-amount>You save A$89.80</span>
+                <span class="package-option__inclusions" aria-label="Included with the 5-card bundle">
+                  <span class="package-option__inclusions-title">Two extras included</span>
+                  <span class="package-option__inclusion">
+                    <span class="package-option__inclusion-icon" aria-hidden="true">✓</span>
+                    <span><strong>FREE STANDARD SHIPPING</strong><small>Australia-wide</small></span>
+                  </span>
+                  <span class="package-option__inclusion">
+                    <span class="package-option__inclusion-icon" aria-hidden="true">+</span>
+                    <span><strong>FREE Counter Stand</strong><small>A$14.49 value</small></span>
+                  </span>
+                </span>
               </button>
             </div>
             <p class="package-comparison" data-package-summary aria-live="polite"><span class="package-comparison__icon" aria-hidden="true">✓</span><span class="package-comparison__copy"><strong>2-card package saves A$19.95</strong> compared with buying two single cards.</span></p>
@@ -789,9 +808,9 @@
         <div class="cart-lines" data-cart-lines></div>
         <section class="cart-upsells" aria-labelledby="upsell-title" data-cart-upsells hidden>
           <div class="cart-upsells__heading"><p class="eyebrow">Optional add-ons</p><h3 id="upsell-title">Add only what you need</h3></div>
-          <article class="upsell-card">
+          <article class="upsell-card" data-upsell-card="stand">
             <img src="assets/products/tapntrust-counter-stand-transparent.webp" alt="Clear acrylic Counter Stand" width="100" height="100">
-            <div><h4>Counter Stand</h4><p>Keep your card upright and visible.</p><strong>A$14.49</strong></div>
+            <div><h4>Counter Stand</h4><p data-upsell-description>Keep your card upright and visible.</p><strong data-upsell-price>A$14.49</strong></div>
             <button type="button" class="button button--small button--secondary" data-upsell-add="stand">Add</button>
           </article>
           <article class="upsell-card upsell-card--special">
@@ -829,6 +848,6 @@
 
   <div class="toast-region" aria-live="polite" aria-atomic="true" data-toast-region></div>
   <noscript><p class="noscript">JavaScript is required to add products to the Shopify cart. You can still read product and policy information.</p></noscript>
-  <script type="module" src="js/app.js"></script>
+  <script type="module" src="js/app.js?v=20260816-3"></script>
 </body>
 </html>
