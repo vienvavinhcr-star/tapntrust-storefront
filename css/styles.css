@@ -231,9 +231,20 @@ h3 { font-size: 1.3rem; }
 .hero__actions .button { width: 100%; min-height: 54px; }
 .hero__actions .button--text { padding: 12px 18px; border: 1px solid #bfd0e4; border-radius: 10px; background: rgba(255,255,255,.72); }
 .hero__actions .button--text:hover { border-color: var(--blue-600); background: #fff; }
-.hero__assurances { display: flex; flex-wrap: wrap; gap: 10px 24px; margin: 0; padding: 0; color: #465670; font-size: 0.9rem; list-style: none; }
+.hero__assurances { display: flex; flex-wrap: wrap; gap: 10px 24px; margin: 0; padding: 0; color: #465670; font-size: .9rem; list-style: none; }
 .hero__assurances li { display: flex; align-items: center; gap: 8px; }
+.verified-check { position: relative; display: block; width: 24px; height: 24px; flex: 0 0 auto; filter: drop-shadow(0 4px 6px rgba(24,119,242,.2)); }
+.verified-check img { display: block; width: 100%; height: 100%; object-fit: contain; }
+.verified-check::after { position: absolute; inset: 0; background: linear-gradient(105deg,transparent 15%,rgba(255,255,255,.92) 45%,transparent 72%); content: ""; opacity: 0; transform: translateX(-140%); animation: verifiedCheckShine 5s ease-in-out infinite; -webkit-mask: url("../assets/icons/verified-badge-blue.png") center / contain no-repeat; mask: url("../assets/icons/verified-badge-blue.png") center / contain no-repeat; }
+.hero__assurances li:nth-child(2) .verified-check::after { animation-delay: .35s; }
 .check { display: grid; width: 20px; height: 20px; place-items: center; border-radius: 50%; color: var(--green-600); background: var(--green-100); font-size: 0.74rem; font-weight: 900; }
+
+@keyframes verifiedCheckShine {
+  0%, 78% { opacity: 0; transform: translateX(-140%); }
+  80% { opacity: 1; }
+  93% { opacity: 1; transform: translateX(140%); }
+  94%, 100% { opacity: 0; transform: translateX(140%); }
+}
 
 .hero__visual { position: relative; margin: 0; }
 .hero__visual > img { position: relative; z-index: 2; width: 100%; filter: drop-shadow(0 24px 36px rgba(6,26,69,.1)); }
@@ -1550,6 +1561,7 @@ h3 { font-size: 1.3rem; }
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+  .verified-check::after { display: none; }
   .reveal-ready [data-reveal] { opacity: 1 !important; transform: none !important; }
   .value-strip__grid > div:active .value-icon, .value-strip__grid > div:active p { transform: none !important; }
   .steps li.is-visible .device--tap, .steps li.is-visible .step__scene--tap::before, .steps li.is-visible .tap-ready::before, .steps li.is-visible .maps-place__stars span, .steps li.is-visible .choice-page__title, .steps li.is-visible .choice-page__button, .steps li.is-visible .nfc-sheet, .steps li.is-visible .maps-place__content, .steps li.is-visible .maps-place__button { animation: none !important; }
