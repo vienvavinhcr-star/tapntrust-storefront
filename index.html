@@ -25,7 +25,7 @@
   <meta name="twitter:title" content="NFC Review Cards for Australian Businesses | Tapntrust">
   <meta name="twitter:description" content="Make it easier for customers to reach your review page with a simple NFC tap.">
   <link rel="icon" href="assets/brand/tapntrust-logo.png" type="image/png">
-  <link rel="stylesheet" href="css/styles.css?v=20260820-4">
+  <link rel="stylesheet" href="css/styles.css?v=20260823-4">
 </head>
 <body>
   <a class="skip-link" href="#main-content">Skip to main content</a>
@@ -88,8 +88,8 @@
             <a class="button button--text" href="#how-it-works">See how it works <span aria-hidden="true">→</span></a>
           </div>
           <ul class="hero__assurances" aria-label="Purchase assurances">
-            <li><span class="check" aria-hidden="true">✓</span> Programmed for your business</li>
-            <li><span class="check" aria-hidden="true">✓</span> Secure Shopify checkout</li>
+            <li><span class="verified-check" aria-hidden="true"><img src="assets/icons/verified-badge-blue.png" alt="" width="24" height="24"></span>Programmed for your business</li>
+            <li><span class="verified-check" aria-hidden="true"><img src="assets/icons/verified-badge-blue.png" alt="" width="24" height="24"></span>Secure Shopify checkout</li>
           </ul>
         </div>
         <figure class="hero__visual">
@@ -328,36 +328,36 @@
 
           <fieldset class="package-fieldset">
             <legend>Choose a card package</legend>
-            <p class="package-fieldset__intro">Savings are compared with the A$39.95 single-card price.</p>
-            <div class="package-grid" data-package-grid>
+            <p class="package-fieldset__intro">Savings are compared with the standard A$69.95 per-card price.</p>
+            <div class="package-grid" data-package-grid data-standard-unit-price="69.95">
               <button class="package-option" type="button" data-package="1" data-price="39.95" aria-pressed="false">
                 <span class="package-option__top">
                   <span class="package-option__count"><strong>1</strong> card</span>
-                  <span class="package-option__saving" data-save-percent>Standard price</span>
+                  <span class="package-option__saving" data-save-percent>Save 43%</span>
                 </span>
                 <span class="package-option__unit"><strong data-unit-price>A$39.95</strong><small>per card</small></span>
-                <span class="package-option__total"><span>Total</span><strong class="package-option__price">A$39.95</strong><del data-compare-price hidden></del></span>
-                <span class="package-option__benefit" data-save-amount>Single-card price</span>
+                <span class="package-option__total"><span>Total</span><strong class="package-option__price">A$39.95</strong><del data-compare-price>A$69.95</del></span>
+                <span class="package-option__benefit" data-save-amount>You save A$30.00</span>
               </button>
               <button class="package-option is-selected" type="button" data-package="2" data-price="59.95" aria-pressed="true">
                 <span class="package-option__badge">Starter bundle</span>
                 <span class="package-option__top">
                   <span class="package-option__count"><strong>2</strong> cards</span>
-                  <span class="package-option__saving" data-save-percent>Save 25%</span>
+                  <span class="package-option__saving" data-save-percent>Save 57%</span>
                 </span>
                 <span class="package-option__unit"><strong data-unit-price>A$29.98</strong><small>per card</small></span>
-                <span class="package-option__total"><span>Total</span><strong class="package-option__price">A$59.95</strong><del data-compare-price>A$79.90</del></span>
-                <span class="package-option__benefit" data-save-amount>You save A$19.95</span>
+                <span class="package-option__total"><span>Total</span><strong class="package-option__price">A$59.95</strong><del data-compare-price>A$139.90</del></span>
+                <span class="package-option__benefit" data-save-amount>You save A$79.95</span>
               </button>
               <button class="package-option package-option--sweet-spot" type="button" data-package="3" data-price="74.95" aria-pressed="false">
                 <span class="package-option__badge">Sweet spot</span>
                 <span class="package-option__top">
                   <span class="package-option__count"><strong>3</strong> cards</span>
-                  <span class="package-option__saving" data-save-percent>Save 37%</span>
+                  <span class="package-option__saving" data-save-percent>Save 64%</span>
                 </span>
                 <span class="package-option__unit"><strong data-unit-price>A$24.98</strong><small>per card</small></span>
-                <span class="package-option__total"><span>Total</span><strong class="package-option__price">A$74.95</strong><del data-compare-price>A$119.85</del></span>
-                <span class="package-option__benefit" data-save-amount>You save A$44.90</span>
+                <span class="package-option__total"><span>Total</span><strong class="package-option__price">A$74.95</strong><del data-compare-price>A$209.85</del></span>
+                <span class="package-option__benefit" data-save-amount>You save A$134.90</span>
                 <span class="package-option__inclusions package-option__inclusions--shipping" aria-label="Included with the 3-card bundle">
                   <span class="package-option__inclusions-title">Included with your bundle</span>
                   <span class="package-option__inclusion">
@@ -370,11 +370,11 @@
                 <span class="package-option__badge">Best value</span>
                 <span class="package-option__top">
                   <span class="package-option__count"><strong>5</strong> cards</span>
-                  <span class="package-option__saving" data-save-percent>Save 45%</span>
+                  <span class="package-option__saving" data-save-percent>Save 69%</span>
                 </span>
                 <span class="package-option__unit"><strong data-unit-price>A$21.99</strong><small>per card</small></span>
-                <span class="package-option__total"><span>Total</span><strong class="package-option__price">A$109.95</strong><del data-compare-price>A$199.75</del></span>
-                <span class="package-option__benefit" data-save-amount>You save A$89.80</span>
+                <span class="package-option__total"><span>Total</span><strong class="package-option__price">A$109.95</strong><del data-compare-price>A$349.75</del></span>
+                <span class="package-option__benefit" data-save-amount>You save A$239.80</span>
                 <span class="package-option__inclusions" aria-label="Included with the 5-card bundle">
                   <span class="package-option__inclusions-title">Two extras included</span>
                   <span class="package-option__inclusion">
@@ -388,7 +388,7 @@
                 </span>
               </button>
             </div>
-            <p class="package-comparison" data-package-summary aria-live="polite"><span class="package-comparison__icon" aria-hidden="true">✓</span><span class="package-comparison__copy"><strong>2-card package saves A$19.95</strong> compared with buying two single cards.</span></p>
+            <p class="package-comparison" data-package-summary aria-live="polite"><span class="package-comparison__icon" aria-hidden="true">✓</span><span class="package-comparison__copy"><strong>2-card package saves A$79.95</strong> compared with the standard A$69.95 per-card price.</span></p>
           </fieldset>
 
           <form class="personalisation-form" data-product-form novalidate>
@@ -884,6 +884,6 @@
 
   <div class="toast-region" aria-live="polite" aria-atomic="true" data-toast-region></div>
   <noscript><p class="noscript">JavaScript is required to add products to the Shopify cart. You can still read product and policy information.</p></noscript>
-  <script type="module" src="js/app.js?v=20260816-3"></script>
+  <script type="module" src="js/app.js?v=20260823-1"></script>
 </body>
 </html>
