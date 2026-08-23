@@ -167,14 +167,14 @@ function initialiseMetadata() {
     "@graph": [
       {
         "@type": "Organization",
-        name: "TapNTrust",
+        name: "Tapntrust",
         ...(siteUrl ? { url: `${siteUrl}/`, logo: `${siteUrl}/assets/brand/tapntrust-logo.png` } : {})
       },
       {
         "@type": "Product",
-        name: "TapNTrust NFC Review Card",
+        name: "Tapntrust NFC Review Card",
         description: "A 12 × 12 cm NFC review card programmed for the business location selected by the customer.",
-        brand: { "@type": "Brand", name: "TapNTrust" },
+        brand: { "@type": "Brand", name: "Tapntrust" },
         ...(siteUrl ? { image: `${siteUrl}/assets/products/tapntrust-nfc-card-transparent.webp` } : {}),
         offers: [
           { "@type": "Offer", name: "1 Card", price: "39.95", priceCurrency: "AUD", availability: "https://schema.org/InStock" },
@@ -224,24 +224,26 @@ function updatePackageValueDisplay() {
   const options = [...document.querySelectorAll("[data-package]")];
   const singleOption = options.find((option) => Number(option.dataset.package) === 1);
   const singlePrice = Number(singleOption?.dataset.price || 0);
-  if (!singlePrice) return;
+  const packageGrid = document.querySelector("[data-package-grid]");
+  const standardUnitPrice = Number(packageGrid?.dataset.standardUnitPrice || singlePrice);
+  if (!singlePrice || !standardUnitPrice) return;
 
   options.forEach((option) => {
     const count = Number(option.dataset.package);
     const price = Number(option.dataset.price || 0);
     const currency = option.dataset.currency || "AUD";
     const unitPrice = price / count;
-    const regularTotal = singlePrice * count;
+    const regularTotal = standardUnitPrice * count;
     const saving = Math.max(0, regularTotal - price);
     const savingPercent = Math.round((saving / regularTotal) * 100);
     const comparePrice = option.querySelector("[data-compare-price]");
 
     setText("[data-unit-price]", formatMoney(unitPrice, currency), option);
-    setText("[data-save-percent]", count === 1 ? "Standard price" : `Save ${savingPercent}%`, option);
-    setText("[data-save-amount]", count === 1 ? "Single-card price" : `You save ${formatMoney(saving, currency)}`, option);
+    setText("[data-save-percent]", `Save ${savingPercent}%`, option);
+    setText("[data-save-amount]", `You save ${formatMoney(saving, currency)}`, option);
     if (comparePrice) {
-      comparePrice.hidden = count === 1;
-      comparePrice.textContent = count === 1 ? "" : formatMoney(regularTotal, currency);
+      comparePrice.hidden = saving <= 0;
+      comparePrice.textContent = saving > 0 ? formatMoney(regularTotal, currency) : "";
     }
   });
 
@@ -249,16 +251,18 @@ function updatePackageValueDisplay() {
   const summary = document.querySelector("[data-package-summary]");
   if (!selected || !summary) return;
   const price = Number(selected.dataset.price || 0);
-  const regularTotal = singlePrice * selectedPackage;
+  const currency = selected.dataset.currency || "AUD";
+  const regularTotal = standardUnitPrice * selectedPackage;
   const saving = Math.max(0, regularTotal - price);
+  const standardPriceLabel = formatMoney(standardUnitPrice, currency);
   if (selectedPackage === 1) {
-    summary.innerHTML = '<span class="package-comparison__icon" aria-hidden="true">✓</span><span class="package-comparison__copy"><strong>Single-card package selected.</strong></span>';
+    summary.innerHTML = `<span class="package-comparison__icon" aria-hidden="true">✓</span><span class="package-comparison__copy"><strong>1-card package saves ${formatMoney(saving, currency)}</strong> compared with the ${standardPriceLabel} standard price.</span>`;
   } else if (selectedPackage === 3) {
-    summary.innerHTML = `<span class="package-comparison__icon" aria-hidden="true">✓</span><span class="package-comparison__copy"><strong>3-card package saves ${formatMoney(saving)}</strong> and includes free standard shipping Australia-wide.</span>`;
+    summary.innerHTML = `<span class="package-comparison__icon" aria-hidden="true">✓</span><span class="package-comparison__copy"><strong>3-card package saves ${formatMoney(saving, currency)}</strong> and includes free standard shipping Australia-wide.</span>`;
   } else if (selectedPackage === 5) {
-    summary.innerHTML = `<span class="package-comparison__icon" aria-hidden="true">✓</span><span class="package-comparison__copy"><strong>5-card package saves ${formatMoney(saving)}</strong> with free standard shipping and a free A$14.49 Counter Stand included.</span>`;
+    summary.innerHTML = `<span class="package-comparison__icon" aria-hidden="true">✓</span><span class="package-comparison__copy"><strong>5-card package saves ${formatMoney(saving, currency)}</strong> with free standard shipping and a free A$14.49 Counter Stand included.</span>`;
   } else {
-    summary.innerHTML = `<span class="package-comparison__icon" aria-hidden="true">✓</span><span class="package-comparison__copy"><strong>${selectedPackage}-card package saves ${formatMoney(saving)}</strong> compared with buying ${selectedPackage} single cards.</span>`;
+    summary.innerHTML = `<span class="package-comparison__icon" aria-hidden="true">✓</span><span class="package-comparison__copy"><strong>${selectedPackage}-card package saves ${formatMoney(saving, currency)}</strong> compared with the ${standardPriceLabel} standard per-card price.</span>`;
   }
 }
 
@@ -470,7 +474,7 @@ function createCartLine(line, currency) {
   imageWrap.className = "cart-line__image";
   const image = document.createElement("img");
   image.src = line.image || "assets/products/tapntrust-nfc-card-transparent.webp";
-  image.alt = line.imageAlt || "TapNTrust product";
+  image.alt = line.imageAlt || "Tapntrust product";
   image.loading = "lazy";
   imageWrap.append(image);
 
@@ -529,7 +533,7 @@ function createCartLine(line, currency) {
 
     if (line.kind === "stand") {
       noteTitle.textContent = "Optional clear acrylic display";
-      noteText.textContent = "Keeps your TapNTrust card upright, stable and easy to notice on the counter.";
+      noteText.textContent = "Keeps your Tapntrust card upright, stable and easy to notice on the counter.";
     } else {
       noteTitle.textContent = "Extra card for your selected location";
       noteText.textContent = "Programmed with the same business and Google review link as your card package.";
@@ -898,7 +902,7 @@ function initialiseConsultationForm({ toast }) {
         return;
       }
 
-      const subject = `TapNTrust enquiry from ${String(payload.name || "customer").trim()}`;
+      const subject = `Tapntrust enquiry from ${String(payload.name || "customer").trim()}`;
       const body = [
         `Name: ${String(payload.name || "").trim()}`,
         `Phone: ${String(payload.phone || "").trim()}`,
@@ -934,7 +938,7 @@ function initialiseConsultationForm({ toast }) {
       });
       if (!response.ok) throw new Error("Consultation request failed");
       form.reset();
-      setStatus("Thanks — your request has been sent. TapNTrust will contact you soon.", "success");
+      setStatus("Thanks — your request has been sent. Tapntrust will contact you soon.", "success");
       toast("Consultation request sent");
     } catch {
       setStatus("We couldn’t send your request. Please use a contact option below.", "error");
