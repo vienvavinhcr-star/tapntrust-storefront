@@ -3,6 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="canonical" href="https://tapntrust.com/">
   <!-- Google tag (gtag.js) -->
   <script async src="https://www.googletagmanager.com/gtag/js?id=G-0MT4JK9R04"></script>
   <script>
@@ -889,7 +890,24 @@
   <script type="module" src="js/app.js?v=20260823-1"></script>
 
   <div id="soro-blog"></div>
-<script src="https://app.trysoro.com/api/embed/134f0823-6626-4c9d-90dc-5d5d6c192c03" defer></script>
+  <script src="https://app.trysoro.com/api/embed/134f0823-6626-4c9d-90dc-5d5d6c192c03" defer></script>
+  <script>
+    (() => {
+      const keepOneCanonical = () => {
+        const canonicals = [...document.head.querySelectorAll('link[rel="canonical"]')];
+        if (canonicals.length < 2) return;
+
+        const preferred = canonicals.find((link) => link.dataset.soro === 'true') || canonicals[0];
+        canonicals.forEach((link) => {
+          if (link !== preferred) link.remove();
+        });
+      };
+
+      new MutationObserver(keepOneCanonical).observe(document.head, { childList: true });
+      document.addEventListener('DOMContentLoaded', keepOneCanonical);
+      window.addEventListener('load', keepOneCanonical);
+    })();
+  </script>
   
 </body>
 </html>
