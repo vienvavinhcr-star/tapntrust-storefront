@@ -9,6 +9,56 @@ let selectedPackage = 2;
 let lastFocusedElement = null;
 let businessFinderController = null;
 let editingBusinessLineId = null;
+let lastMetaBusinessPlaceId = "";
+
+function trackMetaEvent(eventName, parameters = {}) {
+  if (typeof window.fbq !== "function") return false;
+  try {
+    window.fbq("track", eventName, parameters);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function packageMetaParameters(packageCount = selectedPackage) {
+  const option = document.querySelector(`[data-package="${Number(packageCount)}"]`);
+  const value = Number(option?.dataset.price || 0);
+  const currency = option?.dataset.currency || "AUD";
+  return {
+    content_name: "Tapntrust NFC Review Card",
+    content_category: `${Number(packageCount)}-card package`,
+    content_type: "product",
+    currency,
+    value,
+    num_items: 1
+  };
+}
+
+function upsellMetaParameters(kind) {
+  const product = cartActions.getState().catalog?.[kind];
+  const variant = product?.variants?.[0];
+  return {
+    content_name: product?.title || (kind === "stand" ? "Tapntrust Counter Stand" : "Tapntrust Extra NFC Card"),
+    content_category: kind === "stand" ? "Counter stand" : "Extra NFC card",
+    content_type: "product",
+    currency: variant?.currency || "AUD",
+    value: Number(variant?.price || 0),
+    num_items: 1
+  };
+}
+
+function initialiseMetaCommerceEvents() {
+  const oneCard = document.querySelector('[data-package="1"]');
+  trackMetaEvent("ViewContent", {
+    content_name: "Tapntrust NFC Review Card",
+    content_category: "NFC Review Card",
+    content_type: "product",
+    currency: oneCard?.dataset.currency || "AUD",
+    value: Number(oneCard?.dataset.price || 39.95)
+  });
+
+}
 
 function formatMoney(value, currency = "AUD") {
   if (currency === "AUD") return money.format(Number(value || 0)).replace("$", "A$");
@@ -190,7 +240,7 @@ function initialiseMetadata() {
   script.textContent = JSON.stringify(structuredData);
   document.head.append(script);
 
-  if (/^\d+$/.test(String(config.META_PIXEL_ID || ""))) {
+  if (/^\d+$/.test(String(config.META_PIXEL_ID || "")) && typeof window.fbq !== "function") {
     const fbq = function (...args) { fbq.callMethod ? fbq.callMethod(...args) : fbq.queue.push(args); };
     fbq.queue = [];
     fbq.loaded = true;
@@ -349,7 +399,21 @@ function initialiseProductForm() {
   businessFinderController = initialiseBusinessFinder({
     root: finderRoot,
     apiKey: config.GOOGLE_MAPS_API_KEY,
-    onChange: () => { form.querySelector('[data-error-for="businessDetails"]').textContent = ""; }
+    onChange: (details = {}) => {
+      form.querySelector('[data-error-for="businessDetails"]').textContent = "";
+      if (
+        details.mode === "selected"
+        && details.googlePlaceId
+        && !editingBusinessLineId
+        && details.googlePlaceId !== lastMetaBusinessPlaceId
+      ) {
+        lastMetaBusinessPlaceId = details.googlePlaceId;
+        trackMetaEvent("Search", {
+          content_category: "Business location lookup",
+          search_string: "Google business location"
+        });
+      }
+    }
   });
 
   urlInput.addEventListener("input", () => {
@@ -375,6 +439,7 @@ function initialiseProductForm() {
         button.dataset.editingBusiness = "false";
       } else {
         await cartActions.addMainPackage({ packageCount: selectedPackage, ...values });
+        trackMetaEvent("AddToCart", packageMetaParameters(selectedPackage));
         status.textContent = "Added to your cart.";
       }
       openCart();
@@ -733,6 +798,7 @@ function initialiseCartUi() {
     button.textContent = "Adding…";
     try {
       await cartActions.addUpsell(button.dataset.upsellAdd);
+      trackMetaEvent("AddToCart", upsellMetaParameters(button.dataset.upsellAdd));
       toast(button.dataset.upsellAdd === "stand" ? "Counter Stand added." : "Extra NFC Card added with the same business details.");
     } catch (error) {
       button.disabled = false;
@@ -1169,6 +1235,7 @@ initialiseBrandAssets();
 initialiseNavigation();
 initialiseProductViewer();
 initialiseMetadata();
+initialiseMetaCommerceEvents();
 initialiseProductForm();
 initialiseCartUi();
 initialiseMobileBuyBar();
