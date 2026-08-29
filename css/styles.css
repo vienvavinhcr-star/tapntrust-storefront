@@ -30,11 +30,16 @@
 *, *::before, *::after { box-sizing: border-box; }
 
 html {
+  max-width: 100%;
+  overflow-x: hidden;
+  overscroll-behavior-x: none;
   scroll-behavior: smooth;
   scroll-padding-top: calc(var(--header-height) + 24px);
 }
 
 body {
+  max-width: 100%;
+  overflow-x: hidden;
   margin: 0;
   color: var(--ink);
   background: var(--surface);
@@ -43,6 +48,10 @@ body {
   line-height: 1.6;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
+}
+
+@supports (overflow: clip) {
+  html, body { overflow-x: clip; }
 }
 
 body.is-locked { overflow: hidden; }
