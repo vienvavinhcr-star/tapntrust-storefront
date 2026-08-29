@@ -1,3 +1,5 @@
+import { shortestGoogleReviewUrl } from "./google-review.js";
+
 const AUSTRALIA_BIAS = Object.freeze({
   north: -9,
   south: -44,
@@ -14,11 +16,15 @@ function textValue(value) {
 
 export function placeToBusinessDetails(place = {}) {
   const links = place.googleMapsLinks || {};
+  const googlePlaceId = textValue(place.id).trim();
   return {
     businessName: textValue(place.displayName).trim(),
     businessAddress: textValue(place.formattedAddress || place.shortFormattedAddress).trim(),
-    googlePlaceId: textValue(place.id).trim(),
-    reviewUrl: textValue(links.writeAReviewURI).trim(),
+    googlePlaceId,
+    reviewUrl: shortestGoogleReviewUrl({
+      placeId: googlePlaceId,
+      directReviewUrl: textValue(links.writeAReviewURI)
+    }),
     googleMapsUrl: textValue(place.googleMapsURI || links.placeURI).trim(),
     category: textValue(place.primaryTypeDisplayName).trim(),
     reviewLinkStatus: "Ready",
