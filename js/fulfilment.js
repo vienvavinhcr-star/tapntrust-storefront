@@ -1,4 +1,5 @@
 import { validHttpsUrl } from "./validation.js";
+import { shortestGoogleReviewUrl } from "./google-review.js";
 
 export const FULFILMENT_KEYS = Object.freeze({
   businessName: "_Business Name",
@@ -51,11 +52,15 @@ export function businessDetailsFromAttributes(attributes = {}) {
 
 export function validateBusinessDetails(details = {}) {
   const source = clean(details.reviewLinkSource || (details.googlePlaceId ? "Google Places" : "Manual"));
+  const googlePlaceId = clean(details.googlePlaceId);
+  const suppliedReviewUrl = clean(details.reviewUrl);
   const normalised = {
     businessName: clean(details.businessName),
     businessAddress: clean(details.businessAddress),
-    googlePlaceId: clean(details.googlePlaceId),
-    reviewUrl: clean(details.reviewUrl),
+    googlePlaceId,
+    reviewUrl: source === "Google Places"
+      ? shortestGoogleReviewUrl({ placeId: googlePlaceId, directReviewUrl: suppliedReviewUrl })
+      : suppliedReviewUrl,
     googleMapsUrl: clean(details.googleMapsUrl),
     reviewLinkStatus: clean(details.reviewLinkStatus) || "Ready",
     reviewLinkSource: source
