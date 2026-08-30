@@ -81,7 +81,7 @@ function ensureStyles() {
   if (document.querySelector('link[data-welcome-offer-styles]')) return;
   const link = document.createElement("link");
   link.rel = "stylesheet";
-  link.href = "css/welcome-offer.css?v=20260831-2";
+  link.href = "css/welcome-offer.css?v=20260831-3";
   link.dataset.welcomeOfferStyles = "";
   document.head.append(link);
 }
@@ -118,16 +118,15 @@ function markup(discountCode, discountPercent) {
         </div>
         <div class="welcome-offer__success" data-welcome-success hidden>
           <span class="welcome-offer__success-mark" aria-hidden="true">✓</span>
-          <p class="welcome-offer__kicker">10% OFF UNLOCKED</p>
-          <h2>Your welcome code is ready</h2>
-          <p>Copy your code now and use it at Shopify Checkout.</p>
+          <p class="welcome-offer__kicker">${discountPercent}% OFF UNLOCKED</p>
+          <h2>Your discount code is ready</h2>
+          <p>Copy this code and enter it at checkout to get ${discountPercent}% off.</p>
           <div class="welcome-offer__code-row">
             <strong data-welcome-code>${discountCode}</strong>
             <button type="button" data-welcome-copy>Copy code</button>
           </div>
-          <p class="welcome-offer__checkout-note"><strong>At checkout:</strong> paste <strong>${discountCode}</strong> into the “Discount code” box. Shopify will apply ${discountPercent}% off when the code is accepted.</p>
           <p class="welcome-offer__copy-status" role="status" aria-live="polite" data-welcome-copy-status></p>
-          <button class="welcome-offer__shop" type="button" data-welcome-shop>Shop with ${discountPercent}% off</button>
+          <button class="welcome-offer__shop" type="button" data-welcome-shop>Continue shopping</button>
         </div>
       </div>
     </section>`;
@@ -213,7 +212,7 @@ export function initialiseWelcomeOffer(config = {}) {
     }, options);
   }
 
-  form?.addEventListener("submit", async (event) => {
+  form?.addEventListener("submit", (event) => {
     event.preventDefault();
     const honeypot = String(new FormData(form).get("company") || "").trim();
     if (honeypot) return;
@@ -227,30 +226,21 @@ export function initialiseWelcomeOffer(config = {}) {
     }
 
     emailInput?.removeAttribute("aria-invalid");
-    status.textContent = "Saving your welcome offer…";
-    const submit = form.querySelector('button[type="submit"]');
-    if (submit) submit.disabled = true;
     const signupAt = nowIso();
-    const sent = await postEvent(endpoint, {
-      ...payloadBase(email),
-      event: "signup",
-      occurredAt: signupAt,
-      discountCode,
-      discountPercent
-    });
-
-    if (!sent) {
-      status.textContent = "We couldn’t save your email. Please try again.";
-      if (submit) submit.disabled = false;
-      return;
-    }
-
     storageSet(STORAGE.email, email);
     storageSet(STORAGE.signupAt, signupAt);
     status.textContent = "";
     formPanel.hidden = true;
     successPanel.hidden = false;
     root.querySelector("[data-welcome-copy]")?.focus();
+
+    void postEvent(endpoint, {
+      ...payloadBase(email),
+      event: "signup",
+      occurredAt: signupAt,
+      discountCode,
+      discountPercent
+    });
   });
 
   root.querySelectorAll("[data-welcome-close], [data-welcome-backdrop]").forEach((element) => element.addEventListener("click", close));
@@ -266,9 +256,9 @@ export function initialiseWelcomeOffer(config = {}) {
   root.querySelector("[data-welcome-copy]")?.addEventListener("click", async () => {
     try {
       await navigator.clipboard.writeText(discountCode);
-      copyStatus.textContent = `${discountCode} copied — paste it into the Discount code box at checkout.`;
+      copyStatus.textContent = `${discountCode} copied. Enter it at checkout for ${discountPercent}% off.`;
     } catch {
-      copyStatus.textContent = `Copy this code for checkout: ${discountCode}`;
+      copyStatus.textContent = `Your checkout code is ${discountCode}.`;
     }
   });
 
