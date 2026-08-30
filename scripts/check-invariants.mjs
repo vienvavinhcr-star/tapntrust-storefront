@@ -2,6 +2,7 @@
 
 import fs from "node:fs";
 import path from "node:path";
+import { spawnSync } from "node:child_process";
 
 const root = process.cwd();
 const CANONICAL_META_PIXEL_ID = "2121538478429149";
@@ -49,9 +50,12 @@ function walk(dir, collected = []) {
 
 const config = read("js/config.js");
 const app = read("js/app.js");
+const appCompat = read("js/app.min.js");
+const meta = read("js/analytics/meta.js");
 const cart = read("js/cart.js");
 const shopify = read("js/shopify.js");
 const fulfilment = read("js/fulfilment.js");
+const cartUi = read("js/ui/cart-drawer.js");
 
 // 1. Product handles are stable.
 for (const [key, expected] of Object.entries(EXPECTED_HANDLES)) {
@@ -101,8 +105,10 @@ assert(
   `duplicate Meta Pixel bootstrap found: ${duplicateBootstrap.join(", ")}`
 );
 
-// 5. GitHub storefront must never claim a completed Meta Purchase.
 const jsFiles = walk(path.join(root, "js")).filter((file) => file.endsWith(".js"));
+const publicJs = jsFiles.map((file) => fs.readFileSync(file, "utf8")).join("\n");
+
+// 5. GitHub storefront must never claim a completed Meta Purchase.
 const purchaseEmitters = [];
 for (const file of jsFiles) {
   const text = fs.readFileSync(file, "utf8");
@@ -116,16 +122,16 @@ assert(
   `frontend Meta Purchase emitter found in: ${purchaseEmitters.join(", ")}`
 );
 
-// 6. Pixel fallback in app.js remains guarded against a duplicate bootstrap.
+// 6. Pixel fallback remains guarded against a duplicate bootstrap.
 assert(
-  /typeof window\.fbq !== ["']function["']/.test(app),
-  "app.js Pixel fallback is guarded by existing window.fbq",
-  "app.js Pixel initialization lost its duplicate-bootstrap guard"
+  /typeof window\.fbq === ["']function["']/.test(meta),
+  "Meta Pixel fallback is guarded by existing window.fbq",
+  "Meta Pixel initialization lost its duplicate-bootstrap guard"
 );
 
 // 7. Shopify checkout remains sourced from Shopify cart.checkoutUrl.
 assert(
-  /checkoutUrl\s*:\s*cart\.checkoutUrl/.test(cart) && /checkout\.href\s*=\s*cart\.checkoutUrl/.test(app),
+  /checkoutUrl\s*:\s*cart\.checkoutUrl/.test(cart) && /checkout\.href\s*=\s*cart\.checkoutUrl/.test(cartUi),
   "checkout CTA remains sourced from Shopify cart.checkoutUrl",
   "Shopify checkoutUrl wiring changed or cannot be verified"
 );
@@ -147,7 +153,6 @@ assert(
 );
 
 // 10. Shopify transport remains Storefront cart based; no Admin secret marker should appear in public JS.
-const publicJs = jsFiles.map((file) => fs.readFileSync(file, "utf8")).join("\n");
 assert(
   !/(shpat_|shopify[_-]?admin[_-]?token|admin[_-]?api[_-]?access[_-]?token)/i.test(publicJs),
   "no obvious Shopify Admin/private token marker is present in public JavaScript",
@@ -157,6 +162,40 @@ assert(
   /cartCreate|cartLinesAdd|cartLinesUpdate|cartLinesRemove/.test(shopify),
   "Shopify Storefront cart operations remain present",
   "expected Shopify Storefront cart operations cannot be verified"
+);
+
+// 11. The legacy production entry is only a compatibility shim, so app.js is the source of truth.
+assert(
+  /import\s+["']\.\/app\.js["']/.test(appCompat) && appCompat.length < 250,
+  "app.min.js is a thin compatibility shim to canonical app.js",
+  "app.min.js has become a second storefront implementation"
+);
+
+// 12. The app entry delegates large UI concerns to modules.
+const requiredImports = [
+  "./analytics/meta.js",
+  "./ui/cart-drawer.js",
+  "./ui/site.js",
+  "./ui/guide.js",
+  "./forms/consultation.js",
+  "./metadata.js"
+];
+assert(
+  requiredImports.every((modulePath) => app.includes(modulePath)),
+  "app.js delegates analytics, cart UI, site UI, guide, form and metadata concerns",
+  "app.js modular routing is incomplete"
+);
+
+// 13. Every JavaScript file parses successfully in Node.
+const syntaxFailures = [];
+for (const file of jsFiles) {
+  const result = spawnSync(process.execPath, ["--check", file], { encoding: "utf8" });
+  if (result.status !== 0) syntaxFailures.push(`${path.relative(root, file)}: ${(result.stderr || result.stdout || "syntax error").trim()}`);
+}
+assert(
+  syntaxFailures.length === 0,
+  "all JavaScript files pass node --check",
+  `JavaScript syntax failures: ${syntaxFailures.join(" | ")}`
 );
 
 console.log("Tapntrust invariant check\n");
