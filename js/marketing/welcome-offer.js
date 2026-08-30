@@ -19,14 +19,22 @@ function storageSet(key, value) {
   try { localStorage.setItem(key, String(value)); } catch { /* Optional browser storage. */ }
 }
 
+function storageRemove(key) {
+  try { localStorage.removeItem(key); } catch { /* Optional browser storage. */ }
+}
+
 function nowIso() {
   return new Date().toISOString();
+}
+
+function createVisitorId() {
+  return globalThis.crypto?.randomUUID?.() || `visitor-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
 function visitorId() {
   const existing = storageGet(STORAGE.visitorId);
   if (existing) return existing;
-  const created = globalThis.crypto?.randomUUID?.() || `visitor-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  const created = createVisitorId();
   storageSet(STORAGE.visitorId, created);
   return created;
 }
@@ -141,7 +149,6 @@ export function initialiseWelcomeOffer(config = {}) {
   if (!endpoint) return;
   const discountCode = String(config.WELCOME_DISCOUNT_CODE || "WELCOMETNT").trim().toUpperCase();
   const discountPercent = Number(config.WELCOME_DISCOUNT_PERCENT || 10);
-  const delayMs = Math.max(0, Number(config.WELCOME_POPUP_DELAY_MS || 10000));
   const cooldownDays = Math.max(1, Number(config.WELCOME_POPUP_COOLDOWN_DAYS || 14));
   const cooldownMs = cooldownDays * 24 * 60 * 60 * 1000;
 
@@ -155,8 +162,6 @@ export function initialiseWelcomeOffer(config = {}) {
   const successPanel = root.querySelector("[data-welcome-success]");
   const copyStatus = root.querySelector("[data-welcome-copy-status]");
   let lastFocused = null;
-  let lastCartQuantity = 0;
-  let hasCartBaseline = false;
 
   function close() {
     root.classList.remove("is-open");
@@ -184,22 +189,12 @@ export function initialiseWelcomeOffer(config = {}) {
     return !shownAt || Date.now() - shownAt >= cooldownMs;
   }
 
-  function storefrontModalIsOpen() {
-    return Boolean(document.querySelector(".cart-drawer.is-open, .guide-modal.is-open"));
-  }
-
-  function attemptOpen() {
-    if (!eligibleToShow()) return;
-    if (document.visibilityState !== "visible" || storefrontModalIsOpen()) {
-      window.setTimeout(attemptOpen, 1000);
-      return;
-    }
-    open();
-  }
-
-  function scheduleOpen() {
-    if (!eligibleToShow()) return;
-    window.setTimeout(attemptOpen, delayMs);
+  function startLeadCycle(addToCartAt) {
+    storageSet(STORAGE.visitorId, createVisitorId());
+    storageSet(STORAGE.addToCartAt, addToCartAt || nowIso());
+    storageRemove(STORAGE.email);
+    storageRemove(STORAGE.signupAt);
+    storageRemove(STORAGE.checkoutAt);
   }
 
   async function recordAction(eventName, occurredAt, options = {}) {
@@ -211,6 +206,14 @@ export function initialiseWelcomeOffer(config = {}) {
       occurredAt
     }, options);
   }
+
+  document.addEventListener("tapntrust:welcome-offer-eligible", (event) => {
+    if (!eligibleToShow()) return;
+    const addToCartAt = String(event.detail?.occurredAt || nowIso());
+    startLeadCycle(addToCartAt);
+    event.preventDefault();
+    open();
+  });
 
   form?.addEventListener("submit", (event) => {
     event.preventDefault();
@@ -236,6 +239,7 @@ export function initialiseWelcomeOffer(config = {}) {
 
     void postEvent(endpoint, {
       ...payloadBase(email),
+      checkoutAt: "",
       event: "signup",
       occurredAt: signupAt,
       discountCode,
@@ -262,36 +266,15 @@ export function initialiseWelcomeOffer(config = {}) {
     }
   });
 
-  root.querySelector("[data-welcome-shop]")?.addEventListener("click", () => {
-    close();
-    window.setTimeout(() => document.querySelector("#shop")?.scrollIntoView({ behavior: "smooth", block: "start" }), 240);
-  });
-
-  document.addEventListener("tapntrust:cart-change", (event) => {
-    const quantity = Number(event.detail?.cart?.totalQuantity || 0);
-    if (!hasCartBaseline) {
-      hasCartBaseline = true;
-      lastCartQuantity = quantity;
-      return;
-    }
-
-    if (quantity > lastCartQuantity && !storageGet(STORAGE.addToCartAt)) {
-      const occurredAt = nowIso();
-      storageSet(STORAGE.addToCartAt, occurredAt);
-      recordAction("add_to_cart", occurredAt);
-    }
-    lastCartQuantity = quantity;
-  });
+  root.querySelector("[data-welcome-shop]")?.addEventListener("click", close);
 
   document.addEventListener("click", (event) => {
     if (!(event.target instanceof Element)) return;
     const checkout = event.target.closest("[data-checkout]");
     if (!checkout || checkout.getAttribute("aria-disabled") === "true") return;
-    if (storageGet(STORAGE.checkoutAt)) return;
+    if (!storageGet(STORAGE.email) || storageGet(STORAGE.checkoutAt)) return;
     const occurredAt = nowIso();
     storageSet(STORAGE.checkoutAt, occurredAt);
     recordAction("checkout", occurredAt, { beacon: true });
   }, { capture: true });
-
-  scheduleOpen();
 }
