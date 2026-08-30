@@ -3,6 +3,6 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "check": "node scripts/check-invariants.mjs"
+    "check": "node scripts/check-imports.mjs && node scripts/check-invariants.mjs"
   }
 }
