@@ -138,6 +138,7 @@ export function initialiseWelcomeOffer(config = {}) {
   if (!document.querySelector("[data-product-form]") || document.querySelector("[data-welcome-dialog]")) return;
 
   const endpoint = endpointFromConfig(config);
+  if (!endpoint) return;
   const discountCode = String(config.WELCOME_DISCOUNT_CODE || "WELCOMETNT").trim().toUpperCase();
   const discountPercent = Number(config.WELCOME_DISCOUNT_PERCENT || 10);
   const delayMs = Math.max(0, Number(config.WELCOME_POPUP_DELAY_MS || 10000));
@@ -221,11 +222,6 @@ export function initialiseWelcomeOffer(config = {}) {
       status.textContent = "Enter a valid email address.";
       emailInput?.setAttribute("aria-invalid", "true");
       emailInput?.focus();
-      return;
-    }
-
-    if (!endpoint) {
-      status.textContent = "Email signup is being connected. Please try again shortly.";
       return;
     }
 
