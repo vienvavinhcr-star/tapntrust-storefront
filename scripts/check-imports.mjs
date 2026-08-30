@@ -17,8 +17,13 @@ function walk(dir, collected = []) {
   return collected;
 }
 
+function filesystemSpecifier(specifier) {
+  return String(specifier).split(/[?#]/, 1)[0];
+}
+
 function resolveImport(fromFile, specifier) {
-  const absolute = path.resolve(path.dirname(fromFile), specifier);
+  const cleanSpecifier = filesystemSpecifier(specifier);
+  const absolute = path.resolve(path.dirname(fromFile), cleanSpecifier);
   const candidates = [absolute, `${absolute}.js`, path.join(absolute, "index.js")];
   return candidates.find((candidate) => fs.existsSync(candidate) && fs.statSync(candidate).isFile()) || null;
 }

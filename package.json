@@ -3,6 +3,6 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "check": "node scripts/check-imports.mjs && node scripts/check-cart-integrity.mjs && node scripts/check-invariants.mjs"
+    "check": "node scripts/check-imports.mjs && node scripts/check-cart-integrity.mjs && node scripts/check-welcome-offer.mjs && node scripts/check-invariants.mjs"
   }
 }
