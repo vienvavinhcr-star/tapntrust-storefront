@@ -45,8 +45,9 @@ Use the smallest relevant surface area.
 13. Google browser API keys must remain HTTP-referrer/API restricted. Never replace them with unrestricted secret credentials in client code.
 14. `js/app.js` is the canonical storefront entry source. `js/app.min.js` is only a tiny compatibility shim and must not become a second implementation.
 15. Keep concerns in their existing module when possible; do not move unrelated logic back into `js/app.js`.
-16. The welcome offer is **WELCOMETNT for 10% off**, appears after 10 seconds, and is suppressed for 14 days on the same device after being shown unless the owner explicitly changes those rules.
-17. Lead tracking may record email, signup time, Add to Cart intent and checkout intent, but must not collect payment credentials. The Google Apps Script Web App endpoint may be public; any private Google credential must never be embedded in browser code.
+16. The welcome offer is **WELCOMETNT for 10% off**. It may open only after a customer has successfully selected/entered a valid business and added a primary card package to cart. It is suppressed for 14 days on the same device after being shown unless the owner explicitly changes those rules.
+17. Each welcome lead cycle must start clean: a new lead/visitor cycle must not inherit checkout intent or unrelated funnel timestamps from an earlier email/session on the same device.
+18. Lead tracking may record email, signup time, Add to Cart intent and checkout intent, but must not collect payment credentials. The Google Apps Script Web App endpoint may be public; any private Google credential must never be embedded in browser code.
 
 ## Small-change policy — important for token efficiency
 
@@ -89,7 +90,7 @@ For sensitive changes, explicitly confirm in the final work summary that the pro
 - `js/cart-integrity.js` — Extra Card parent/child enforcement, orphan cleanup and checkout guard.
 - `js/ui/guide.js` — review-link guide dialog.
 - `js/forms/consultation.js` — consultation/contact form behaviour.
-- `js/marketing/welcome-offer.js` — 10-second email capture popup, 14-day suppression and lead funnel event forwarding.
+- `js/marketing/welcome-offer.js` — post-primary-Add-to-Cart email capture popup, 14-day suppression and lead funnel event forwarding.
 - `js/analytics/meta.js` — Meta Pixel fallback and browser-side pre-purchase commerce events.
 - `js/metadata.js` — runtime canonical/OG/structured metadata.
 - `js/cart.js` — cart state, Shopify line attributes, packages, upsells, discounts.
@@ -103,7 +104,7 @@ For sensitive changes, explicitly confirm in the final work summary that the pro
 - `integrations/google-apps-script/lead-capture.gs` — Apps Script Web App that upserts signup/cart/checkout funnel fields into the Tapntrust Leads Google Sheet.
 - `scripts/check-invariants.mjs` — repository guardrails + JavaScript syntax checks.
 - `scripts/check-cart-integrity.mjs` — regression tests for Extra Card dependency rules.
-- `scripts/check-welcome-offer.mjs` — regression checks for welcome offer timing, discount and tracking rules.
+- `scripts/check-welcome-offer.mjs` — regression checks for welcome offer trigger, discount and tracking rules.
 
 ## Documentation map
 
