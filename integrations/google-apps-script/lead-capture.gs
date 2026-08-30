@@ -1,4 +1,5 @@
 const SHEET_NAME = 'Tapntrust Leads';
+const SPREADSHEET_ID_PROPERTY = 'TAPNTRUST_LEADS_SPREADSHEET_ID';
 const HEADERS = [
   'Email',
   'Sign Up Date',
@@ -28,7 +29,10 @@ const HEADERS = [
  * 6. Copy the /exec Web App URL into js/config.js LEAD_CAPTURE_ENDPOINT.
  */
 function setupTapntrustLeadSheet() {
-  const sheet = getLeadSheet_();
+  const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+  if (!spreadsheet) throw new Error('Open the target Google Sheet before running setup.');
+  PropertiesService.getScriptProperties().setProperty(SPREADSHEET_ID_PROPERTY, spreadsheet.getId());
+  const sheet = spreadsheet.getSheetByName(SHEET_NAME) || spreadsheet.insertSheet(SHEET_NAME);
   ensureHeaders_(sheet);
   sheet.setFrozenRows(1);
   sheet.autoResizeColumns(1, HEADERS.length);
@@ -64,8 +68,8 @@ function doPost(e) {
       const existingEmail = clean_(row[0]);
       const resolvedEmail = email || existingEmail;
       if (!resolvedEmail) {
-        // We intentionally do not create anonymous rows. The browser keeps the
-        // pre-signup action timestamp and includes it when the visitor signs up.
+        // Do not create anonymous rows. The browser keeps pre-signup funnel
+        // timestamps and sends them with the signup event later.
         return json_({ ok: true, deferred: true });
       }
 
@@ -105,8 +109,9 @@ function doPost(e) {
 }
 
 function getLeadSheet_() {
-  const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
-  if (!spreadsheet) throw new Error('Bind this Apps Script project to the Google Sheet that should receive leads.');
+  const spreadsheetId = PropertiesService.getScriptProperties().getProperty(SPREADSHEET_ID_PROPERTY);
+  if (!spreadsheetId) throw new Error('Run setupTapntrustLeadSheet() once before deploying the Web App.');
+  const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
   return spreadsheet.getSheetByName(SHEET_NAME) || spreadsheet.insertSheet(SHEET_NAME);
 }
 
