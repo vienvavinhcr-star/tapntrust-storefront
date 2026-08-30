@@ -211,6 +211,7 @@ export function initialiseWelcomeOffer(config = {}) {
     if (!eligibleToShow()) return;
     const addToCartAt = String(event.detail?.occurredAt || nowIso());
     startLeadCycle(addToCartAt);
+    event.preventDefault();
     open();
   });
 
