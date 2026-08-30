@@ -14,7 +14,7 @@ The storefront expects 1, 2, 3 and 5 card package variants on the main Shopify p
 
 ## Cart ownership
 
-`js/cart.js` owns storefront cart state and delegates Shopify mutations to `js/shopify.js`.
+`js/cart.js` owns storefront cart state and delegates Shopify mutations to `js/shopify.js`. `js/cart-integrity.js` enforces parent/child integrity for Extra NFC Cards without changing Shopify payment behaviour.
 
 Persistent browser keys currently include:
 - Shopify cart ID;
@@ -33,6 +33,7 @@ Rules:
 - GitHub frontend must never treat a checkout click as a completed purchase.
 - GitHub frontend must never fire Meta `Purchase`.
 - Payment and successful order completion remain authoritative in Shopify.
+- Before checkout, any orphan Extra NFC Card must be removed from the Shopify cart.
 
 ## Upsells
 
@@ -41,10 +42,15 @@ Extra Card is an add-on, not a standalone product path in the custom storefront.
 
 When added through the website it inherits the active primary package's business/review fulfilment data. If no primary package exists, `addUpsell("extra")` must fail rather than creating a metadata-free Extra Card.
 
-A future cart hardening task should preserve the rule that deleting the primary package cannot leave a usable metadata-free Extra Card checkout path.
+Dependency enforcement:
+- removing a primary package also removes Extra Cards linked to its business setup;
+- dependent Extra Cards are removed before the parent package, so a partial network failure cannot create a new orphan;
+- old/restored carts are scanned after initialization and orphan Extra Cards are removed automatically;
+- checkout has a final integrity guard that cleans an orphan Extra Card before navigation to Shopify Checkout;
+- legacy carts without setup IDs fall back to matching business name + review URL.
 
 ### Counter Stand
-Counter Stand is a physical accessory. It does not require business/review metadata.
+Counter Stand is a physical accessory. It does not require business/review metadata and is not removed when a card package is removed.
 
 ## Changing packages
 
@@ -59,4 +65,4 @@ Do not simulate an accepted Shopify discount in production if Shopify rejected i
 ## Safe edit guidance
 
 For copy/layout work inside the cart drawer, do not change cart mutation logic.
-For cart logic changes, inspect `js/cart.js`, `js/shopify.js`, and `docs/FULFILMENT.md`, then run `node scripts/check-invariants.mjs`.
+For Extra Card dependency/cleanup work, inspect `js/cart-integrity.js`, `js/cart.js`, and `docs/FULFILMENT.md`, then run `npm run check`.
