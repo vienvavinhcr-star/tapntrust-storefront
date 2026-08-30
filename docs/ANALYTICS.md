@@ -10,7 +10,7 @@ The Meta Pixel ID above is the canonical storefront value. Any remaining legacy 
 
 ## Meta Pixel ownership
 
-Current storefront pages still contain legacy inline Meta Pixel bootstrap markup. `js/app.js` also contains a guarded fallback initializer that only runs if `config.META_PIXEL_ID` is numeric **and** `window.fbq` does not already exist.
+Current storefront pages still contain legacy inline Meta Pixel bootstrap markup. `js/analytics/meta.js` contains the guarded browser fallback initializer used by the main storefront. It runs only if `config.META_PIXEL_ID` is numeric **and** `window.fbq` does not already exist.
 
 Rules:
 - Do not add another Pixel bootstrap snippet.
@@ -21,9 +21,9 @@ Rules:
 
 ## Browser commerce events
 
-`js/app.js` uses `trackMetaEvent(...)` for pre-purchase commerce signals such as `ViewContent` and `AddToCart`.
+`js/analytics/meta.js` owns the reusable `trackMetaEvent(...)`, package/upsell parameters, `ViewContent` initialization and Pixel fallback. Callers such as `js/app.js` and `js/ui/cart-drawer.js` only request the pre-purchase events they need.
 
-These calls assume Pixel has already been initialized. Keep event emission separate from Pixel bootstrap logic.
+These calls assume Pixel has already been initialized. Keep event emission separate from Shopify purchase completion.
 
 If adding `InitiateCheckout`, it must fire only on a real, enabled Shopify checkout CTA and must not be mislabeled as `Purchase`.
 
@@ -48,8 +48,8 @@ GA is bootstrapped in HTML using measurement ID `G-0MT4JK9R04`. Do not add a sec
 
 ## Known issue corrected in maintenance layer
 
-`terms.html` previously initialized Meta Pixel `2121538478429149` in JavaScript but used a different ID in its `<noscript>` fallback. The maintenance layer standardizes the fallback to the canonical ID.
+`terms.html` previously initialized Meta Pixel `2121538478429149` in JavaScript but used a different ID in its `<noscript>` fallback. The maintenance layer standardized the fallback to the canonical ID.
 
-## Future refactor, intentionally deferred
+## Source-of-truth rule
 
-A later dedicated refactor may centralize analytics bootstrap into a shared module/template. Do not perform that refactor as part of an unrelated UI/content task.
+Do not duplicate Meta helper implementations back into `js/app.js` or `js/app.min.js`. Meta browser logic belongs in `js/analytics/meta.js`; `js/app.min.js` is only a compatibility entry to canonical `js/app.js`.
