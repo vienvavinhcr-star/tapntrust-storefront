@@ -244,7 +244,7 @@ h3 { font-size: 1.3rem; }
 .hero__assurances li { display: flex; align-items: center; gap: 8px; }
 .verified-check { position: relative; display: block; width: 24px; height: 24px; flex: 0 0 auto; filter: drop-shadow(0 4px 6px rgba(24,119,242,.2)); }
 .verified-check img { display: block; width: 100%; height: 100%; object-fit: contain; }
-.verified-check::after { position: absolute; inset: 0; background: linear-gradient(105deg,transparent 24%,rgba(255,255,255,.95) 48%,transparent 72%) 180% 0 / 240% 100% no-repeat; content: ""; opacity: 0; animation: verifiedCheckShine 5s ease-in-out infinite; -webkit-mask: url("../assets/icon.png") center / contain no-repeat; mask: url("../assets/icon.png") center / contain no-repeat; }
+.verified-check::after { position: absolute; inset: 0; background: linear-gradient(105deg,transparent 24%,rgba(255,255,255,.95) 48%,transparent 72%) 180% 0 / 240% 100% no-repeat; content: ""; opacity: 0; animation: verifiedCheckShine 5s ease-in-out infinite; -webkit-mask: url("../assets/icon-verified-48.png") center / contain no-repeat; mask: url("../assets/icon-verified-48.png") center / contain no-repeat; }
 .hero__assurances li:nth-child(2) .verified-check::after { animation-delay: .35s; }
 .check { display: grid; width: 20px; height: 20px; place-items: center; border-radius: 50%; color: var(--green-600); background: var(--green-100); font-size: 0.74rem; font-weight: 900; }
 
@@ -760,7 +760,7 @@ h3 { font-size: 1.3rem; }
 .customer-brands__group { display: flex; flex: 0 0 auto; align-items: center; gap: 44px; margin: 0; padding: 0 44px 0 0; list-style: none; }
 .customer-brands__group li { display: block; width: 190px; height: 92px; flex: 0 0 auto; overflow: hidden; background: #fff; opacity: .94; transition: opacity var(--transition), transform var(--transition); }
 .customer-brands__group li:hover { opacity: 1; transform: translateY(-2px); }
-.customer-brand__mark { display: block; width: 100%; height: 100%; background-image: url("../assets/brand/customer-brands.jpg"); background-repeat: no-repeat; background-size: 233.8% 584.2%; }
+.customer-brand__mark { display: block; width: 100%; height: 100%; background-image: url("../assets/brand/customer-brands.webp"); background-repeat: no-repeat; background-size: 233.8% 584.2%; }
 .customer-brands__group li:nth-child(1) .customer-brand__mark { background-position: 8.1% 2.4%; }
 .customer-brands__group li:nth-child(2) .customer-brand__mark { background-position: 91.6% 2.4%; }
 .customer-brands__group li:nth-child(3) .customer-brand__mark { background-position: 8.1% 26.1%; }
