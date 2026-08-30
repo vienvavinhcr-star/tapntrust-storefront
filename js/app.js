@@ -1189,9 +1189,8 @@ function initialiseScrollReveal() {
   if (!("IntersectionObserver" in window) || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
 
   const groups = [
-    { selector: ".friction .section-heading, .friction-solution, .how .section-heading, .purchase-bridge__copy, .placement-showcase .section-heading, .placement-gallery .section-heading, .customer-feedback .section-heading", type: "up", step: 0 },
+    { selector: ".customer-brands__heading, .how .section-heading, .purchase-bridge__copy, .placement-showcase .section-heading, .placement-gallery .section-heading, .customer-feedback .section-heading", type: "up", step: 0 },
     { selector: ".value-strip__grid > div", type: "up", step: 45 },
-    { selector: ".friction-list li", type: "up", step: 55 },
     { selector: ".steps li", type: "up", step: 75 },
     { selector: ".review-impact__copy, .review-impact__visual, .purchase-bridge__visual, .shop__visual-column, .product-configurator", type: "soft-scale", step: 90 },
     { selector: ".placement-card, .feedback-card", type: "up", step: 45 },
