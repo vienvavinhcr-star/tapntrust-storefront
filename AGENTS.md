@@ -16,9 +16,14 @@ Read this file before making any change in this repository. For normal tasks, th
 Use the smallest relevant surface area.
 
 - Copy, spacing, colours, layout, images: inspect only the relevant HTML/CSS. Do **not** audit cart, Shopify, fulfilment, Pixel or checkout unless the requested change touches them.
+- Navigation, product viewer, mobile buy bar, placement carousel, step demo, reveal effects: inspect `js/ui/site.js` plus the relevant HTML/CSS only.
+- Cart drawer presentation/interactions: inspect `js/ui/cart-drawer.js`; inspect `js/cart.js` only if cart state/mutations must change.
+- Review-link guide dialog: inspect `js/ui/guide.js` and `js/ui/common.js` only.
+- Consultation form: inspect `js/forms/consultation.js`.
 - Business search / Google review destination: read `docs/FULFILMENT.md`, then `js/business-finder.js`, `js/google-review.js`, and only related callers.
 - Cart, packages, extras, discounts: read `docs/COMMERCE.md`, then `js/cart.js` and `js/shopify.js`.
-- Meta Pixel, GA, Clarity, conversion events: read `docs/ANALYTICS.md` before editing tracking.
+- Meta Pixel / Meta commerce events: read `docs/ANALYTICS.md`, then `js/analytics/meta.js` and only its relevant callers.
+- SEO/runtime structured metadata: inspect `js/metadata.js`.
 - Cross-cutting architectural changes: read `docs/ARCHITECTURE.md`.
 
 ## Non-negotiable invariants
@@ -36,6 +41,8 @@ Use the smallest relevant surface area.
 11. Do not change checkout URLs or bypass the website business-selection flow unless explicitly requested.
 12. Do not expose Shopify Admin/private tokens. Storefront browser tokens are public-by-design; Admin/private credentials are not.
 13. Google browser API keys must remain HTTP-referrer/API restricted. Never replace them with unrestricted secret credentials in client code.
+14. `js/app.js` is the canonical storefront entry source. `js/app.min.js` is only a tiny compatibility shim and must not become a second implementation.
+15. Keep concerns in their existing module when possible; do not move unrelated logic back into `js/app.js`.
 
 ## Small-change policy — important for token efficiency
 
@@ -47,7 +54,7 @@ For presentation-only or narrowly scoped tasks:
 - Do not inspect analytics/commerce merely because they exist.
 - Do not rewrite working modules for style.
 - Prefer one or two relevant files over broad repository reads.
-- Run `node scripts/check-invariants.mjs` after the change when Node is available.
+- Run `npm run check` after the change when Node is available.
 - If the invariant checker passes and the changed surface is isolated, stop; do not continue searching for hypothetical unrelated problems.
 
 ## Sensitive-change policy
@@ -68,7 +75,15 @@ For sensitive changes, explicitly confirm in the final work summary that the pro
 
 - `index.html` — main storefront markup and current production analytics bootstrap.
 - `css/styles.css`, `css/styles.min.css` — storefront styling.
-- `js/app.js` / `js/app.min.js` — main storefront UI orchestration and Meta commerce event calls.
+- `js/app.js` — small storefront entry/orchestrator and product configurator wiring.
+- `js/app.min.js` — compatibility shim that imports `js/app.js`; do not add feature logic here.
+- `js/ui/common.js` — shared toast, text, focus-trap and body-lock helpers.
+- `js/ui/site.js` — independent site UI: navigation, product viewer, mobile bar, walkthrough, animations/carousels.
+- `js/ui/cart-drawer.js` — cart drawer rendering and user interactions; delegates state mutations to `js/cart.js`.
+- `js/ui/guide.js` — review-link guide dialog.
+- `js/forms/consultation.js` — consultation/contact form behaviour.
+- `js/analytics/meta.js` — Meta Pixel fallback and browser-side pre-purchase commerce events.
+- `js/metadata.js` — runtime canonical/OG/structured metadata.
 - `js/cart.js` — cart state, Shopify line attributes, packages, upsells, discounts.
 - `js/shopify.js` — Storefront API transport and GraphQL operations.
 - `js/business-finder.js` — Google Places business selection.
@@ -77,6 +92,7 @@ For sensitive changes, explicitly confirm in the final work summary that the pro
 - `js/clarity-events.js` — Microsoft Clarity funnel events.
 - `js/config.js` — public browser configuration.
 - `js/page.js` — shared behaviour on supporting pages.
+- `scripts/check-invariants.mjs` — repository guardrails + JavaScript syntax checks.
 
 ## Documentation map
 
@@ -96,6 +112,6 @@ A change is done when:
 - the requested behaviour is implemented;
 - unrelated behaviour was not changed;
 - relevant invariants are preserved;
-- `node scripts/check-invariants.mjs` passes when available;
+- `npm run check` passes when available;
 - only relevant files were touched; and
 - the summary names exactly what changed and any intentional limitations.
