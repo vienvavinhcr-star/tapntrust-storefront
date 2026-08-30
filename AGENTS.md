@@ -18,6 +18,7 @@ Use the smallest relevant surface area.
 - Copy, spacing, colours, layout, images: inspect only the relevant HTML/CSS. Do **not** audit cart, Shopify, fulfilment, Pixel or checkout unless the requested change touches them.
 - Navigation, product viewer, mobile buy bar, placement carousel, step demo, reveal effects: inspect `js/ui/site.js` plus the relevant HTML/CSS only.
 - Cart drawer presentation/interactions: inspect `js/ui/cart-drawer.js`; inspect `js/cart.js` only if cart state/mutations must change.
+- Extra Card parent/child cleanup or checkout integrity: inspect `js/cart-integrity.js`; inspect `js/cart.js` only if the underlying Shopify cart mutation behaviour must change.
 - Review-link guide dialog: inspect `js/ui/guide.js` and `js/ui/common.js` only.
 - Consultation form: inspect `js/forms/consultation.js`.
 - Business search / Google review destination: read `docs/FULFILMENT.md`, then `js/business-finder.js`, `js/google-review.js`, and only related callers.
@@ -34,7 +35,7 @@ Use the smallest relevant surface area.
 4. The canonical Meta Pixel/Dataset ID for this storefront is documented in `docs/ANALYTICS.md` and must remain consistent wherever legacy inline markup still exists.
 5. Do not change Shopify product handles unless the user explicitly asks. Current handles are documented in `docs/COMMERCE.md`.
 6. A primary NFC card line must retain fulfilment metadata needed to program the card.
-7. An Extra NFC Card is an add-on. It must inherit the selected business/review destination from its primary package and must not become a metadata-free standalone checkout path.
+7. An Extra NFC Card is an add-on. It must inherit the selected business/review destination from its primary package, must be removed with that package, and orphan Extra Cards must be cleaned before checkout.
 8. Counter Stand does not require business/review metadata.
 9. Editing a primary package quantity/variant must preserve its business setup metadata.
 10. Do not silently remove, rename, or repurpose fulfilment attribute keys.
@@ -80,6 +81,7 @@ For sensitive changes, explicitly confirm in the final work summary that the pro
 - `js/ui/common.js` — shared toast, text, focus-trap and body-lock helpers.
 - `js/ui/site.js` — independent site UI: navigation, product viewer, mobile bar, walkthrough, animations/carousels.
 - `js/ui/cart-drawer.js` — cart drawer rendering and user interactions; delegates state mutations to `js/cart.js`.
+- `js/cart-integrity.js` — Extra Card parent/child enforcement, orphan cleanup and checkout guard.
 - `js/ui/guide.js` — review-link guide dialog.
 - `js/forms/consultation.js` — consultation/contact form behaviour.
 - `js/analytics/meta.js` — Meta Pixel fallback and browser-side pre-purchase commerce events.
@@ -93,6 +95,7 @@ For sensitive changes, explicitly confirm in the final work summary that the pro
 - `js/config.js` — public browser configuration.
 - `js/page.js` — shared behaviour on supporting pages.
 - `scripts/check-invariants.mjs` — repository guardrails + JavaScript syntax checks.
+- `scripts/check-cart-integrity.mjs` — regression tests for Extra Card dependency rules.
 
 ## Documentation map
 

@@ -1,5 +1,6 @@
 import config from "./config.js";
-import cartActions from "./cart.js";
+import baseCartActions from "./cart.js";
+import { createIntegrityCartActions, initialiseCheckoutIntegrityGuard } from "./cart-integrity.js";
 import { validHttpsUrl, looksGoogleRelated } from "./validation.js";
 import { initialiseBusinessFinder } from "./business-finder.js";
 import { businessDetailsFromAttributes } from "./fulfilment.js";
@@ -25,6 +26,7 @@ import {
 } from "./ui/site.js";
 import { initialiseConsultationForm } from "./forms/consultation.js";
 
+const cartActions = createIntegrityCartActions(baseCartActions);
 const money = new Intl.NumberFormat("en-AU", { style: "currency", currency: "AUD" });
 let selectedPackage = 2;
 let businessFinderController = null;
@@ -275,6 +277,7 @@ initialiseMetaPixel(config);
 initialiseMetaCommerceEvents();
 initialiseProductForm();
 cartUi.initialise();
+initialiseCheckoutIntegrityGuard(cartActions);
 initialiseMobileBuyBar();
 guideUi.initialise();
 initialiseLinkWalkthrough();
