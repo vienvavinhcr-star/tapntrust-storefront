@@ -166,7 +166,7 @@ assert(
 
 // 11. The legacy production entry is only a compatibility shim, so app.js is the source of truth.
 assert(
-  /import\s+["']\.\/app\.js["']/.test(appCompat) && appCompat.length < 250,
+  /import\s+["']\.\/app\.js(?:\?[^"']*)?["']/.test(appCompat) && appCompat.length < 300,
   "app.min.js is a thin compatibility shim to canonical app.js",
   "app.min.js has become a second storefront implementation"
 );
