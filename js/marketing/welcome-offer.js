@@ -183,20 +183,22 @@ export function initialiseWelcomeOffer(config = {}) {
     return !shownAt || Date.now() - shownAt >= cooldownMs;
   }
 
+  function storefrontModalIsOpen() {
+    return Boolean(document.querySelector(".cart-drawer.is-open, .guide-modal.is-open"));
+  }
+
+  function attemptOpen() {
+    if (!eligibleToShow()) return;
+    if (document.visibilityState !== "visible" || storefrontModalIsOpen()) {
+      window.setTimeout(attemptOpen, 1000);
+      return;
+    }
+    open();
+  }
+
   function scheduleOpen() {
     if (!eligibleToShow()) return;
-    window.setTimeout(() => {
-      if (!eligibleToShow()) return;
-      if (document.visibilityState === "visible") open();
-      else {
-        const showWhenVisible = () => {
-          if (document.visibilityState !== "visible") return;
-          document.removeEventListener("visibilitychange", showWhenVisible);
-          if (eligibleToShow()) open();
-        };
-        document.addEventListener("visibilitychange", showWhenVisible);
-      }
-    }, delayMs);
+    window.setTimeout(attemptOpen, delayMs);
   }
 
   async function recordAction(eventName, occurredAt, options = {}) {
