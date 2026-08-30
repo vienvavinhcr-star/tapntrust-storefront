@@ -16,7 +16,7 @@ export const config = Object.freeze({
   NEWSLETTER_ENDPOINT: "",
   CONSULTATION_ENDPOINT: "",
   SITE_URL: "https://tapntrust.com",
-  META_PIXEL_ID: "",
+  META_PIXEL_ID: "2121538478429149",
   SUPPORT_EMAIL: "support@tapntrust.com",
   FACEBOOK_URL: "https://www.facebook.com/tapntrust.com.au/",
   INSTAGRAM_URL: "https://www.instagram.com/tapntrust.au/"
