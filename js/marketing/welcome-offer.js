@@ -81,7 +81,7 @@ function ensureStyles() {
   if (document.querySelector('link[data-welcome-offer-styles]')) return;
   const link = document.createElement("link");
   link.rel = "stylesheet";
-  link.href = "css/welcome-offer.css?v=20260831-1";
+  link.href = "css/welcome-offer.css?v=20260831-2";
   link.dataset.welcomeOfferStyles = "";
   document.head.append(link);
 }
@@ -109,7 +109,7 @@ function markup(discountCode, discountPercent) {
             <label for="welcome-offer-email">Email address</label>
             <div class="welcome-offer__field-row">
               <input id="welcome-offer-email" name="email" type="email" inputmode="email" autocomplete="email" placeholder="you@example.com" required data-welcome-email>
-              <button type="submit">Get my ${discountPercent}% off</button>
+              <button type="submit">Unlock my ${discountPercent}% off</button>
             </div>
             <div class="welcome-offer__honeypot" aria-hidden="true"><label>Company<input name="company" type="text" tabindex="-1" autocomplete="off"></label></div>
             <p class="welcome-offer__status" role="status" aria-live="polite" data-welcome-status></p>
@@ -118,15 +118,16 @@ function markup(discountCode, discountPercent) {
         </div>
         <div class="welcome-offer__success" data-welcome-success hidden>
           <span class="welcome-offer__success-mark" aria-hidden="true">✓</span>
-          <p class="welcome-offer__kicker">You’re in</p>
-          <h2>Your ${discountPercent}% welcome code</h2>
-          <p>Enter this code at Shopify Checkout:</p>
+          <p class="welcome-offer__kicker">10% OFF UNLOCKED</p>
+          <h2>Your welcome code is ready</h2>
+          <p>Copy your code now and use it at Shopify Checkout.</p>
           <div class="welcome-offer__code-row">
             <strong data-welcome-code>${discountCode}</strong>
             <button type="button" data-welcome-copy>Copy code</button>
           </div>
+          <p class="welcome-offer__checkout-note"><strong>At checkout:</strong> paste <strong>${discountCode}</strong> into the “Discount code” box. Shopify will apply ${discountPercent}% off when the code is accepted.</p>
           <p class="welcome-offer__copy-status" role="status" aria-live="polite" data-welcome-copy-status></p>
-          <button class="welcome-offer__shop" type="button" data-welcome-shop>Choose a card package</button>
+          <button class="welcome-offer__shop" type="button" data-welcome-shop>Shop with ${discountPercent}% off</button>
         </div>
       </div>
     </section>`;
@@ -265,9 +266,9 @@ export function initialiseWelcomeOffer(config = {}) {
   root.querySelector("[data-welcome-copy]")?.addEventListener("click", async () => {
     try {
       await navigator.clipboard.writeText(discountCode);
-      copyStatus.textContent = "Copied to clipboard.";
+      copyStatus.textContent = `${discountCode} copied — paste it into the Discount code box at checkout.`;
     } catch {
-      copyStatus.textContent = `Code: ${discountCode}`;
+      copyStatus.textContent = `Copy this code for checkout: ${discountCode}`;
     }
   });
 
