@@ -25,6 +25,7 @@ import {
   initialiseStepDemo
 } from "./ui/site.js";
 import { initialiseConsultationForm } from "./forms/consultation.js";
+import { initialiseWelcomeOffer } from "./marketing/welcome-offer.js";
 
 const cartActions = createIntegrityCartActions(baseCartActions);
 const money = new Intl.NumberFormat("en-AU", { style: "currency", currency: "AUD" });
@@ -278,6 +279,7 @@ initialiseMetaCommerceEvents();
 initialiseProductForm();
 cartUi.initialise();
 initialiseCheckoutIntegrityGuard(cartActions);
+initialiseWelcomeOffer(config);
 initialiseMobileBuyBar();
 guideUi.initialise();
 initialiseLinkWalkthrough();
