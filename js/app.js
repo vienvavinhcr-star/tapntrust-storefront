@@ -25,7 +25,6 @@ import {
   initialiseStepDemo
 } from "./ui/site.js";
 import { initialiseConsultationForm } from "./forms/consultation.js";
-import { initialiseWelcomeOffer } from "./marketing/welcome-offer.js";
 
 const cartActions = createIntegrityCartActions(baseCartActions);
 const money = new Intl.NumberFormat("en-AU", { style: "currency", currency: "AUD" });
@@ -231,7 +230,6 @@ function initialiseProductForm() {
     button.disabled = true;
     button.textContent = "Adding to cart…";
     status.textContent = "";
-    let welcomeOfferOpened = false;
     try {
       if (editingBusinessLineId) {
         await cartActions.updateBusinessForLine(editingBusinessLineId, values);
@@ -242,13 +240,8 @@ function initialiseProductForm() {
         await cartActions.addMainPackage({ packageCount: selectedPackage, ...values });
         trackMetaEvent("AddToCart", packageMetaParameters(selectedPackage));
         status.textContent = "Added to your cart.";
-        const welcomeEvent = new CustomEvent("tapntrust:welcome-offer-eligible", {
-          cancelable: true,
-          detail: { occurredAt: new Date().toISOString() }
-        });
-        welcomeOfferOpened = !document.dispatchEvent(welcomeEvent);
       }
-      if (!welcomeOfferOpened) cartUi?.openCart();
+      cartUi?.openCart();
       toast(status.textContent);
     } catch (error) {
       status.textContent = error.message || "We couldn't add this product. Please try again.";
@@ -285,7 +278,6 @@ initialiseMetaCommerceEvents();
 initialiseProductForm();
 cartUi.initialise();
 initialiseCheckoutIntegrityGuard(cartActions);
-initialiseWelcomeOffer(config);
 initialiseMobileBuyBar();
 guideUi.initialise();
 initialiseLinkWalkthrough();

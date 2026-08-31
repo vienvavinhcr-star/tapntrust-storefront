@@ -34,6 +34,6 @@ export function trapFocus(event, container) {
 }
 
 export function setBodyLock() {
-  const anyOpen = document.querySelector(".cart-drawer.is-open, .guide-modal.is-open, .welcome-offer.is-open");
+  const anyOpen = document.querySelector(".cart-drawer.is-open, .guide-modal.is-open");
   document.body.classList.toggle("is-locked", Boolean(anyOpen));
 }

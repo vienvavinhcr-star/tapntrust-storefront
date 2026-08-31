@@ -7,8 +7,7 @@ import {
   fetchCart,
   addCartLines,
   updateCartLines,
-  removeCartLines,
-  updateCartDiscountCodes
+  removeCartLines
 } from "./shopify.js";
 import {
   FULFILMENT_KEYS,
@@ -21,7 +20,6 @@ import {
 
 const CART_ID_KEY = "tapntrust_shopify_cart_id";
 const DEMO_CART_KEY = "tapntrust_preview_cart";
-const PENDING_DISCOUNT_KEY = "tapntrust_pending_discount";
 const ACTIVE_SETUP_KEY = "tapntrust_active_business_setup_id";
 const CARD_IMAGE = "assets/products/tapntrust-nfc-card-transparent.webp";
 const STAND_IMAGE = "assets/products/tapntrust-counter-stand-transparent.webp";
@@ -138,11 +136,9 @@ function normaliseShopifyCart(cart) {
 
 function recalculatePreviewCart(cart) {
   const subtotal = cart.lines.reduce((sum, line) => sum + line.unitPrice * line.quantity, 0);
-  const hasWelcome = cart.discountCodes.includes(config.WELCOME_DISCOUNT_CODE);
-  const discountAmount = hasWelcome ? subtotal * 0.15 : 0;
   cart.subtotal = subtotal;
-  cart.discountAmount = discountAmount;
-  cart.total = subtotal - discountAmount;
+  cart.discountAmount = 0;
+  cart.total = subtotal;
   cart.totalQuantity = cart.lines.reduce((sum, line) => sum + line.quantity, 0);
   cart.lines.forEach((line) => { line.lineTotal = line.unitPrice * line.quantity; });
   return cart;
@@ -269,15 +265,9 @@ async function loadCatalog() {
   return catalog;
 }
 
-function pendingDiscountCodes() {
-  const code = storageGet(PENDING_DISCOUNT_KEY);
-  return code ? [code] : [];
-}
-
 function saveShopifyCart(cart) {
   state.cart = normaliseShopifyCart(cart);
   storageSet(CART_ID_KEY, cart.id);
-  if (state.cart.discountCodes.length) storageRemove(PENDING_DISCOUNT_KEY);
 }
 
 function zeroQuantityLineIds(cart) {
@@ -334,7 +324,7 @@ async function addShopifyLines(lines) {
   }));
 
   if (!state.cart?.id) {
-    saveShopifyCart(await createCart(inputs, pendingDiscountCodes()));
+    saveShopifyCart(await createCart(inputs));
     return;
   }
 
@@ -343,7 +333,7 @@ async function addShopifyLines(lines) {
     const returnedLines = updated?.lines?.nodes || [];
     if (!returnedLines.length || Number(updated.totalQuantity || 0) <= 0) {
       storageRemove(CART_ID_KEY);
-      const discountCodes = state.cart?.discountCodes?.length ? state.cart.discountCodes : pendingDiscountCodes();
+      const discountCodes = state.cart?.discountCodes || [];
       saveShopifyCart(await createCart(inputs, discountCodes));
       return;
     }
@@ -351,7 +341,7 @@ async function addShopifyLines(lines) {
   } catch (error) {
     if (!isExpiredCartError(error)) throw error;
     storageRemove(CART_ID_KEY);
-    saveShopifyCart(await createCart(inputs, pendingDiscountCodes()));
+    saveShopifyCart(await createCart(inputs, state.cart?.discountCodes || []));
   }
 }
 
@@ -628,34 +618,6 @@ export async function removeLine(lineId) {
   return getCartState();
 }
 
-export async function applyDiscount(code = config.WELCOME_DISCOUNT_CODE) {
-  const cleanCode = String(code || "").trim().toUpperCase();
-  if (!cleanCode) throw new ShopifyError("No discount code was provided.");
-
-  if (!state.cart?.lines?.length) {
-    storageSet(PENDING_DISCOUNT_KEY, cleanCode);
-    return { pending: true, state: getCartState() };
-  }
-
-  setLoading(true);
-  try {
-    if (state.mode === "shopify") {
-      saveShopifyCart(await updateCartDiscountCodes(state.cart.id, [cleanCode]));
-      if (!state.cart.discountCodes.includes(cleanCode)) {
-        throw new ShopifyError("Shopify did not accept this discount code. Confirm it is active in Shopify Admin.");
-      }
-    } else {
-      state.cart.discountCodes = [cleanCode];
-      recalculatePreviewCart(state.cart);
-      persistPreviewCart();
-    }
-    storageRemove(PENDING_DISCOUNT_KEY);
-  } finally {
-    setLoading(false);
-  }
-  return { pending: false, state: getCartState() };
-}
-
 export const cartActions = {
   initialise: initialiseCart,
   getState: getCartState,
@@ -665,8 +627,7 @@ export const cartActions = {
   changeLineQuantity,
   changePrimaryPackage,
   updateBusinessForLine,
-  removeLine,
-  applyDiscount
+  removeLine
 };
 
 export default cartActions;

@@ -19,7 +19,6 @@ Use the smallest relevant surface area.
 - Navigation, product viewer, mobile buy bar, placement carousel, step demo, reveal effects: inspect `js/ui/site.js` plus the relevant HTML/CSS only.
 - Cart drawer presentation/interactions: inspect `js/ui/cart-drawer.js`; inspect `js/cart.js` only if cart state/mutations must change.
 - Extra Card parent/child cleanup or checkout integrity: inspect `js/cart-integrity.js`; inspect `js/cart.js` only if the underlying Shopify cart mutation behaviour must change.
-- Welcome email popup / Google Sheet lead funnel: inspect `js/marketing/welcome-offer.js`, `css/welcome-offer.css`, `js/config.js`, and `integrations/google-apps-script/lead-capture.gs`. Do not modify cart or Pixel logic unless the requested change explicitly requires it.
 - Review-link guide dialog: inspect `js/ui/guide.js` and `js/ui/common.js` only.
 - Consultation form: inspect `js/forms/consultation.js`.
 - Business search / Google review destination: read `docs/FULFILMENT.md`, then `js/business-finder.js`, `js/google-review.js`, and only related callers.
@@ -45,9 +44,7 @@ Use the smallest relevant surface area.
 13. Google browser API keys must remain HTTP-referrer/API restricted. Never replace them with unrestricted secret credentials in client code.
 14. `js/app.js` is the canonical storefront entry source. `js/app.min.js` is only a tiny compatibility shim and must not become a second implementation.
 15. Keep concerns in their existing module when possible; do not move unrelated logic back into `js/app.js`.
-16. The welcome offer is **WELCOMETNT for 10% off**. It may open only after a customer has successfully selected/entered a valid business and added a primary card package to cart. It is suppressed for 14 days on the same device after being shown unless the owner explicitly changes those rules.
-17. Each welcome lead cycle must start clean: a new lead/visitor cycle must not inherit checkout intent or unrelated funnel timestamps from an earlier email/session on the same device.
-18. Lead tracking may record email, signup time, Add to Cart intent and checkout intent, but must not collect payment credentials. The Google Apps Script Web App endpoint may be public; any private Google credential must never be embedded in browser code.
+16. The retired custom welcome-email popup and its Google Sheets lead funnel must not be reintroduced unless the owner explicitly requests them. Email signup and discount delivery are handled outside this frontend.
 
 ## Small-change policy — important for token efficiency
 
@@ -81,7 +78,6 @@ For sensitive changes, explicitly confirm in the final work summary that the pro
 
 - `index.html` — main storefront markup and current production analytics bootstrap.
 - `css/styles.css`, `css/styles.min.css` — storefront styling.
-- `css/welcome-offer.css` — welcome email popup presentation only.
 - `js/app.js` — small storefront entry/orchestrator and product configurator wiring.
 - `js/app.min.js` — compatibility shim that imports `js/app.js`; do not add feature logic here.
 - `js/ui/common.js` — shared toast, text, focus-trap and body-lock helpers.
@@ -90,7 +86,6 @@ For sensitive changes, explicitly confirm in the final work summary that the pro
 - `js/cart-integrity.js` — Extra Card parent/child enforcement, orphan cleanup and checkout guard.
 - `js/ui/guide.js` — review-link guide dialog.
 - `js/forms/consultation.js` — consultation/contact form behaviour.
-- `js/marketing/welcome-offer.js` — post-primary-Add-to-Cart email capture popup, 14-day suppression and lead funnel event forwarding.
 - `js/analytics/meta.js` — Meta Pixel fallback and browser-side pre-purchase commerce events.
 - `js/metadata.js` — runtime canonical/OG/structured metadata.
 - `js/cart.js` — cart state, Shopify line attributes, packages, upsells, discounts.
@@ -99,12 +94,10 @@ For sensitive changes, explicitly confirm in the final work summary that the pro
 - `js/google-review.js` — Google review URL helpers.
 - `js/fulfilment.js` — fulfilment attribute keys and transformations.
 - `js/clarity-events.js` — Microsoft Clarity funnel events.
-- `js/config.js` — public browser configuration, including the public Apps Script lead endpoint when enabled.
+- `js/config.js` — public browser configuration.
 - `js/page.js` — shared behaviour on supporting pages.
-- `integrations/google-apps-script/lead-capture.gs` — Apps Script Web App that upserts signup/cart/checkout funnel fields into the Tapntrust Leads Google Sheet.
 - `scripts/check-invariants.mjs` — repository guardrails + JavaScript syntax checks.
 - `scripts/check-cart-integrity.mjs` — regression tests for Extra Card dependency rules.
-- `scripts/check-welcome-offer.mjs` — regression checks for welcome offer trigger, discount and tracking rules.
 
 ## Documentation map
 
