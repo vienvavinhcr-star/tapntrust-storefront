@@ -1,4 +1,63 @@
 const CLARITY_EVENT_PREFIX = "tapntrust.clarity.";
+const TEST_MODE_STORAGE_KEY = "tapntrust_test_mode";
+
+function storageGet(key) {
+  try {
+    return window.localStorage.getItem(key) || "";
+  } catch {
+    return "";
+  }
+}
+
+function storageSet(key, value) {
+  try {
+    window.localStorage.setItem(key, value);
+  } catch {
+    // Test mode is best-effort when localStorage is unavailable.
+  }
+}
+
+function storageRemove(key) {
+  try {
+    window.localStorage.removeItem(key);
+  } catch {
+    // Test mode is best-effort when localStorage is unavailable.
+  }
+}
+
+function resolveTestMode() {
+  const params = new URLSearchParams(window.location.search);
+  const requested = params.get("test");
+
+  if (requested === "1") storageSet(TEST_MODE_STORAGE_KEY, "1");
+  else if (requested === "0") storageRemove(TEST_MODE_STORAGE_KEY);
+
+  return requested === "1" || (requested !== "0" && storageGet(TEST_MODE_STORAGE_KEY) === "1");
+}
+
+const clarityTestMode = resolveTestMode();
+
+function disableClarityForTestMode() {
+  if (!clarityTestMode) return false;
+
+  // Queue the opt-out before Clarity finishes loading. Microsoft Clarity's
+  // consent(false) call clears Clarity cookies and prevents further tracking
+  // until consent is granted again.
+  window.clarity = window.clarity || function (...args) {
+    (window.clarity.q = window.clarity.q || []).push(args);
+  };
+
+  try {
+    window.clarity("consent", false);
+  } catch {
+    // If Clarity is unavailable, there is nothing to record.
+  }
+
+  document.documentElement.dataset.tapntrustTestMode = "true";
+  return true;
+}
+
+disableClarityForTestMode();
 
 function hasTracked(eventName) {
   try {
@@ -17,7 +76,7 @@ function markTracked(eventName) {
 }
 
 function trackClarityEventOnce(eventName) {
-  if (hasTracked(eventName) || typeof window.clarity !== "function") return false;
+  if (clarityTestMode || hasTracked(eventName) || typeof window.clarity !== "function") return false;
 
   try {
     window.clarity("event", eventName);
@@ -29,6 +88,8 @@ function trackClarityEventOnce(eventName) {
 }
 
 function initialiseBusinessSearchTracking() {
+  if (clarityTestMode) return;
+
   const searchInput = document.querySelector("[data-business-search]");
   const selectedCard = document.querySelector("[data-selected-business]");
   const businessName = document.querySelector('[name="businessName"]');
@@ -78,6 +139,8 @@ function initialiseBusinessSearchTracking() {
 }
 
 function initialiseCheckoutTracking() {
+  if (clarityTestMode) return;
+
   document.addEventListener("click", (event) => {
     if (!(event.target instanceof Element)) return;
     const checkout = event.target.closest("[data-checkout]");
