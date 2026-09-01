@@ -5,7 +5,7 @@ import {
   bundleGiftStandAttributes,
   bundleGiftParentSetupId,
   isBundleGiftStand,
-  isFiveCardPrimary,
+  packageCountForPrimaryLine,
   primarySetupId
 } from "./bundle-gift.js";
 
@@ -99,8 +99,6 @@ export function createIntegrityCartActions(baseCartActions) {
     if (!standVariant?.available) {
       throw new ShopifyError("The free Counter Stand is currently unavailable.");
     }
-
-    if (currentState.mode !== "shopify") return currentState;
     if (!currentState.cart?.id) throw new ShopifyError("The Shopify cart is not ready for the free Counter Stand.");
 
     await addCartLines(currentState.cart.id, [{
@@ -116,7 +114,7 @@ export function createIntegrityCartActions(baseCartActions) {
 
     bundleSyncPromise = (async () => {
       let currentState = baseCartActions.getState();
-      if (!currentState.cart?.lines?.length) return currentState;
+      if (!currentState.cart?.lines?.length || currentState.mode !== "shopify") return currentState;
 
       let plan = bundleGiftPlan(currentState.cart.lines, currentState.catalog);
       for (const lineId of [...plan.removeIds, ...plan.paidGiftIds]) {
@@ -154,13 +152,34 @@ export function createIntegrityCartActions(baseCartActions) {
   }
 
   async function addMainPackage(input) {
+    const beforeIds = new Set((baseCartActions.getState().cart?.lines || []).map((line) => line.id));
     await baseCartActions.addMainPackage(input);
-    return syncBundleGiftStands();
+    if (Number(input?.packageCount) !== 5) return baseCartActions.getState();
+
+    try {
+      return await syncBundleGiftStands();
+    } catch (error) {
+      const addedPrimary = (baseCartActions.getState().cart?.lines || []).find((line) => line.kind === "primary" && !beforeIds.has(line.id));
+      if (addedPrimary?.id) await baseCartActions.removeLine(addedPrimary.id);
+      throw error;
+    }
   }
 
   async function changePrimaryPackage(lineId, packageCount) {
+    const beforeState = baseCartActions.getState();
+    const beforeLine = beforeState.cart?.lines?.find((line) => line.id === lineId && line.kind === "primary");
+    const previousCount = packageCountForPrimaryLine(beforeLine, beforeState.catalog);
     await baseCartActions.changePrimaryPackage(lineId, packageCount);
-    return syncBundleGiftStands();
+
+    try {
+      return await syncBundleGiftStands();
+    } catch (error) {
+      if (previousCount && previousCount !== Number(packageCount)) {
+        await baseCartActions.changePrimaryPackage(lineId, previousCount);
+        await syncBundleGiftStands().catch(() => {});
+      }
+      throw error;
+    }
   }
 
   async function removeLine(lineId) {
@@ -198,6 +217,7 @@ export function createIntegrityCartActions(baseCartActions) {
 }
 
 export function bundleIntegrityNeeded(cartState) {
+  if (cartState?.mode !== "shopify") return false;
   const lines = cartState?.cart?.lines || [];
   const catalog = cartState?.catalog || {};
   const plan = bundleGiftPlan(lines, catalog);
