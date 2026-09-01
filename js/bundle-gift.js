@@ -1,6 +1,7 @@
 import { FULFILMENT_KEYS, ITEM_ROLES, buildFulfilmentAttributes } from "./fulfilment.js";
 
 export const FIVE_CARD_PACKAGE_COUNT = 5;
+export const FIVE_CARD_STAND_GIFT_VARIANT_TITLE = "5 Card Bundle Gift";
 export const BUNDLE_GIFT_KEYS = Object.freeze({
   type: "_Bundle Gift",
   parentSetupId: "_Bundle Parent Setup ID"
@@ -24,6 +25,13 @@ export function isFiveCardPrimary(line, catalog) {
 
 export function primarySetupId(line) {
   return clean(line?.attributes?.[FULFILMENT_KEYS.setupId]);
+}
+
+export function findBundleGiftStandVariant(catalog = {}) {
+  return catalog?.stand?.variants?.find((variant) => (
+    clean(variant.title).toLowerCase() === FIVE_CARD_STAND_GIFT_VARIANT_TITLE.toLowerCase()
+    && Number(variant.price || 0) <= 0.005
+  )) || null;
 }
 
 export function bundleGiftStandAttributes(parentSetupId) {
