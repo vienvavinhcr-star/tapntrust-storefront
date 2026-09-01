@@ -23,7 +23,7 @@ Use the smallest relevant surface area.
 - Consultation form: inspect `js/forms/consultation.js`.
 - Business search / Google review destination: read `docs/FULFILMENT.md`, then `js/business-finder.js`, `js/google-review.js`, and only related callers.
 - Cart, packages, extras, discounts: read `docs/COMMERCE.md`, then `js/cart.js` and `js/shopify.js`.
-- Meta Pixel / Meta commerce events: read `docs/ANALYTICS.md`, then `js/analytics/meta.js` and only its relevant callers.
+- Meta Pixel / Clarity / analytics / test mode: read `docs/ANALYTICS.md`, then the relevant file under `js/analytics/` or `js/clarity-events.js` and only its relevant callers.
 - SEO/runtime structured metadata: inspect `js/metadata.js`.
 - Cross-cutting architectural changes: read `docs/ARCHITECTURE.md`.
 
@@ -45,6 +45,7 @@ Use the smallest relevant surface area.
 14. `js/app.js` is the canonical storefront entry source. `js/app.min.js` is only a tiny compatibility shim and must not become a second implementation.
 15. Keep concerns in their existing module when possible; do not move unrelated logic back into `js/app.js`.
 16. The retired custom welcome-email popup and its Google Sheets lead funnel must not be reintroduced unless the owner explicitly requests them. Email signup and discount delivery are handled outside this frontend.
+17. Tapntrust owner test mode must continue to suppress Microsoft Clarity tracking on the owner's browser. `?test=1` enables the persistent browser flag and `?test=0` disables it. Do not make this mode disable Meta Pixel unless explicitly requested.
 
 ## Small-change policy — important for token efficiency
 
@@ -93,7 +94,7 @@ For sensitive changes, explicitly confirm in the final work summary that the pro
 - `js/business-finder.js` — Google Places business selection.
 - `js/google-review.js` — Google review URL helpers.
 - `js/fulfilment.js` — fulfilment attribute keys and transformations.
-- `js/clarity-events.js` — Microsoft Clarity funnel events.
+- `js/clarity-events.js` — Microsoft Clarity funnel events plus persistent owner test-mode opt-out.
 - `js/config.js` — public browser configuration.
 - `js/page.js` — shared behaviour on supporting pages.
 - `scripts/check-invariants.mjs` — repository guardrails + JavaScript syntax checks.
