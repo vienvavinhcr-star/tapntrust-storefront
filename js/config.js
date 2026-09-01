@@ -12,6 +12,10 @@ export const config = Object.freeze({
   MAIN_PRODUCT_HANDLE: "tapntrust-nfc-review-card",
   STAND_PRODUCT_HANDLE: "tapntrust-counter-stand",
   EXTRA_CARD_PRODUCT_HANDLE: "tapntrust-extra-nfc-card",
+  WELCOME_DISCOUNT_CODE: "WELCOMETNT",
+  WELCOME_DISCOUNT_PERCENT: 10,
+  WELCOME_POPUP_COOLDOWN_DAYS: 14,
+  LEAD_CAPTURE_ENDPOINT: "https://script.google.com/macros/s/AKfycbxCpk3-e2MJoUnV0fPfhMlco-wVGSxeG-sXH06QhbPpNPKXglA8BFmIrL9KA2koScC3/exec",
   GOOGLE_MAPS_API_KEY: "AIzaSyCOTsNKgB-NNvqfe2UFySJKE-_X4LCXFJU",
   CONSULTATION_ENDPOINT: "",
   SITE_URL: "https://tapntrust.com",
@@ -20,5 +24,9 @@ export const config = Object.freeze({
   FACEBOOK_URL: "https://www.facebook.com/tapntrust.com.au/",
   INSTAGRAM_URL: "https://www.instagram.com/tapntrust.au/"
 });
+
+import("./marketing/welcome-offer.js?v=20260901-1")
+  .then(({ initialiseWelcomeOffer }) => initialiseWelcomeOffer(config))
+  .catch(() => {});
 
 export default config;

@@ -19,6 +19,7 @@ Use the smallest relevant surface area.
 - Navigation, product viewer, mobile buy bar, placement carousel, step demo, reveal effects: inspect `js/ui/site.js` plus the relevant HTML/CSS only.
 - Cart drawer presentation/interactions: inspect `js/ui/cart-drawer.js`; inspect `js/cart.js` only if cart state/mutations must change.
 - Extra Card parent/child cleanup or checkout integrity: inspect `js/cart-integrity.js`; inspect `js/cart.js` only if the underlying Shopify cart mutation behaviour must change.
+- Welcome offer / Google Sheet lead funnel: inspect `js/marketing/welcome-offer.js`, `css/welcome-offer.css`, `js/config.js`, `integrations/google-apps-script/lead-capture.gs`, and `scripts/check-welcome-offer.mjs`. Only inspect Shopify discount transport when auto-apply behavior changes.
 - Review-link guide dialog: inspect `js/ui/guide.js` and `js/ui/common.js` only.
 - Consultation form: inspect `js/forms/consultation.js`.
 - Business search / Google review destination: read `docs/FULFILMENT.md`, then `js/business-finder.js`, `js/google-review.js`, and only related callers.
@@ -44,8 +45,12 @@ Use the smallest relevant surface area.
 13. Google browser API keys must remain HTTP-referrer/API restricted. Never replace them with unrestricted secret credentials in client code.
 14. `js/app.js` is the canonical storefront entry source. `js/app.min.js` is only a tiny compatibility shim and must not become a second implementation.
 15. Keep concerns in their existing module when possible; do not move unrelated logic back into `js/app.js`.
-16. The retired custom welcome-email popup and its Google Sheets lead funnel must not be reintroduced unless the owner explicitly requests them. Email signup and discount delivery are handled outside this frontend.
-17. Tapntrust owner test mode must suppress both Microsoft Clarity and browser-side Meta Pixel/events on the owner's browser. `?test=1` enables the persistent browser flag and `?test=0` disables it. Do not weaken this suppression without explicit owner approval.
+16. The welcome offer is **WELCOMETNT for 10% off**. It may auto-open once after a successful primary Add to Cart, but dismissing it must not remove the offer from the cart. The 14-day suppression starts only after the customer successfully submits an email/claims the offer.
+17. The cart must keep a recoverable welcome-offer CTA while a primary package exists and the offer is unclaimed. After claim, show the unlocked code/status instead of asking for email again during the active 14-day period.
+18. Welcome signup may auto-apply `WELCOMETNT` using Shopify Storefront `cartDiscountCodesUpdate`; if auto-apply fails, the code must remain visible/copyable for manual checkout entry. Never hack the Shopify checkout URL for this discount.
+19. Welcome lead tracking may record email, signup time, successful primary Add to Cart time and real checkout-click time. A new lead cycle must not inherit a checkout timestamp from an earlier lead. Do not mark checkout until the customer actually clicks an enabled checkout CTA.
+20. The Google Apps Script lead endpoint is public-by-design, but no private Google credential may be embedded in browser code. Payment credentials must never be sent to the lead sheet.
+21. Tapntrust owner test mode must suppress both Microsoft Clarity and browser-side Meta Pixel/events on the owner's browser. `?test=1` enables the persistent browser flag and `?test=0` disables it. Do not weaken this suppression without explicit owner approval.
 
 ## Small-change policy — important for token efficiency
 
@@ -79,6 +84,7 @@ For sensitive changes, explicitly confirm in the final work summary that the pro
 
 - `index.html` — main storefront markup and current production analytics bootstrap.
 - `css/styles.css`, `css/styles.min.css` — storefront styling.
+- `css/welcome-offer.css` — welcome popup and cart recovery offer presentation.
 - `js/app.js` — small storefront entry/orchestrator and product configurator wiring.
 - `js/app.min.js` — compatibility shim that imports `js/app.js`; do not add feature logic here.
 - `js/ui/common.js` — shared toast, text, focus-trap and body-lock helpers.
@@ -89,17 +95,20 @@ For sensitive changes, explicitly confirm in the final work summary that the pro
 - `js/forms/consultation.js` — consultation/contact form behaviour.
 - `js/test-mode.js` — persistent owner analytics test mode shared by Meta and Clarity.
 - `js/analytics/meta.js` — Meta Pixel fallback and browser-side pre-purchase commerce events.
+- `js/marketing/welcome-offer.js` — welcome popup, cart recovery CTA, claim state, Shopify discount auto-apply and lead funnel forwarding.
 - `js/metadata.js` — runtime canonical/OG/structured metadata.
 - `js/cart.js` — cart state, Shopify line attributes, packages, upsells, discounts.
-- `js/shopify.js` — Storefront API transport and GraphQL operations.
+- `js/shopify.js` — Storefront API transport and GraphQL operations, including cart discount-code updates.
 - `js/business-finder.js` — Google Places business selection.
 - `js/google-review.js` — Google review URL helpers.
 - `js/fulfilment.js` — fulfilment attribute keys and transformations.
 - `js/clarity-events.js` — Microsoft Clarity funnel events plus persistent owner test-mode opt-out.
-- `js/config.js` — public browser configuration.
+- `js/config.js` — public browser configuration, including the public lead endpoint and welcome offer settings.
 - `js/page.js` — shared behaviour on supporting pages.
+- `integrations/google-apps-script/lead-capture.gs` — Apps Script Web App source for the Tapntrust Leads Google Sheet.
 - `scripts/check-invariants.mjs` — repository guardrails + JavaScript syntax checks.
 - `scripts/check-cart-integrity.mjs` — regression tests for Extra Card dependency rules.
+- `scripts/check-welcome-offer.mjs` — regression checks for welcome offer claim, recovery, discount and funnel rules.
 
 ## Documentation map
 
