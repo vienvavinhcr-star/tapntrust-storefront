@@ -10,7 +10,7 @@ The Meta Pixel ID above is the canonical storefront value. Any remaining legacy 
 
 ## Meta Pixel ownership
 
-Current storefront pages still contain legacy inline Meta Pixel bootstrap markup. `js/analytics/meta.js` contains the guarded browser fallback initializer used by the main storefront. It runs only if `config.META_PIXEL_ID` is numeric **and** `window.fbq` does not already exist.
+Current storefront pages still contain legacy inline Meta Pixel bootstrap markup. `js/analytics/meta.js` contains the guarded browser fallback initializer used by the main storefront. It runs only if `config.META_PIXEL_ID` is numeric, owner test mode is not active, and `window.fbq` does not already exist.
 
 Rules:
 - Do not add another Pixel bootstrap snippet.
@@ -47,16 +47,16 @@ The module uses sessionStorage guards to avoid repeatedly firing the same Clarit
 Tapntrust has a browser-local owner test mode for development/testing sessions:
 
 - Open `https://tapntrust.com/?test=1` once in the browser you use for testing.
-- The mode is persisted in localStorage on that browser, so later visits to the storefront remain in test mode even without the query parameter.
-- While test mode is enabled, `js/clarity-events.js` sends Clarity's opt-out call and does not emit Tapntrust Clarity funnel events.
-- Meta Pixel remains enabled so Meta Events Manager can still be tested.
+- The mode is persisted in localStorage on that browser, so later visits remain in test mode even without the query parameter.
+- While active, `js/test-mode.js` opts out of Clarity, neutralises queued browser-side Meta Pixel calls, and `js/analytics/meta.js` refuses to initialize or emit Meta events.
+- `js/clarity-events.js` also refuses to emit Tapntrust Clarity funnel events.
 - To return that browser to normal analytics behaviour, open `https://tapntrust.com/?test=0` once.
 
-Do not change the meaning of `?test=1` or make it suppress Meta Pixel unless the owner explicitly asks.
+The storefront still contains legacy inline Meta bootstrap markup, so test-mode code must remain early in the JavaScript dependency chain. A future analytics-centralisation refactor should move all browser Pixel bootstrap ownership into the analytics module so suppression can happen before any inline Pixel code.
 
 ## Google Analytics
 
-GA is bootstrapped in HTML using measurement ID `G-0MT4JK9R04`. Do not add a second GA bootstrap without an explicit analytics migration plan.
+GA is bootstrapped in HTML using measurement ID `G-0MT4JK9R04`. Owner test mode currently targets Clarity and Meta only; Google Analytics is unchanged. Do not add a second GA bootstrap without an explicit analytics migration plan.
 
 ## Known issue corrected in maintenance layer
 
@@ -64,4 +64,4 @@ GA is bootstrapped in HTML using measurement ID `G-0MT4JK9R04`. Do not add a sec
 
 ## Source-of-truth rule
 
-Do not duplicate Meta helper implementations back into `js/app.js` or `js/app.min.js`. Meta browser logic belongs in `js/analytics/meta.js`; `js/app.min.js` is only a compatibility entry to canonical `js/app.js`.
+Do not duplicate Meta helper implementations back into `js/app.js` or `js/app.min.js`. Meta browser logic belongs in `js/analytics/meta.js`; shared owner test-mode logic belongs in `js/test-mode.js`; `js/app.min.js` is only a compatibility entry to canonical `js/app.js`.
