@@ -35,8 +35,19 @@
 
   document.documentElement.dataset.tapntrustTestMode = "true";
 
-  // Block the legacy inline Meta Pixel bootstrap before it can load fbevents.js.
-  // Its later fbq('init') / fbq('track') calls become intentional no-ops.
+  // Neutralise any queued browser-side Meta Pixel calls and stop subsequent
+  // storefront fbq events on this browser while owner test mode is active.
+  try {
+    if (typeof window.fbq === "function") {
+      window.fbq("consent", "revoke");
+      if (Array.isArray(window.fbq.queue)) window.fbq.queue.length = 0;
+    }
+  } catch {
+    // Continue with the local no-op even if the legacy Pixel stub rejects a call.
+  }
+
+  document.querySelectorAll('script[src*="connect.facebook.net/"]').forEach((script) => script.remove());
+
   const noopFbq = function () {};
   noopFbq.loaded = true;
   noopFbq.version = "2.0";
@@ -44,7 +55,7 @@
   window.fbq = noopFbq;
   window._fbq = noopFbq;
 
-  // Queue Clarity opt-out before its delayed/bootstrap script can record.
+  // Queue Clarity opt-out and suppress Tapntrust Clarity funnel events.
   window.clarity = window.clarity || function (...args) {
     (window.clarity.q = window.clarity.q || []).push(args);
   };
