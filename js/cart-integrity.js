@@ -1,5 +1,4 @@
 import { FULFILMENT_KEYS, businessDetailsFromAttributes } from "./fulfilment.js";
-import { ShopifyError, addCartLines } from "./shopify.js";
 import {
   FIVE_CARD_STAND_GIFT_VARIANT_TITLE,
   bundleGiftPlan,
@@ -96,6 +95,7 @@ export function createIntegrityCartActions(baseCartActions) {
   }
 
   async function addBundleGiftStand(parentSetupId) {
+    const { ShopifyError, addCartLines } = await import("./shopify.js");
     const currentState = baseCartActions.getState();
     const standVariant = findBundleGiftStandVariant(currentState.catalog);
     if (!standVariant) {
@@ -138,7 +138,7 @@ export function createIntegrityCartActions(baseCartActions) {
         ));
         if (!gift || Number(gift.lineTotal || 0) > 0.005) {
           if (gift?.id) await baseCartActions.removeLine(gift.id);
-          throw new ShopifyError("The 5-card bundle Counter Stand was not returned by Shopify as a true A$0.00 line item.");
+          throw new Error("The 5-card bundle Counter Stand was not returned by Shopify as a true A$0.00 line item.");
         }
       }
 
