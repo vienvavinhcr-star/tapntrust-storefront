@@ -23,7 +23,7 @@ Use the smallest relevant surface area.
 - Consultation form: inspect `js/forms/consultation.js`.
 - Business search / Google review destination: read `docs/FULFILMENT.md`, then `js/business-finder.js`, `js/google-review.js`, and only related callers.
 - Cart, packages, extras, discounts: read `docs/COMMERCE.md`, then `js/cart.js` and `js/shopify.js`.
-- Meta Pixel / Clarity / analytics / test mode: read `docs/ANALYTICS.md`, then the relevant file under `js/analytics/` or `js/clarity-events.js` and only its relevant callers.
+- Meta Pixel / Clarity / analytics / test mode: read `docs/ANALYTICS.md`, then `js/test-mode.js`, `js/analytics/meta.js`, `js/clarity-events.js`, and only relevant callers.
 - SEO/runtime structured metadata: inspect `js/metadata.js`.
 - Cross-cutting architectural changes: read `docs/ARCHITECTURE.md`.
 
@@ -45,7 +45,7 @@ Use the smallest relevant surface area.
 14. `js/app.js` is the canonical storefront entry source. `js/app.min.js` is only a tiny compatibility shim and must not become a second implementation.
 15. Keep concerns in their existing module when possible; do not move unrelated logic back into `js/app.js`.
 16. The retired custom welcome-email popup and its Google Sheets lead funnel must not be reintroduced unless the owner explicitly requests them. Email signup and discount delivery are handled outside this frontend.
-17. Tapntrust owner test mode must continue to suppress Microsoft Clarity tracking on the owner's browser. `?test=1` enables the persistent browser flag and `?test=0` disables it. Do not make this mode disable Meta Pixel unless explicitly requested.
+17. Tapntrust owner test mode must suppress both Microsoft Clarity and browser-side Meta Pixel/events on the owner's browser. `?test=1` enables the persistent browser flag and `?test=0` disables it. Do not weaken this suppression without explicit owner approval.
 
 ## Small-change policy — important for token efficiency
 
@@ -87,6 +87,7 @@ For sensitive changes, explicitly confirm in the final work summary that the pro
 - `js/cart-integrity.js` — Extra Card parent/child enforcement, orphan cleanup and checkout guard.
 - `js/ui/guide.js` — review-link guide dialog.
 - `js/forms/consultation.js` — consultation/contact form behaviour.
+- `js/test-mode.js` — persistent owner analytics test mode shared by Meta and Clarity.
 - `js/analytics/meta.js` — Meta Pixel fallback and browser-side pre-purchase commerce events.
 - `js/metadata.js` — runtime canonical/OG/structured metadata.
 - `js/cart.js` — cart state, Shopify line attributes, packages, upsells, discounts.
