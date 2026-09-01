@@ -42,6 +42,18 @@ When changing Shopify/Meta integrations, verify in Meta Test Events rather than 
 
 The module uses sessionStorage guards to avoid repeatedly firing the same Clarity funnel event in one session.
 
+### Owner test mode
+
+Tapntrust has a browser-local owner test mode for development/testing sessions:
+
+- Open `https://tapntrust.com/?test=1` once in the browser you use for testing.
+- The mode is persisted in localStorage on that browser, so later visits to the storefront remain in test mode even without the query parameter.
+- While test mode is enabled, `js/clarity-events.js` sends Clarity's opt-out call and does not emit Tapntrust Clarity funnel events.
+- Meta Pixel remains enabled so Meta Events Manager can still be tested.
+- To return that browser to normal analytics behaviour, open `https://tapntrust.com/?test=0` once.
+
+Do not change the meaning of `?test=1` or make it suppress Meta Pixel unless the owner explicitly asks.
+
 ## Google Analytics
 
 GA is bootstrapped in HTML using measurement ID `G-0MT4JK9R04`. Do not add a second GA bootstrap without an explicit analytics migration plan.
