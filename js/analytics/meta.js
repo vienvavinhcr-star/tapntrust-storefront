@@ -1,4 +1,9 @@
+function ownerTestModeActive() {
+  return window.TAPNTRUST_TEST_MODE === true;
+}
+
 export function initialiseMetaPixel(config) {
+  if (ownerTestModeActive()) return;
   if (!/^\d+$/.test(String(config.META_PIXEL_ID || "")) || typeof window.fbq === "function") return;
 
   const fbq = function (...args) { fbq.callMethod ? fbq.callMethod(...args) : fbq.queue.push(args); };
@@ -15,7 +20,7 @@ export function initialiseMetaPixel(config) {
 }
 
 export function trackMetaEvent(eventName, parameters = {}) {
-  if (typeof window.fbq !== "function") return false;
+  if (ownerTestModeActive() || typeof window.fbq !== "function") return false;
   try {
     window.fbq("track", eventName, parameters);
     return true;
@@ -53,6 +58,7 @@ export function upsellMetaParameters(cartActions, kind) {
 }
 
 export function initialiseMetaCommerceEvents() {
+  if (ownerTestModeActive()) return;
   const oneCard = document.querySelector('[data-package="1"]');
   trackMetaEvent("ViewContent", {
     content_name: "Tapntrust NFC Review Card",
