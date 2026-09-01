@@ -2,7 +2,7 @@
  * Public GitHub Pages configuration.
  * Storefront tokens are designed for browser use. Admin/private tokens are not.
  */
-import("./clarity-events.js").catch(() => {});
+import("./clarity-events.js?v=20260901-1").catch(() => {});
 
 export const config = Object.freeze({
   SHOPIFY_STORE_DOMAIN: "https://iz8qif-0j.myshopify.com",
