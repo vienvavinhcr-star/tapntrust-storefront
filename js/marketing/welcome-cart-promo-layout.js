@@ -11,12 +11,12 @@ function ensureStyles() {
 
 function placePromo() {
   const drawer = document.querySelector("[data-cart-drawer]");
-  const header = drawer?.querySelector(".cart-drawer__header");
+  const content = drawer?.querySelector("[data-cart-content]");
   const promo = drawer?.querySelector("[data-welcome-cart-offer]");
-  if (!drawer || !header || !promo) return false;
+  if (!drawer || !content || !promo) return false;
 
   promo.classList.add("welcome-cart-offer--top");
-  if (header.nextElementSibling !== promo) header.insertAdjacentElement("afterend", promo);
+  if (content.firstElementChild !== promo) content.prepend(promo);
   return true;
 }
 
