@@ -1,10 +1,9 @@
 import { FULFILMENT_KEYS, businessDetailsFromAttributes } from "./fulfilment.js";
 import {
-  FIVE_CARD_STAND_GIFT_VARIANT_TITLE,
   bundleGiftPlan,
   bundleGiftStandAttributes,
   bundleGiftParentSetupId,
-  findBundleGiftStandVariant,
+  findPaidCounterStandVariant,
   isBundleGiftStand,
   packageCountForPrimaryLine,
   primarySetupId
@@ -97,13 +96,8 @@ export function createIntegrityCartActions(baseCartActions) {
   async function addBundleGiftStand(parentSetupId) {
     const { ShopifyError, addCartLines } = await import("./shopify.js");
     const currentState = baseCartActions.getState();
-    const standVariant = findBundleGiftStandVariant(currentState.catalog);
-    if (!standVariant) {
-      throw new ShopifyError(
-        `The free Counter Stand variant "${FIVE_CARD_STAND_GIFT_VARIANT_TITLE}" is missing or is not priced at A$0.00 in Shopify.`
-      );
-    }
-    if (!standVariant.available) {
+    const standVariant = findPaidCounterStandVariant(currentState.catalog);
+    if (!standVariant?.available) {
       throw new ShopifyError("The free Counter Stand is currently unavailable.");
     }
     if (!currentState.cart?.id) throw new ShopifyError("The Shopify cart is not ready for the free Counter Stand.");
@@ -138,7 +132,9 @@ export function createIntegrityCartActions(baseCartActions) {
         ));
         if (!gift || Number(gift.lineTotal || 0) > 0.005) {
           if (gift?.id) await baseCartActions.removeLine(gift.id);
-          throw new Error("The 5-card bundle Counter Stand was not returned by Shopify as a true A$0.00 line item.");
+          throw new Error(
+            "The 5-card bundle Counter Stand was not discounted to A$0.00 by Shopify. Check the active automatic Buy X get Y discount."
+          );
         }
       }
 
