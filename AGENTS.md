@@ -51,7 +51,7 @@ Use the smallest relevant surface area.
 19. Welcome lead tracking may record email, signup time, successful primary Add to Cart time and real checkout-click time. A new lead cycle must not inherit a checkout timestamp from an earlier lead. Do not mark checkout until the customer actually clicks an enabled checkout CTA.
 20. The Google Apps Script lead endpoint is public-by-design, but no private Google credential may be embedded in browser code. Payment credentials must never be sent to the lead sheet.
 21. Tapntrust owner test mode must suppress both Microsoft Clarity and browser-side Meta Pixel/events on the owner's browser. `?test=1` enables the persistent browser flag and `?test=0` disables it. Do not weaken this suppression without explicit owner approval.
-22. A 5-card package includes one physical Counter Stand and that gift must be a **real Shopify A$0 line item**, not UI-only text. It uses the Counter Stand variant titled `5 Card Bundle Gift` priced at A$0.00. The gift must be linked to its parent package, removed when the parent is removed/changed away from 5 cards, and must never reach checkout with a non-zero line total.
+22. A 5-card package includes one physical Counter Stand and that gift must be a **real Shopify line item**, not UI-only text. The storefront adds the normal Counter Stand as the Y item, while Shopify's active automatic Buy X get Y discount must make that linked gift line A$0. The gift must be linked to its parent package, removed when the parent is removed/changed away from 5 cards, and must never reach checkout with a non-zero line total. Do not create a separate A$0 bundle variant while this automatic discount flow is active.
 
 ## Small-change policy — important for token efficiency
 
@@ -90,9 +90,9 @@ For sensitive changes, explicitly confirm in the final work summary that the pro
 - `js/app.min.js` — compatibility shim that imports `js/app.js`; do not add feature logic here.
 - `js/ui/common.js` — shared toast, text, focus-trap and body-lock helpers.
 - `js/ui/site.js` — independent site UI: navigation, product viewer, mobile bar, walkthrough, animations/carousels.
-- `js/ui/cart-drawer.js` — cart drawer rendering and user interactions; delegates state mutations to `js/cart.js`.
+- `js/cart-drawer.js` — cart drawer rendering and user interactions; delegates state mutations to `js/cart.js`.
 - `js/cart-integrity.js` — Extra Card parent/child enforcement, 5-card gift-stand synchronization, orphan cleanup and checkout guard.
-- `js/bundle-gift.js` — 5-card package / free Counter Stand linkage and A$0 gift validation helpers.
+- `js/bundle-gift.js` — 5-card package / automatic free Counter Stand linkage and A$0 gift validation helpers.
 - `js/ui/guide.js` — review-link guide dialog.
 - `js/forms/consultation.js` — consultation/contact form behaviour.
 - `js/test-mode.js` — persistent owner analytics test mode shared by Meta and Clarity.
