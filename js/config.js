@@ -4,6 +4,7 @@
  */
 import "./test-mode.js?v=20260901-1";
 import("./clarity-events.js?v=20260901-2").catch(() => {});
+import("./marketing/welcome-cart-promo-layout.js?v=20260902-1").catch(() => {});
 
 export const config = Object.freeze({
   SHOPIFY_STORE_DOMAIN: "https://iz8qif-0j.myshopify.com",
