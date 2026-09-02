@@ -3,7 +3,7 @@ from pathlib import Path
 path = Path('index.html')
 text = path.read_text()
 start = text.index('  <!-- Google tag (gtag.js) -->')
-end_marker = '  <!-- End Meta Pixel Code -->'
+end_marker = '<!-- End Meta Pixel Code -->'
 end = text.index(end_marker, start) + len(end_marker)
 replacement = '''  <!-- Owner test-mode gate + analytics bootstrap -->
   <script>
