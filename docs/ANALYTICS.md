@@ -48,15 +48,16 @@ Tapntrust has a browser-local owner test mode for development/testing sessions:
 
 - Open `https://tapntrust.com/?test=1` once in the browser you use for testing.
 - The mode is persisted in localStorage on that browser, so later visits remain in test mode even without the query parameter.
-- While active, `js/test-mode.js` opts out of Clarity, neutralises queued browser-side Meta Pixel calls, and `js/analytics/meta.js` refuses to initialize or emit Meta events.
+- While active, the early homepage gate prevents Google Analytics and the inline Meta Pixel bootstrap from loading, `js/test-mode.js` hard-blocks Clarity, and `js/analytics/meta.js` refuses to initialize or emit Meta events.
 - `js/clarity-events.js` also refuses to emit Tapntrust Clarity funnel events.
+- Shopify behavior and the Google Sheet welcome-lead funnel intentionally remain active so the owner can test commerce and lead capture.
 - To return that browser to normal analytics behaviour, open `https://tapntrust.com/?test=0` once.
 
 The storefront still contains legacy inline Meta bootstrap markup, so test-mode code must remain early in the JavaScript dependency chain. A future analytics-centralisation refactor should move all browser Pixel bootstrap ownership into the analytics module so suppression can happen before any inline Pixel code.
 
 ## Google Analytics
 
-GA is bootstrapped in HTML using measurement ID `G-0MT4JK9R04`. Owner test mode currently targets Clarity and Meta only; Google Analytics is unchanged. Do not add a second GA bootstrap without an explicit analytics migration plan.
+GA uses measurement ID `G-0MT4JK9R04`. The homepage analytics bootstrap runs only when owner test mode is inactive; while `?test=1` is active, the GA script is not loaded and the `ga-disable-G-0MT4JK9R04` flag is set as a second guard. Do not add a second GA bootstrap without an explicit analytics migration plan.
 
 ## Known issue corrected in maintenance layer
 
