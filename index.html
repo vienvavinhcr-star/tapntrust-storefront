@@ -4,32 +4,54 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="canonical" href="https://tapntrust.com/">
-  <!-- Google tag (gtag.js) -->
-  <script async src="https://www.googletagmanager.com/gtag/js?id=G-0MT4JK9R04"></script>
+  <!-- Owner test-mode gate + analytics bootstrap -->
   <script>
-    window.dataLayer = window.dataLayer || [];
-    function gtag(){dataLayer.push(arguments);}
-    gtag('js', new Date());
-    gtag('config', 'G-0MT4JK9R04');
+    (() => {
+      const TEST_MODE_KEY = 'tapntrust_test_mode';
+      let requested = '';
+      try { requested = new URLSearchParams(window.location.search).get('test') || ''; } catch {}
+      try {
+        if (requested === '1') localStorage.setItem(TEST_MODE_KEY, '1');
+        else if (requested === '0') localStorage.removeItem(TEST_MODE_KEY);
+      } catch {}
+      let stored = false;
+      try { stored = localStorage.getItem(TEST_MODE_KEY) === '1'; } catch {}
+      const enabled = requested === '1' || (requested !== '0' && stored);
+      window.TAPNTRUST_TEST_MODE = enabled;
+      window['ga-disable-G-0MT4JK9R04'] = enabled;
+      if (enabled) {
+        document.documentElement.dataset.tapntrustTestMode = 'true';
+        const noopFbq = function () {};
+        noopFbq.loaded = true;
+        noopFbq.version = '2.0';
+        noopFbq.queue = [];
+        window.fbq = noopFbq;
+        window._fbq = noopFbq;
+        return;
+      }
+      const ga = document.createElement('script');
+      ga.async = true;
+      ga.src = 'https://www.googletagmanager.com/gtag/js?id=G-0MT4JK9R04';
+      document.head.append(ga);
+      window.dataLayer = window.dataLayer || [];
+      window.gtag = window.gtag || function () { window.dataLayer.push(arguments); };
+      window.gtag('js', new Date());
+      window.gtag('config', 'G-0MT4JK9R04');
+      !function(f,b,e,v,n,t,s)
+      {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+      n.callMethod.apply(n,arguments):n.queue.push(arguments)};
+      if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
+      n.queue=[];t=b.createElement(e);t.async=!0;
+      t.src=v;s=b.getElementsByTagName(e)[0];
+      s.parentNode.insertBefore(t,s)}(window, document,'script',
+      'https://connect.facebook.net/en_US/fbevents.js');
+      window.fbq('init', '2121538478429149');
+      window.fbq('track', 'PageView');
+    })();
   </script>
-
-<!-- Meta Pixel Code -->
-<script>
-!function(f,b,e,v,n,t,s)
-{if(f.fbq)return;n=f.fbq=function(){n.callMethod?
-n.callMethod.apply(n,arguments):n.queue.push(arguments)};
-if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
-n.queue=[];t=b.createElement(e);t.async=!0;
-t.src=v;s=b.getElementsByTagName(e)[0];
-s.parentNode.insertBefore(t,s)}(window, document,'script',
-'https://connect.facebook.net/en_US/fbevents.js');
-fbq('init', '2121538478429149');
-fbq('track', 'PageView');
-</script>
-<noscript><img height="1" width="1" style="display:none" alt=""
-src="https://www.facebook.com/tr?id=2121538478429149&ev=PageView&noscript=1"
-/></noscript>
-<!-- End Meta Pixel Code -->
+  <noscript><img height="1" width="1" style="display:none" alt=""
+  src="https://www.facebook.com/tr?id=2121538478429149&ev=PageView&noscript=1"
+  /></noscript>
   
   <title>NFC Google Review Cards Australia | Tapntrust</title>
   <meta name="description" content="Make it easier for customers to reach your review page with a Tapntrust NFC Review Card. Designed for Australian local businesses.">
@@ -968,6 +990,7 @@ src="https://www.facebook.com/tr?id=2121538478429149&ev=PageView&noscript=1"
       };
 
       const scheduleClarity = () => {
+        if (window.TAPNTRUST_TEST_MODE === true) return;
         const loadClarity = () => {
           window.clarity = window.clarity || function () {
             (window.clarity.q = window.clarity.q || []).push(arguments);
