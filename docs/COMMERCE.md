@@ -16,15 +16,18 @@ The storefront expects 1, 2, 3 and 5 card package variants on the main Shopify p
 
 The 5-card package includes one physical Counter Stand. This must be represented as a real Shopify cart line so it appears in Shopify Checkout, the final Shopify order, and fulfilment.
 
-The existing Counter Stand Shopify product must include a dedicated variant with these exact properties:
-- variant title: `5 Card Bundle Gift`;
-- price: `A$0.00`;
-- recommended compare-at price: `A$14.49`;
-- available inventory / available for sale.
+Shopify owns the free price through the active automatic **Buy X get Y** discount for the 5-card package + Counter Stand. Shopify does not automatically add the Y item, so the storefront adds the normal paid Counter Stand variant to the cart with private `_Bundle Gift` / `_Bundle Parent Setup ID` attributes. Shopify must then return that gift line with a zero line total.
 
-The existing paid Counter Stand variant must remain the normal paid option and should stay first in the Shopify variant order so the optional paid stand upsell continues to use it.
+Rules:
+- only a 5-card primary package requires a gift stand;
+- the storefront adds one linked Counter Stand line for each qualifying 5-card primary package;
+- Shopify's automatic Buy X get Y discount must make that linked stand line A$0.00;
+- if Shopify returns the supposed gift with a non-zero line total, the storefront removes it and does not allow the bundle state to proceed as valid;
+- removing the parent package or changing away from 5 cards removes the linked gift stand;
+- the normal Counter Stand product/variant remains the optional paid stand when added manually outside the bundle flow;
+- do not create a separate A$0 product/variant for the bundle while this automatic discount flow is active.
 
-The storefront adds the zero-price gift variant only for a 5-card primary package and attaches private `_Bundle Gift` / `_Bundle Parent Setup ID` attributes. It removes the gift when the parent package is removed or changed away from 5 cards. Checkout integrity must reject/remove any supposed bundle gift that Shopify returns with a non-zero line total. Never fake a free stand only in UI.
+The automatic bundle discount must be configured so it qualifies exactly the intended 5-card purchase and gives one Counter Stand free. Discount-combination settings in Shopify are authoritative for whether this automatic offer can stack with `WELCOMETNT`.
 
 ## Cart ownership
 
@@ -48,7 +51,7 @@ Rules:
 - GitHub frontend must never fire Meta `Purchase`.
 - Payment and successful order completion remain authoritative in Shopify.
 - Before checkout, any orphan Extra NFC Card must be removed from the Shopify cart.
-- A 5-card package must have its linked A$0 Counter Stand gift line before checkout.
+- A 5-card package must have its linked Counter Stand gift line and Shopify must return that line at A$0 before checkout.
 
 ## Upsells
 
@@ -65,19 +68,21 @@ Dependency enforcement:
 - legacy carts without setup IDs fall back to matching business name + review URL.
 
 ### Counter Stand
-Counter Stand is a physical accessory. It does not require business/review metadata. A normal paid stand is independent and is not removed when a card package is removed. The dedicated `5 Card Bundle Gift` variant is different: it is linked to its 5-card parent through private bundle attributes and must be removed with that parent.
+Counter Stand is a physical accessory. It does not require business/review metadata. A normal manually added stand is independent and is not removed when a card package is removed. A stand tagged as the 5-card bundle gift is different: it is linked to its parent through private bundle attributes and must be removed with that parent.
 
 ## Changing packages
 
 Changing the main package variant must preserve its existing Shopify line attributes. Current code intentionally omits attributes during the merchandise/quantity update so Shopify retains the current metadata.
 
-Changing a package to 5 cards must add the A$0 gift stand. Changing away from 5 cards must remove that linked gift stand.
+Changing a package to 5 cards must add the linked gift stand and confirm Shopify discounted it to A$0. Changing away from 5 cards must remove that linked gift stand.
 
 ## Discounts
 
 The public config contains a welcome discount code used by the storefront. Shopify is authoritative for whether a discount is valid/applicable.
 
-The 5-card Counter Stand gift is not a discount-code simulation: it uses a dedicated A$0 Shopify variant so the physical item is a real order line.
+The 5-card Counter Stand gift uses Shopify's automatic Buy X get Y discount. The storefront only supplies the required Y line; it never fakes or overrides Shopify pricing.
+
+`WELCOMETNT` and the automatic bundle offer can both apply only if Shopify's discount-combination settings permit them to combine. Do not simulate stacking in frontend code if Shopify rejects the combination.
 
 Do not simulate an accepted Shopify discount in production if Shopify rejected it.
 
