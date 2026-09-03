@@ -1,0 +1,67 @@
+.google-review-proof__stars {
+  display: inline-flex;
+  gap: .08em;
+  letter-spacing: 0;
+}
+
+.google-review-proof__star {
+  color: #c8d2df;
+  opacity: .72;
+  transform: scale(.94);
+  transform-origin: 50% 55%;
+  will-change: color, opacity, transform, filter;
+  animation-duration: 11.2s;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+}
+
+.google-review-proof__star--1 { animation-name: google-review-star-1; }
+.google-review-proof__star--2 { animation-name: google-review-star-2; }
+.google-review-proof__star--3 { animation-name: google-review-star-3; }
+.google-review-proof__star--4 { animation-name: google-review-star-4; }
+.google-review-proof__star--5 { animation-name: google-review-star-5; }
+
+@keyframes google-review-star-1 {
+  0%, 1% { color: #c8d2df; opacity: .72; transform: scale(.94); filter: none; }
+  3% { color: #ffbd18; opacity: 1; transform: scale(1.08); filter: drop-shadow(0 2px 5px rgba(247, 181, 0, .24)); }
+  5%, 92% { color: #f7b500; opacity: 1; transform: scale(1); filter: drop-shadow(0 1px 3px rgba(247, 181, 0, .16)); }
+  96%, 100% { color: #c8d2df; opacity: .72; transform: scale(.94); filter: none; }
+}
+
+@keyframes google-review-star-2 {
+  0%, 6% { color: #c8d2df; opacity: .72; transform: scale(.94); filter: none; }
+  8% { color: #ffbd18; opacity: 1; transform: scale(1.08); filter: drop-shadow(0 2px 5px rgba(247, 181, 0, .24)); }
+  10%, 92% { color: #f7b500; opacity: 1; transform: scale(1); filter: drop-shadow(0 1px 3px rgba(247, 181, 0, .16)); }
+  96%, 100% { color: #c8d2df; opacity: .72; transform: scale(.94); filter: none; }
+}
+
+@keyframes google-review-star-3 {
+  0%, 11% { color: #c8d2df; opacity: .72; transform: scale(.94); filter: none; }
+  13% { color: #ffbd18; opacity: 1; transform: scale(1.08); filter: drop-shadow(0 2px 5px rgba(247, 181, 0, .24)); }
+  15%, 92% { color: #f7b500; opacity: 1; transform: scale(1); filter: drop-shadow(0 1px 3px rgba(247, 181, 0, .16)); }
+  96%, 100% { color: #c8d2df; opacity: .72; transform: scale(.94); filter: none; }
+}
+
+@keyframes google-review-star-4 {
+  0%, 16% { color: #c8d2df; opacity: .72; transform: scale(.94); filter: none; }
+  18% { color: #ffbd18; opacity: 1; transform: scale(1.08); filter: drop-shadow(0 2px 5px rgba(247, 181, 0, .24)); }
+  20%, 92% { color: #f7b500; opacity: 1; transform: scale(1); filter: drop-shadow(0 1px 3px rgba(247, 181, 0, .16)); }
+  96%, 100% { color: #c8d2df; opacity: .72; transform: scale(.94); filter: none; }
+}
+
+@keyframes google-review-star-5 {
+  0%, 21% { color: #c8d2df; opacity: .72; transform: scale(.94); filter: none; }
+  23% { color: #ffbd18; opacity: 1; transform: scale(1.08); filter: drop-shadow(0 2px 5px rgba(247, 181, 0, .24)); }
+  25%, 92% { color: #f7b500; opacity: 1; transform: scale(1); filter: drop-shadow(0 1px 3px rgba(247, 181, 0, .16)); }
+  96%, 100% { color: #c8d2df; opacity: .72; transform: scale(.94); filter: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .google-review-proof__star {
+    color: #f7b500;
+    opacity: 1;
+    transform: none;
+    filter: none;
+    animation: none !important;
+  }
+}
