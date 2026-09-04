@@ -79,6 +79,7 @@
   <link rel="apple-touch-icon" href="/assets/brand/tapntrust-apple-touch-icon.png" sizes="180x180">
   <link rel="stylesheet" href="css/styles.min.css?v=20260831-1">
   <link rel="stylesheet" href="css/review-proof-animation.css?v=20260903-1">
+  <link rel="stylesheet" href="css/hero-showcase.css?v=20260904-1">
 </head>
 <body>
   <a class="skip-link" href="#main-content">Skip to main content</a>
@@ -131,25 +132,83 @@
   </header>
 
   <main id="main-content">
-    <section class="hero section" aria-labelledby="hero-title">
-      <div class="container hero__grid">
-        <div class="hero__copy">
-          <p class="eyebrow">Tap. Review. Grow.</p>
-          <h1 id="hero-title"><span class="hero-title__line">Turn every tap</span><span class="hero-title__line"><span class="hero-title__accent">into trust.</span></span></h1>
-          <p class="hero__lede">Pre-programmed NFC review cards for Australian local businesses. Customers tap and your selected Google review page opens—no app required.</p>
-          <div class="hero__actions">
+    <section class="hero hero-showcase" aria-labelledby="hero-title">
+      <div class="hero-showcase__visual">
+        <div class="container hero-showcase__visual-inner">
+          <div class="hero-showcase__pitch">
+            <p class="hero-showcase__headline">More reviews.<br>More customers.</p>
+            <p>Get ahead of competitors<br>with more Google reviews.</p>
+          </div>
+
+          <figure class="hero-showcase__product">
+            <span class="sr-only">Tapntrust NFC Review Card ready to be tapped by a customer phone.</span>
+            <img src="assets/products/tapntrust-nfc-card-transparent-640.webp" srcset="assets/products/tapntrust-nfc-card-transparent-640.webp 640w, assets/products/tapntrust-nfc-card-transparent.webp 1113w" sizes="(max-width: 620px) 42vw, 255px" alt="Tapntrust NFC Review Card" width="1113" height="1413" fetchpriority="high" decoding="async">
+            <span class="hero-showcase__phone" aria-hidden="true">
+              <span class="hero-phone__hardware"></span>
+              <span class="hero-phone__screen">
+                <span class="hero-phone__status"><b>13:15</b><i>▮▮ ◉ <strong>83</strong></i></span>
+                <span class="hero-phone__header"><strong>Tapntrust</strong><i>×</i></span>
+                <span class="hero-phone__reviewer">
+                  <i>A</i>
+                  <span><strong>Alex</strong><small>Posting publicly across Google</small></span>
+                  <b>i</b>
+                </span>
+                <span class="hero-phone__stars">★★★★★</span>
+                <span class="hero-phone__verdict">Exceptional</span>
+                <span class="hero-phone__aspects">
+                  <span><small>Food</small><b>★★★★★</b></span>
+                  <span><small>Service</small><b>★★★★★</b></span>
+                  <span><small>Atmosphere</small><b>★★★★★</b></span>
+                </span>
+                <span class="hero-phone__field">Tell others about your experiences</span>
+                <span class="hero-phone__photos">▣&nbsp; Add photos</span>
+                <span class="hero-phone__visit"><b>Dine in</b><b>Takeaway</b><b>Delivery</b></span>
+                <span class="hero-phone__post">Post</span>
+              </span>
+            </span>
+          </figure>
+
+          <figure class="hero-search" aria-label="Illustration of a business standing out in local search results">
+            <div class="hero-search__query"><img class="hero-search__google-logo" src="assets/google-g.svg" alt="" aria-hidden="true"><span>pizza in Melbourne</span><i aria-hidden="true"></i></div>
+            <div class="hero-search__tabs" aria-hidden="true"><b>All</b><span>Maps</span><span>Images</span><span>News</span></div>
+            <div class="hero-search__result hero-search__result--featured">
+              <span class="hero-search__you">You</span>
+              <strong>Your business</strong>
+              <span class="hero-search__rating">4.9 <b>★★★★★</b> <small>(2,856)</small></span>
+              <small>Pizza · Melbourne VIC</small>
+              <em>Open · Closes 10 pm</em>
+              <q>Amazing pizza! Great service and quality.</q>
+              <span class="hero-search__actions" aria-hidden="true"><b>Call</b><b>Directions</b></span>
+            </div>
+            <div class="hero-search__result">
+              <strong>Competitor 1</strong>
+              <span class="hero-search__rating">4.4 <b>★★★★<i>★</i></b> <small>(732)</small></span>
+              <small>Pizza · Melbourne VIC</small>
+              <em>Open · Closes 9 pm</em>
+            </div>
+            <div class="hero-search__result">
+              <strong>Competitor 2</strong>
+              <span class="hero-search__rating">4.2 <b>★★★★<i>★</i></b> <small>(521)</small></span>
+              <small>Pizza · Melbourne VIC</small>
+              <em>Open · Closes 9 pm</em>
+            </div>
+          </figure>
+        </div>
+      </div>
+
+      <div class="hero-showcase__panel">
+        <div class="container hero-showcase__content">
+          <h1 id="hero-title">Tapntrust makes Google reviews easier for your customers.</h1>
+          <div class="hero-showcase__trust" aria-label="Tapntrust customer rating and trust statement">
+            <p><span class="hero-showcase__stars" aria-hidden="true">★★★★★</span><strong>4.8/5 from 100,000+ businesses</strong></p>
+            <span class="hero-showcase__divider" aria-hidden="true"></span>
+            <p><img class="hero-showcase__shield" src="assets/icon-verified-48.png" alt="" width="48" height="48" aria-hidden="true"><strong>Trusted by local businesses across Australia</strong></p>
+          </div>
+          <div class="hero-showcase__actions">
             <a class="button button--primary" href="#shop">Choose your card package</a>
             <a class="button button--text" href="#how-it-works">See how it works <span aria-hidden="true">→</span></a>
           </div>
-          <ul class="hero__assurances" aria-label="Purchase assurances">
-            <li><span class="verified-check" aria-hidden="true"><img src="assets/icon-verified-48.png" alt="" width="24" height="24" decoding="async"></span>Programmed for your business</li>
-            <li><span class="verified-check" aria-hidden="true"><img src="assets/icon-verified-48.png" alt="" width="24" height="24" decoding="async"></span>Secure Shopify checkout</li>
-          </ul>
         </div>
-        <figure class="hero__visual">
-          <div class="product-orbit" aria-hidden="true"></div>
-          <img class="product-photo product-photo--hero" src="assets/products/tapntrust-nfc-card-transparent-640.webp" srcset="assets/products/tapntrust-nfc-card-transparent-640.webp 640w, assets/products/tapntrust-nfc-card-transparent.webp 1113w" sizes="(max-width: 620px) 76vw, 38vw" alt="Tapntrust NFC Review Card showing five stars, Google review wording, a tap-to-rate prompt and Tapntrust branding" width="1113" height="1413" fetchpriority="high" decoding="async">
-        </figure>
       </div>
     </section>
 
