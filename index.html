@@ -80,8 +80,10 @@
   <link rel="stylesheet" href="css/styles.min.css?v=20260831-1">
   <link rel="stylesheet" href="css/review-proof-animation.css?v=20260903-1">
   <link rel="stylesheet" href="css/hero-showcase.css?v=20260904-1">
+  <link rel="stylesheet" href="css/seasonal-theme.css?v=20260905-1">
 </head>
-<body>
+<!-- Seasonal decoration: use "fathers-day" to enable or "off" to restore the regular design. -->
+<body data-seasonal-theme="fathers-day">
   <a class="skip-link" href="#main-content">Skip to main content</a>
 
   <div class="announcement" role="status">
@@ -132,6 +134,20 @@
   </header>
 
   <main id="main-content">
+    <aside class="seasonal-decoration seasonal-greeting" aria-label="Father’s Day greeting" hidden>
+      <div class="container seasonal-greeting__inner">
+        <svg class="seasonal-greeting__illustration" viewBox="0 0 64 64" fill="none" aria-hidden="true" focusable="false">
+          <circle cx="32" cy="32" r="31" fill="#f6ecd9"/>
+          <path d="M15 49v-9c0-7 4-11 10-11s10 4 10 11v9M35 49v-5c0-5 3-8 7-8s7 3 7 8v5" stroke="currentColor" stroke-width="2.3" stroke-linecap="round"/>
+          <circle cx="25" cy="21" r="7" stroke="currentColor" stroke-width="2.3"/>
+          <circle cx="42" cy="30" r="5" stroke="currentColor" stroke-width="2.3"/>
+          <path d="m29 39 6 7 5-4" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M45 13c-4-5-9 1 0 7 9-6 4-12 0-7Z" fill="#b18a48"/>
+        </svg>
+        <p class="seasonal-greeting__message"><strong>Happy Father’s Day</strong><span>Celebrating the dads behind local businesses.</span></p>
+        <span class="seasonal-greeting__signature">With love, Tapntrust</span>
+      </div>
+    </aside>
     <section class="hero hero-showcase" aria-labelledby="hero-title">
       <div class="hero-showcase__visual">
         <div class="container hero-showcase__visual-inner">
@@ -198,6 +214,7 @@
 
       <div class="hero-showcase__panel">
         <div class="container hero-showcase__content">
+          <p class="seasonal-decoration seasonal-hero-note" hidden><span aria-hidden="true">♡</span> For the dads who do it all.</p>
           <h1 id="hero-title">Tapntrust makes Google reviews easier for your customers.</h1>
           <div class="hero-showcase__trust" aria-label="Tapntrust customer rating and trust statement">
             <p><span class="hero-showcase__stars" aria-hidden="true">★★★★★</span><strong>4.8/5 from 100,000+ businesses</strong></p>
