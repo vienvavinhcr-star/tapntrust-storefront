@@ -53,6 +53,13 @@ Use the smallest relevant surface area.
 21. Tapntrust owner test mode must suppress Microsoft Clarity, browser-side Meta Pixel/events, and Google Analytics on the owner's browser. `?test=1` enables the persistent browser flag and `?test=0` disables it. Shopify and the Google Sheet lead funnel remain active for functional testing. Do not weaken this suppression without explicit owner approval.
 22. A 5-card package includes one physical Counter Stand and that gift must be a **real Shopify line item**, not UI-only text. The storefront adds the normal Counter Stand as the Y item, while Shopify's active automatic Buy X get Y discount must make that linked gift line A$0. The gift must be linked to its parent package, removed when the parent is removed/changed away from 5 cards, and must never reach checkout with a non-zero line total. Do not create a separate A$0 bundle variant while this automatic discount flow is active.
 
+## Seasonal decorations — reusable every year
+
+- Reuse and extend seasonal themes for Australian holidays each year. Inspect only the seasonal markup in `index.html` and `css/seasonal-theme.css` for decoration changes.
+- On ordinary days or when the owner requests the holiday theme be turned off, set `data-seasonal-theme="off"` on `<body>` in `index.html`. Enable the selected holiday with its theme value, such as `fathers-day`, when requested. Switching is currently manual, not scheduled automatically.
+- Keep the theme attribute, stylesheet link and seasonal markup in `index.html`, and keep `css/seasonal-theme.css`, even while disabled. Do not delete them as unused code or remove a theme after its holiday; retain it for reuse next year.
+- Themes are decorative only. Scope styles to the active theme, leave no decoration or reserved space when off, and preserve normal navigation, product selection, cart, checkout and tracking behaviour.
+
 ## Small-change policy — important for token efficiency
 
 For presentation-only or narrowly scoped tasks:
