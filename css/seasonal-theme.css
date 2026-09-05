@@ -1,0 +1,77 @@
+/* Decorations stay dormant unless the matching theme is enabled on <body>. */
+.seasonal-decoration { display: none; }
+
+body[data-seasonal-theme="fathers-day"] .seasonal-greeting {
+  display: block !important;
+  color: #132b4e;
+  background: linear-gradient(110deg, #faf6ee, #fffdf8 55%, #f5ead6);
+  border-bottom: 1px solid #e9dcc4;
+}
+
+body[data-seasonal-theme="fathers-day"] .seasonal-greeting__inner {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding-block: 14px;
+}
+
+body[data-seasonal-theme="fathers-day"] .seasonal-greeting__illustration {
+  flex: 0 0 54px;
+  width: 54px;
+  height: 54px;
+}
+
+body[data-seasonal-theme="fathers-day"] .seasonal-greeting__message {
+  display: grid;
+  gap: 3px;
+  margin: 0;
+}
+
+body[data-seasonal-theme="fathers-day"] .seasonal-greeting__message strong {
+  font-size: 1.08rem;
+  font-weight: 750;
+  line-height: 1.25;
+  letter-spacing: -.025em;
+}
+
+body[data-seasonal-theme="fathers-day"] .seasonal-greeting__message > span {
+  color: #586272;
+  font-size: .8rem;
+  line-height: 1.45;
+}
+
+body[data-seasonal-theme="fathers-day"] .seasonal-greeting__signature {
+  margin-left: auto;
+  color: #7b6036;
+  font-size: .65rem;
+  font-weight: 650;
+  letter-spacing: .15em;
+  text-transform: uppercase;
+}
+
+body[data-seasonal-theme="fathers-day"] .hero-showcase__panel {
+  border-top: 1px solid #a88a55;
+  background: radial-gradient(ellipse at 50% 0, rgba(194,156,88,.13), transparent 65%), #041333;
+}
+
+body[data-seasonal-theme="fathers-day"] .seasonal-hero-note {
+  display: inline-flex !important;
+  align-items: center;
+  gap: 9px;
+  margin: 0 0 20px;
+  color: #e5c996;
+  font-size: .8rem;
+  line-height: 1.4;
+  letter-spacing: .025em;
+}
+
+body[data-seasonal-theme="fathers-day"] .seasonal-hero-note > span { font-size: 1.25rem; }
+
+@media (max-width: 600px) {
+  body[data-seasonal-theme="fathers-day"] .seasonal-greeting__inner { gap: 12px; padding-block: 12px; }
+  body[data-seasonal-theme="fathers-day"] .seasonal-greeting__illustration { flex-basis: 44px; width: 44px; height: 44px; }
+  body[data-seasonal-theme="fathers-day"] .seasonal-greeting__message strong { font-size: .93rem; }
+  body[data-seasonal-theme="fathers-day"] .seasonal-greeting__message > span { max-width: 260px; font-size: .72rem; }
+  body[data-seasonal-theme="fathers-day"] .seasonal-greeting__signature { display: none; }
+  body[data-seasonal-theme="fathers-day"] .seasonal-hero-note { margin-bottom: 16px; font-size: .73rem; }
+}
