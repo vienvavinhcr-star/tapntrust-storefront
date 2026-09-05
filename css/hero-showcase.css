@@ -1017,6 +1017,69 @@
   .hero-showcase__phone { right: -56%; bottom: 18px; }
 }
 
+.review-impact__copy--editorial .eyebrow {
+  margin-bottom: 20px;
+  font-size: .72rem;
+  letter-spacing: .2em;
+}
+
+.review-impact__copy--editorial h2 {
+  margin-bottom: 22px;
+  font-size: clamp(2.15rem, 4vw, 3.75rem);
+  line-height: 1.08;
+  letter-spacing: -.045em;
+  text-wrap: balance;
+}
+
+.review-impact__copy--editorial h2 > span { color: #ffcd4f; }
+
+.review-impact__copy--editorial .review-impact__intro {
+  max-width: 540px;
+  margin-bottom: 28px;
+  font-size: .98rem;
+  line-height: 1.65;
+}
+
+.review-impact__copy--editorial .review-impact__benefits { gap: 0; }
+
+.review-impact__copy--editorial .review-impact__benefits li {
+  grid-template-columns: 28px minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+  padding: 20px 0;
+  border: 0;
+  border-top: 1px solid rgba(170,199,240,.22);
+  border-radius: 0;
+  background: none;
+  backdrop-filter: none;
+}
+
+.review-impact__copy--editorial .review-impact__benefits li:last-child { padding-bottom: 0; }
+
+.review-impact__copy--editorial .review-impact__benefits li > span {
+  width: auto;
+  height: auto;
+  padding-top: 3px;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  font-size: .7rem;
+  letter-spacing: .06em;
+}
+
+.review-impact__copy--editorial .review-impact__benefits p { gap: 7px; }
+.review-impact__copy--editorial .review-impact__benefits strong { font-size: 1rem; line-height: 1.35; letter-spacing: -.02em; }
+.review-impact__copy--editorial .review-impact__benefits small { max-width: 470px; color: #bccce3; font-size: .84rem; line-height: 1.6; }
+
+@media (max-width: 520px) {
+  .review-impact__copy--editorial .eyebrow { margin-bottom: 16px; font-size: .65rem; }
+  .review-impact__copy--editorial h2 { margin-bottom: 18px; font-size: clamp(2rem, 8.7vw, 2.8rem); }
+  .review-impact__copy--editorial .review-impact__intro { margin-bottom: 24px; font-size: .9rem; }
+  .review-impact__copy--editorial .review-impact__benefits li { gap: 12px; padding-block: 18px; }
+  .review-impact__copy--editorial .review-impact__benefits strong { font-size: .94rem; }
+  .review-impact__copy--editorial .review-impact__benefits small { font-size: .82rem; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .hero-showcase * { animation: none !important; }
   .hero-showcase__phone::after { animation: none !important; opacity: 0; }
