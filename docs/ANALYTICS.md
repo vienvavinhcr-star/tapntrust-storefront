@@ -35,12 +35,33 @@ When changing Shopify/Meta integrations, verify in Meta Test Events rather than 
 
 ## Microsoft Clarity
 
-`js/clarity-events.js` currently tracks:
-- `business_search_started`;
-- `business_selected`;
-- `begin_checkout`.
+`js/clarity-events.js` owns the Clarity API events. All callers import the same module URL; do not add a second versioned import or SDK loader.
 
-The module uses sessionStorage guards to avoid repeatedly firing the same Clarity funnel event in one session.
+| Event | Recorded when |
+| --- | --- |
+| `business_search_started` | A visitor types at least three characters in business search. |
+| `business_selected` | A recent business-search selection is confirmed. |
+| `add_to_cart` | A primary package is successfully added, including completion of required bundle-gift checks. |
+| `add_to_cart_1_card` | The successfully added package contains 1 card. |
+| `add_to_cart_2_cards` | The successfully added package contains 2 cards. |
+| `add_to_cart_3_cards` | The successfully added package contains 3 cards. |
+| `add_to_cart_5_cards` | The successfully added package contains 5 cards. |
+| `welcome_offer_claimed` | The welcome form accepts a valid email and reveals the code. No email or other personal data is sent to Clarity. |
+| `extra_card_added` | The visitor's manual Extra Card add-on action succeeds. |
+| `counter_stand_added` | The visitor's manual Counter Stand add-on action succeeds. The automatic free stand in a 5-card bundle never triggers this event. |
+| `begin_checkout` | A visitor clicks an enabled checkout link with a non-empty destination. This is intent, not proof that Shopify loaded or a purchase completed. |
+
+Package, claim and add-on events exclude preview carts. Failed additions, changing the selected package before submission, editing business details, restored carts and automatic gifts do not count as successful Add to Cart actions. Package events describe the package at the time of addition, not a later variant change or the final purchased package. Add-on events measure manual additions, not purchases or whether the item remains in the cart.
+
+Each event is emitted once per browser-tab sessionStorage lifetime, with an in-memory fallback when storage is unavailable. This is not an exact Clarity session identifier or a unique-customer count. A session can contain more than one package event; do not sum package session counts as unique customers. Early actions use the existing Clarity command queue until its delayed loader starts. Tracking failures never block shopping.
+
+In Clarity, use API events in Smart Events / Funnels after new visitor activity reaches the project:
+- Main funnel: `add_to_cart` → `begin_checkout`.
+- Per-package funnel: `add_to_cart_2_cards` (or another package) → `begin_checkout`.
+- Optional claim branch: `add_to_cart` → `welcome_offer_claimed` → `begin_checkout`.
+- Optional upsell branches: `add_to_cart` → `extra_card_added` or `counter_stand_added` → `begin_checkout`.
+
+Do not require both add-ons or a claim in the main funnel: they are optional and can happen in different orders. The storefront cannot observe email entry or other actions inside Shopify Checkout. These events do not backfill historical sessions and remain suppressed in owner test mode. Reference: [Clarity client API](https://learn.microsoft.com/en-us/clarity/setup-and-installation/clarity-api).
 
 ### Owner test mode
 

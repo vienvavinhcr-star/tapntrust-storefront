@@ -3,7 +3,7 @@
  * Storefront tokens are designed for browser use. Admin/private tokens are not.
  */
 import "./test-mode.js?v=20260902-2";
-import("./clarity-events.js?v=20260901-2").catch(() => {});
+import "./clarity-events.js";
 import("./marketing/welcome-cart-promo-layout.js?v=20260902-1").catch(() => {});
 
 export const config = Object.freeze({

@@ -1,5 +1,12 @@
 const CLARITY_EVENT_PREFIX = "tapntrust.clarity.";
 const TEST_MODE_STORAGE_KEY = "tapntrust_test_mode";
+const trackedThisPage = new Set();
+const PACKAGE_EVENTS = Object.freeze({
+  1: "add_to_cart_1_card",
+  2: "add_to_cart_2_cards",
+  3: "add_to_cart_3_cards",
+  5: "add_to_cart_5_cards"
+});
 
 function storageGet(key) {
   try {
@@ -60,6 +67,7 @@ function disableClarityForTestMode() {
 disableClarityForTestMode();
 
 function hasTracked(eventName) {
+  if (trackedThisPage.has(eventName)) return true;
   try {
     return window.sessionStorage.getItem(`${CLARITY_EVENT_PREFIX}${eventName}`) === "1";
   } catch {
@@ -68,6 +76,7 @@ function hasTracked(eventName) {
 }
 
 function markTracked(eventName) {
+  trackedThisPage.add(eventName);
   try {
     window.sessionStorage.setItem(`${CLARITY_EVENT_PREFIX}${eventName}`, "1");
   } catch {
@@ -76,15 +85,40 @@ function markTracked(eventName) {
 }
 
 function trackClarityEventOnce(eventName) {
-  if (clarityTestMode || hasTracked(eventName) || typeof window.clarity !== "function") return false;
+  if (clarityTestMode || window.TAPNTRUST_TEST_MODE === true || hasTracked(eventName)) return false;
 
   try {
+    // Preserve early actions until the existing delayed Clarity loader starts.
+    // This is only its standard command queue, not a second SDK loader.
+    window.clarity = window.clarity || function (...args) {
+      (window.clarity.q = window.clarity.q || []).push(args);
+    };
     window.clarity("event", eventName);
     markTracked(eventName);
     return true;
   } catch {
     return false;
   }
+}
+
+export function trackClarityPackageAdded(packageCount, cartState) {
+  const eventName = PACKAGE_EVENTS[Number(packageCount)];
+  if (!eventName || cartState?.mode !== "shopify") return;
+  trackClarityEventOnce("add_to_cart");
+  trackClarityEventOnce(eventName);
+}
+
+// Call only after a successful manual upsell action. Automatic bundle gifts
+// never pass through this hook, even though they use the same stand variant.
+export function trackClarityUpsellAdded(kind, cartState) {
+  if (cartState?.mode !== "shopify") return;
+  if (kind === "extra") trackClarityEventOnce("extra_card_added");
+  else if (kind === "stand") trackClarityEventOnce("counter_stand_added");
+}
+
+export function trackClarityWelcomeClaimed(cartState) {
+  if (cartState?.mode !== "shopify") return;
+  trackClarityEventOnce("welcome_offer_claimed");
 }
 
 function initialiseBusinessSearchTracking() {
@@ -144,7 +178,7 @@ function initialiseCheckoutTracking() {
   document.addEventListener("click", (event) => {
     if (!(event.target instanceof Element)) return;
     const checkout = event.target.closest("[data-checkout]");
-    if (!checkout || checkout.getAttribute("aria-disabled") === "true") return;
+    if (!checkout || checkout.disabled || checkout.getAttribute("aria-disabled") === "true") return;
 
     const href = String(checkout.getAttribute("href") || "").trim();
     if (!href || href === "#") return;

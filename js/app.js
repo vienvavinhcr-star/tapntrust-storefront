@@ -1,4 +1,5 @@
 import config from "./config.js";
+import { trackClarityPackageAdded } from "./clarity-events.js";
 import baseCartActions from "./cart.js";
 import { createIntegrityCartActions, initialiseCheckoutIntegrityGuard } from "./cart-integrity.js";
 import { validHttpsUrl, looksGoogleRelated } from "./validation.js";
@@ -237,7 +238,9 @@ function initialiseProductForm() {
         status.textContent = "Business details updated in your cart.";
         button.dataset.editingBusiness = "false";
       } else {
-        await cartActions.addMainPackage({ packageCount: selectedPackage, ...values });
+        const packageCount = selectedPackage;
+        const addedState = await cartActions.addMainPackage({ packageCount, ...values });
+        trackClarityPackageAdded(packageCount, addedState);
         trackMetaEvent("AddToCart", packageMetaParameters(selectedPackage));
         status.textContent = "Added to your cart.";
       }

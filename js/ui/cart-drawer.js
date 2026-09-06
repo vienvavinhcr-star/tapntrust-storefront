@@ -1,6 +1,7 @@
 import { setBodyLock, setText, toast, trapFocus } from "./common.js";
 import { trackMetaEvent, upsellMetaParameters } from "../analytics/meta.js";
 import { FULFILMENT_KEYS } from "../fulfilment.js";
+import { trackClarityUpsellAdded } from "../clarity-events.js";
 
 export function createCartUi({ cartActions, formatMoney, updatePackagesFromCatalog, onEditBusiness }) {
   let lastFocusedElement = null;
@@ -332,7 +333,8 @@ export function createCartUi({ cartActions, formatMoney, updatePackagesFromCatal
       button.disabled = true;
       button.textContent = "Adding…";
       try {
-        await cartActions.addUpsell(button.dataset.upsellAdd);
+        const addedState = await cartActions.addUpsell(button.dataset.upsellAdd);
+        trackClarityUpsellAdded(button.dataset.upsellAdd, addedState);
         trackMetaEvent("AddToCart", upsellMetaParameters(cartActions, button.dataset.upsellAdd));
         toast(button.dataset.upsellAdd === "stand" ? "Counter Stand added." : "Extra NFC Card added with the same business details.");
       } catch (error) {

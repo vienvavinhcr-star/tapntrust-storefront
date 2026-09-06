@@ -1,5 +1,6 @@
 import { setBodyLock, trapFocus } from "../ui/common.js";
 import { updateCartDiscountCodes } from "../shopify.js";
+import { trackClarityWelcomeClaimed } from "../clarity-events.js";
 
 const STORAGE = Object.freeze({
   visitorId: "tapntrust_welcome_visitor_id",
@@ -253,6 +254,7 @@ export function initialiseWelcomeOffer(config = {}) {
     setLocal(STORAGE.email, email); setLocal(STORAGE.signupAt, signupAt); setLocal(STORAGE.claimedAt, Date.now()); removeLocal(STORAGE.checkoutAt);
     formStatus.textContent = "";
     formPanel.hidden = true; successPanel.hidden = false;
+    trackClarityWelcomeClaimed(latestCartState);
     root.querySelector("[data-welcome-copy]")?.focus();
     renderCartOffer();
     void postEvent(endpoint, { ...payloadBase(email), checkoutAt: "", event: "signup", occurredAt: signupAt, discountCode, discountPercent });
