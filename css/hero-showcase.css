@@ -629,6 +629,14 @@
 
 .hero-showcase__actions .button--text:hover { color: #fff; }
 
+@media (min-width: 1200px) {
+  .hero-showcase__pitch { max-width: 560px; }
+
+  .hero-showcase__pitch .hero-showcase__headline {
+    font-size: clamp(3.8rem, 4.2vw, 4.4rem);
+  }
+}
+
 .value-strip {
   padding: 30px 0 38px;
   border-top: 0;
