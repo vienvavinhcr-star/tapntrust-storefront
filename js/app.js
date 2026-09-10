@@ -17,6 +17,7 @@ import { createCartUi } from "./ui/cart-drawer.js";
 import { createGuideUi } from "./ui/guide.js";
 import {
   initialiseBrandAssets,
+  initialiseActionVideo,
   initialiseLinkWalkthrough,
   initialiseMobileBuyBar,
   initialiseNavigation,
@@ -273,6 +274,7 @@ document.addEventListener("keydown", (event) => {
 
 document.querySelectorAll("[data-current-year]").forEach((element) => { element.textContent = new Date().getFullYear(); });
 initialiseBrandAssets();
+initialiseActionVideo();
 initialiseNavigation();
 initialiseProductViewer();
 initialiseMetadata(config);

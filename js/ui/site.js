@@ -1,3 +1,53 @@
+export function initialiseActionVideo() {
+  const video = document.querySelector("[data-action-video]");
+  if (!video) return;
+  const motion = window.matchMedia("(prefers-reduced-motion: reduce)");
+  const saveData = navigator.connection?.saveData === true;
+  let visible = false;
+  let userPaused = false;
+  let automaticPause = false;
+  video.muted = true;
+
+  const syncPlayback = () => {
+    if (!visible || document.hidden) {
+      if (!video.paused) {
+        automaticPause = true;
+        video.pause();
+      }
+    } else if (!motion.matches && !saveData && !userPaused) {
+      video.play().catch(() => {}); // Native controls remain available if autoplay is blocked.
+    }
+  };
+  video.addEventListener("pause", () => {
+    if (!automaticPause) userPaused = true;
+    automaticPause = false;
+  });
+  video.addEventListener("play", () => { userPaused = false; });
+  document.addEventListener("visibilitychange", syncPlayback);
+  motion.addEventListener?.("change", () => {
+    if (motion.matches && !video.paused) {
+      automaticPause = true;
+      video.pause();
+    } else syncPlayback();
+  });
+  if (!("IntersectionObserver" in window)) {
+    video.preload = "metadata";
+    return;
+  }
+  const warmup = new IntersectionObserver((entries) => {
+    if (!entries.some((entry) => entry.isIntersecting)) return;
+    video.preload = saveData || motion.matches ? "metadata" : "auto";
+    video.load();
+    warmup.disconnect();
+  }, { rootMargin: "1200px 0px" });
+  warmup.observe(video);
+  const playback = new IntersectionObserver(([entry]) => {
+    visible = entry.isIntersecting;
+    syncPlayback();
+  }, { threshold: .2 });
+  playback.observe(video);
+}
+
 export function initialiseBrandAssets() {
   document.querySelectorAll("[data-brand-logo]").forEach((logo) => {
     const markMissing = () => logo.classList.add("is-missing");
