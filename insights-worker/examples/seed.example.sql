@@ -1,5 +1,6 @@
 -- Replace the IDs, business details, Google review destination and card token.
 -- Generate a token with: node insights-worker/scripts/generate-card-token.mjs
+-- Copy to the gitignored seed.sql before replacing placeholders. Never add real or test data to this template.
 -- Run locally with: pnpm exec wrangler d1 execute tapntrust-insights --local --file insights-worker/examples/seed.sql -c insights-worker/wrangler.jsonc
 
 INSERT INTO businesses (id, name)

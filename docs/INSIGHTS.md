@@ -92,40 +92,36 @@ Generate a new public card token:
 node insights-worker/scripts/generate-card-token.mjs
 ```
 
-Copy `insights-worker/examples/seed.sql`, replace its placeholders, and execute the copy against the intended local or remote D1 database. Never edit an issued card's token later.
+Copy `insights-worker/examples/seed.example.sql` to the ignored `insights-worker/examples/seed.sql`, replace its placeholders, and execute only that ignored copy against the intended local or remote D1 database. Never commit real or test business, location, card or customer data. Never edit an issued card's token later.
 
-## Production setup
+## Production status
 
-External setup is required before this can receive real NFC traffic:
+Phase 1 production infrastructure was verified on 12 September 2026:
 
-1. Authenticate Wrangler with the Tapntrust Cloudflare account.
-2. Create `tapntrust-insights` in the Oceania location and bind it as `DB` in `insights-worker/wrangler.jsonc`. Wrangler can update the config with the returned database ID:
+- Worker: `tapntrust-insights-redirect`.
+- Custom domain: `go.tapntrust.com`; `/health` returns HTTP 200.
+- D1: `tapntrust-insights`, bound as `DB` in the OC region with migration `0001_initial.sql` applied.
+- The required `ADMIN_API_TOKEN` name is declared in `wrangler.jsonc`, while its value exists only as an encrypted Cloudflare Worker secret.
+- A physical NFC card completed the tracked redirect flow successfully.
 
-   ```bash
-   pnpm exec wrangler d1 create tapntrust-insights --location oc --binding DB --update-config -c insights-worker/wrangler.jsonc
-   ```
+The committed `wrangler.jsonc` is the deployment source of truth for the public custom domain, D1 binding, compatibility settings and required secret name. It must never contain the secret value. Production and test records are operational data and must never be copied from D1 or a working `seed.sql` into Git.
 
-3. Apply the migration remotely:
+For future releases, confirm pending migrations, run the checks, then deploy:
 
-   ```bash
-   pnpm exec wrangler d1 migrations apply DB --remote -c insights-worker/wrangler.jsonc
-   ```
+```bash
+pnpm exec wrangler d1 migrations list DB --remote -c insights-worker/wrangler.jsonc
+pnpm run check:all
+pnpm exec wrangler deploy --dry-run -c insights-worker/wrangler.jsonc
+pnpm exec wrangler deploy -c insights-worker/wrangler.jsonc
+```
 
-4. Store a long random admin secret in Cloudflare; never put it in `wrangler.jsonc`:
+Provision each purchased business, location and card only through a protected owner/server-side process. Use `wrangler secret put ADMIN_API_TOKEN -c insights-worker/wrangler.jsonc` when rotating the admin token; never write the value into the repository.
 
-   ```bash
-   pnpm exec wrangler secret put ADMIN_API_TOKEN -c insights-worker/wrangler.jsonc
-   ```
-
-5. Deploy the Worker and attach the custom domain `go.tapntrust.com` in Cloudflare Workers & Pages.
-6. Seed each purchased business/location/card only through a protected server-side or owner process.
-7. Test one real NFC card end to end before changing fulfilment operations.
-
-## Future fulfilment switch — not active yet
+## Fulfilment transition
 
 Current orders carry the direct Google review URL described in `docs/FULFILMENT.md`; Phase 1 does not change that code or Shopify attributes.
 
-After the Worker, D1, DNS and provisioning workflow are verified, fulfilment can be deliberately changed so each physical card is programmed with `https://go.tapntrust.com/t/{publicToken}` instead of the direct Google review URL. The stored location destination remains the Google URL from the existing fulfilment data.
+The production Worker, D1, custom domain and physical redirect path are verified. Future tracked cards can be deliberately programmed with `https://go.tapntrust.com/t/{publicToken}` instead of the direct Google review URL. The stored location destination remains the Google URL from the existing fulfilment data.
 
 The mapping must be created server-side during fulfilment. The browser must never receive D1 write credentials or Cloudflare admin secrets. Extra NFC cards require their own token even when they share the primary card's location.
 

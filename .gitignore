@@ -3,5 +3,10 @@
 .idea/
 .vscode/
 node_modules/
-.dev.vars
+.dev.vars*
+!.dev.vars.example
+.env*
+!.env.example
 .wrangler/
+insights-worker/examples/seed.sql
+insights-worker/examples/*.local.sql
