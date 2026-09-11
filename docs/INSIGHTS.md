@@ -101,7 +101,9 @@ This per-email limiter is not a complete global anti-abuse system: a distributed
 
 The customer dashboard is read-only in Phase 2A. Internal `/admin` remains the owner/master mechanism for editing labels and placement. Phase 2A does not add Google review ingestion, billing or subscription enforcement.
 
-Email delivery is isolated behind a small mailer interface and currently uses a Cloudflare Email Sending binding. Replacing Cloudflare Email Service with Zoho, Resend or another transactional provider later does not change customer IDs, business ownership or sessions.
+Email delivery remains isolated behind the `MagicLinkMailer` interface and uses ZeptoMail's HTTPS REST API. The Worker posts to the AU data-centre endpoint at `https://api.zeptomail.com.au/v1.1/email` with an Agent-specific Send API key held only in the `ZEPTOMAIL_API_KEY` Worker secret. `AUTH_FROM_EMAIL` remains `contact@tapntrust.com`. Click and open tracking are disabled for authentication mail.
+
+ZeptoMail response bodies and credentials are never returned to customers or copied into logs. If the provider rejects a request or is unavailable, the public response remains enumeration-safe, the newly-created magic-link row is deleted, and the Worker logs only a safe failure category plus an HTTP status when one exists.
 
 ## Local development
 
@@ -134,21 +136,34 @@ Phase 1 production infrastructure was verified on 12 September 2026:
 
 The committed `wrangler.jsonc` is the deployment source of truth for the public custom domain, D1 binding, compatibility settings and required secret name. It must never contain the secret value. Production and test records are operational data and must never be copied from D1 or a working `seed.sql` into Git.
 
-## Phase 2A production setup — manual and not yet deployed
+## Phase 2A production setup — manual
 
-This PR does not apply a production migration, enable email service or deploy the Worker. Before deploying Phase 2A:
+This change does not apply a production migration or deploy the Worker. The ZeptoMail Agent and verified `tapntrust.com` sender domain must exist in the AU data centre before deployment. Then:
 
-1. Confirm the Cloudflare account has Workers Paid if magic links must be sent to arbitrary customer addresses. Cloudflare Email Sending is currently Beta.
-2. In Cloudflare Email Service, onboard `tapntrust.com` for outbound mail and complete the required SPF, DKIM and DMARC DNS setup.
-3. Confirm `contact@tapntrust.com` is accepted as a sender for the `AUTH_EMAIL` binding declared in `wrangler.jsonc`.
-4. Apply `0002_customer_auth.sql` remotely:
+1. In the ZeptoMail AU console, copy the Agent-specific **Send API key** for the Agent that owns the verified `contact@tapntrust.com` sender. Do not use a Zoho OAuth token or expose the Send API key in client code.
+2. Create the encrypted Worker secret from an interactive terminal prompt:
+
+   ```bash
+   pnpm exec wrangler secret put ZEPTOMAIL_API_KEY -c insights-worker/wrangler.jsonc
+   ```
+
+   Never put the real key in `wrangler.jsonc`, `.dev.vars.example`, source code, test fixtures, Git history, PR text or screenshots. A local real value may be placed only in the ignored `insights-worker/.dev.vars` file.
+3. If Phase 2A migration `0002_customer_auth.sql` has not already been applied, apply it remotely once:
 
    ```bash
    pnpm exec wrangler d1 migrations apply DB --remote -c insights-worker/wrangler.jsonc
    ```
 
-5. Deploy the Worker, then provision each customer and each allowed business link through a protected owner/server-side process. Do not add real addresses or access mappings to example SQL or Git.
-6. Test link delivery, non-consuming GET preview, explicit POST consumption, one-time reuse rejection, logout and cross-tenant isolation with controlled accounts before inviting customers.
+4. Run the full checks and a deployment dry run, then deploy the Worker manually:
+
+   ```bash
+   pnpm run check:all
+   pnpm exec wrangler deploy --dry-run -c insights-worker/wrangler.jsonc
+   pnpm exec wrangler deploy -c insights-worker/wrangler.jsonc
+   ```
+
+5. Provision each customer and each allowed business link through a protected owner/server-side process. Do not add real addresses or access mappings to example SQL or Git.
+6. With a controlled customer account, request a sign-in link and verify delivery from `contact@tapntrust.com`. Confirm the link opens the non-consuming confirmation page, the explicit POST signs in exactly once, reuse fails, logout works and cross-tenant data remains inaccessible before inviting customers.
 
 Customer provisioning must create a `customer_users` row and at least one matching `customer_business_access` row. Removing or deactivating that access affects dashboard visibility only; it must never alter card tokens or redirect availability.
 

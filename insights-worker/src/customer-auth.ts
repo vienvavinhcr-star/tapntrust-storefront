@@ -1,7 +1,6 @@
 import {
   clearPendingMagicCookie,
   clearSessionCookie,
-  createCloudflareMagicLinkMailer,
   createPendingMagicCookie,
   createSessionCookie,
   generateOpaqueToken,
@@ -14,6 +13,7 @@ import {
 } from "./auth";
 import { CUSTOMER_PAGE } from "./customer-page";
 import { createCustomerRepository, type CustomerRepository } from "./customer-repository";
+import { createZeptoMailMagicLinkMailer, safeMailFailure } from "./zeptomail";
 
 const MAGIC_LINK_TTL_MS = 15 * 60 * 1000;
 const MAGIC_LINK_TTL_SECONDS = MAGIC_LINK_TTL_MS / 1000;
@@ -28,7 +28,7 @@ const GENERIC_LINK_MESSAGE = "If this email has Tapntrust Insights access, a sig
 type CustomerEnv = Env & {
   AUTH_BASE_URL: string;
   AUTH_FROM_EMAIL: string;
-  AUTH_EMAIL: SendEmail;
+  ZEPTOMAIL_API_KEY: string;
 };
 
 export interface CustomerAuthDependencies {
@@ -217,8 +217,7 @@ async function requestMagicLink(
     await repository.deleteMagicLink(tokenHash).catch(() => undefined);
     console.error(JSON.stringify({
       message: "magic link email failed",
-      userId: user.id,
-      error: error instanceof Error ? error.message : String(error)
+      ...safeMailFailure(error)
     }));
   }));
 
@@ -331,7 +330,10 @@ export async function handleCustomerRequest(
   if (url.pathname === "/auth/verify") return prepareMagicLink(request, url);
   if (url.pathname === "/auth/confirm") return confirmMagicLink(request, env, repository, now);
   if (url.pathname === "/api/auth/request-link") {
-    const mailer = dependencies.mailer || createCloudflareMagicLinkMailer(env.AUTH_EMAIL, env.AUTH_FROM_EMAIL);
+    const mailer = dependencies.mailer || createZeptoMailMagicLinkMailer(
+      env.ZEPTOMAIL_API_KEY,
+      env.AUTH_FROM_EMAIL
+    );
     return requestMagicLink(request, env, ctx, repository, mailer, now);
   }
   if (url.pathname === "/api/auth/logout") return logoutCustomer(request, repository, now);
