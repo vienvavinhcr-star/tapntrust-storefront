@@ -1,4 +1,5 @@
 import { ADMIN_PAGE } from "./admin-page";
+import { handleCustomerRequest, type CustomerAuthDependencies } from "./customer-auth";
 import { isAllowedGoogleReviewUrl, isValidPublicToken, normalisePublicToken } from "./destinations";
 import { createD1Repository, type CardUpdate, type InsightsRepository, type PlacementType } from "./repository";
 
@@ -176,7 +177,8 @@ export async function handleRequest(
   request: Request,
   env: WorkerEnv,
   ctx: ExecutionContext,
-  repository: InsightsRepository = createD1Repository(env.DB)
+  repository: InsightsRepository = createD1Repository(env.DB),
+  customerDependencies: CustomerAuthDependencies = {}
 ): Promise<Response> {
   const url = new URL(request.url);
 
@@ -192,6 +194,9 @@ export async function handleRequest(
       });
     }
     if (url.pathname.startsWith("/api/admin/")) return handleAdmin(request, url.pathname, env, repository);
+
+    const customerResponse = await handleCustomerRequest(request, url, env, ctx, customerDependencies);
+    if (customerResponse) return customerResponse;
 
     const tapMatch = url.pathname.match(/^\/t\/([^/]+)\/?$/);
     if (tapMatch) return handleTap(request, decodeURIComponent(tapMatch[1] || ""), repository, ctx);

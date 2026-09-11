@@ -1,4 +1,4 @@
-# Tapntrust Insights — Phase 1
+# Tapntrust Insights — Phase 1 + Phase 2A
 
 ## Scope and product truth
 
@@ -26,6 +26,12 @@ Owner
   -> go.tapntrust.com/admin
   -> Bearer-protected admin API
   -> card counts, recent taps, editable label and placement
+
+Customer
+  -> go.tapntrust.com/app
+  -> email magic link -> HttpOnly session cookie
+  -> server-side customer -> business access lookup
+  -> tenant-scoped cards, tap counts and recent activity
 ```
 
 The service lives in `insights-worker/` and is deliberately isolated from the GitHub Pages storefront, Shopify cart, checkout, fulfilment metadata, Meta Pixel and Clarity code.
@@ -38,6 +44,10 @@ Cloudflare Worker + D1 was chosen for this phase because the redirect and databa
 - `locations`: a business location and its validated Google review destination.
 - `cards`: one immutable `public_token`, one location, an editable label/placement and active state.
 - `tap_events`: generated event ID, card ID and UTC timestamp only.
+- `customer_users`: an explicitly provisioned customer login email and active state.
+- `customer_business_access`: the authoritative many-to-many link between a customer and allowed `business_id` values.
+- `auth_magic_links`: a single-use SHA-256 token hash with a 15-minute expiry.
+- `customer_sessions`: a SHA-256 session-token hash with expiry and revocation state.
 
 Several cards can point to the same location. They still produce distinct per-card counts.
 
@@ -73,7 +83,19 @@ Protected routes:
 
 Allowed placement values are `counter`, `table`, `reception`, `register`, and `other`. The update query cannot modify the token, location or Google destination.
 
-This is Phase 1A administration, not full customer authentication. Do not expose the admin token in storefront code, GitHub, screenshots or client configuration. Full multi-user authentication belongs in Phase 1B.
+The internal owner mechanism remains separate from customer authentication. Do not expose the admin token in storefront code, GitHub, screenshots, customer pages or customer configuration.
+
+## Phase 2A customer authentication and tenant model
+
+`GET /app` serves the customer dashboard. Customers request a passwordless sign-in link through `POST /api/auth/request-link`; the response is deliberately generic so it does not reveal whether an email is registered. Only active, pre-provisioned customer accounts receive a link.
+
+Magic-link and session tokens are cryptographically random. D1 stores only their SHA-256 hashes. Magic links are single-use, expire after 15 minutes and are rate-limited per account. A successful verification creates a 30-day session in an `HttpOnly`, `Secure`, `SameSite=Lax`, host-only cookie. `POST /api/auth/logout` revokes the server-side session.
+
+`GET /api/customer/summary` is the only Phase 2A customer data endpoint. It does not accept a business selector. The server resolves the session to a customer, joins through `customer_business_access`, and applies that user ID inside every business, location, card and tap query. Query-string or body `business_id` values never determine access.
+
+The customer dashboard is read-only in Phase 2A. Internal `/admin` remains the owner/master mechanism for editing labels and placement. Phase 2A does not add Google review ingestion, billing or subscription enforcement.
+
+Email delivery is isolated behind a small mailer interface and currently uses a Cloudflare Email Sending binding. Replacing Cloudflare Email Service with Zoho, Resend or another transactional provider later does not change customer IDs, business ownership or sessions.
 
 ## Local development
 
@@ -106,6 +128,24 @@ Phase 1 production infrastructure was verified on 12 September 2026:
 
 The committed `wrangler.jsonc` is the deployment source of truth for the public custom domain, D1 binding, compatibility settings and required secret name. It must never contain the secret value. Production and test records are operational data and must never be copied from D1 or a working `seed.sql` into Git.
 
+## Phase 2A production setup — manual and not yet deployed
+
+This PR does not apply a production migration, enable email service or deploy the Worker. Before deploying Phase 2A:
+
+1. Confirm the Cloudflare account has Workers Paid if magic links must be sent to arbitrary customer addresses. Cloudflare Email Sending is currently Beta.
+2. In Cloudflare Email Service, onboard `tapntrust.com` for outbound mail and complete the required SPF, DKIM and DMARC DNS setup.
+3. Confirm `contact@tapntrust.com` is accepted as a sender for the `AUTH_EMAIL` binding declared in `wrangler.jsonc`.
+4. Apply `0002_customer_auth.sql` remotely:
+
+   ```bash
+   pnpm exec wrangler d1 migrations apply DB --remote -c insights-worker/wrangler.jsonc
+   ```
+
+5. Deploy the Worker, then provision each customer and each allowed business link through a protected owner/server-side process. Do not add real addresses or access mappings to example SQL or Git.
+6. Test link delivery, one-time consumption, logout and cross-tenant isolation with controlled accounts before inviting customers.
+
+Customer provisioning must create a `customer_users` row and at least one matching `customer_business_access` row. Removing or deactivating that access affects dashboard visibility only; it must never alter card tokens or redirect availability.
+
 For future releases, confirm pending migrations, run the checks, then deploy:
 
 ```bash
@@ -137,4 +177,4 @@ Run:
 pnpm run check:all
 ```
 
-The Worker integration tests cover valid redirects, separate tracking for shared destinations, unknown and inactive cards, destination allowlisting, database write failure with redirect continuity, admin protection, and label/placement updates that preserve token and destination.
+The Worker integration tests cover valid redirects, separate tracking for shared destinations, unknown and inactive cards, destination allowlisting, database write failure with redirect continuity, admin protection, label/placement updates that preserve token and destination, magic-link sessions, unauthenticated rejection and cross-tenant isolation.
