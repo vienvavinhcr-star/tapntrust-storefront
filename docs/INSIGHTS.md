@@ -29,7 +29,8 @@ Owner
 
 Customer
   -> go.tapntrust.com/app
-  -> email magic link -> HttpOnly session cookie
+  -> email link GET -> non-consuming confirmation page
+  -> explicit same-origin POST -> HttpOnly session cookie
   -> server-side customer -> business access lookup
   -> tenant-scoped cards, tap counts and recent activity
 ```
@@ -48,6 +49,7 @@ Cloudflare Worker + D1 was chosen for this phase because the redirect and databa
 - `customer_business_access`: the authoritative many-to-many link between a customer and allowed `business_id` values.
 - `auth_magic_links`: a single-use SHA-256 token hash with a 15-minute expiry.
 - `customer_sessions`: a SHA-256 session-token hash with expiry and revocation state.
+- `auth_request_limits`: temporary SHA-256 email identifiers and per-email request counters used only for abuse control.
 
 Several cards can point to the same location. They still produce distinct per-card counts.
 
@@ -87,9 +89,13 @@ The internal owner mechanism remains separate from customer authentication. Do n
 
 ## Phase 2A customer authentication and tenant model
 
-`GET /app` serves the customer dashboard. Customers request a passwordless sign-in link through `POST /api/auth/request-link`; the response is deliberately generic so it does not reveal whether an email is registered. Only active, pre-provisioned customer accounts receive a link.
+`GET /app` serves the customer dashboard. Customers request a passwordless sign-in link through `POST /api/auth/request-link`. This endpoint requires `application/json` and an `Origin` matching the configured `AUTH_BASE_URL`. Its accepted and rate-limited responses are deliberately identical so they do not reveal whether an email is registered. Only active, pre-provisioned customer accounts receive an email.
 
-Magic-link and session tokens are cryptographically random. D1 stores only their SHA-256 hashes. Magic links are single-use, expire after 15 minutes and are rate-limited per account. A successful verification creates a 30-day session in an `HttpOnly`, `Secure`, `SameSite=Lax`, host-only cookie. `POST /api/auth/logout` revokes the server-side session.
+Magic-link and session tokens are cryptographically random. D1 stores only their SHA-256 hashes. Magic links are single-use and expire after 15 minutes. Visiting `GET /auth/verify?token=...` never consumes the token: it places the token in a short-lived `HttpOnly`, `Secure`, `SameSite=Lax`, host-only pending cookie and immediately redirects to `/auth/confirm`, removing the raw token from the visible URL. The confirmation page performs no consume operation. Only the customer's explicit, same-origin `POST /auth/confirm` consumes the D1 token and creates the 30-day session. Automated GET previews or safe-link scans therefore cannot invalidate a customer's link.
+
+Request-link abuse control is server-side and applies the same way to registered and unregistered addresses. D1 retains only a SHA-256 email identifier, permits at most one accepted request per minute and three per 15-minute window, and opportunistically deletes limiter rows older than 24 hours. It does not retain IP addresses, browser fingerprints or user-agent data.
+
+This per-email limiter is not a complete global anti-abuse system: a distributed attacker can still rotate through many destination addresses. A future production hardening layer may add a carefully configured Cloudflare rate-limit/WAF rule or Turnstile. Phase 2A deliberately does not claim global protection or introduce IP tracking to simulate it.
 
 `GET /api/customer/summary` is the only Phase 2A customer data endpoint. It does not accept a business selector. The server resolves the session to a customer, joins through `customer_business_access`, and applies that user ID inside every business, location, card and tap query. Query-string or body `business_id` values never determine access.
 
@@ -142,7 +148,7 @@ This PR does not apply a production migration, enable email service or deploy th
    ```
 
 5. Deploy the Worker, then provision each customer and each allowed business link through a protected owner/server-side process. Do not add real addresses or access mappings to example SQL or Git.
-6. Test link delivery, one-time consumption, logout and cross-tenant isolation with controlled accounts before inviting customers.
+6. Test link delivery, non-consuming GET preview, explicit POST consumption, one-time reuse rejection, logout and cross-tenant isolation with controlled accounts before inviting customers.
 
 Customer provisioning must create a `customer_users` row and at least one matching `customer_business_access` row. Removing or deactivating that access affects dashboard visibility only; it must never alter card tokens or redirect availability.
 
@@ -177,4 +183,4 @@ Run:
 pnpm run check:all
 ```
 
-The Worker integration tests cover valid redirects, separate tracking for shared destinations, unknown and inactive cards, destination allowlisting, database write failure with redirect continuity, admin protection, label/placement updates that preserve token and destination, magic-link sessions, unauthenticated rejection and cross-tenant isolation.
+The Worker integration tests cover valid redirects, separate tracking for shared destinations, unknown and inactive cards, destination allowlisting, database write failure with redirect continuity, admin protection, label/placement updates that preserve token and destination, scanner-safe magic-link confirmation, JSON/origin enforcement, enumeration-safe cooldown responses, magic-link sessions, unauthenticated rejection and cross-tenant isolation.

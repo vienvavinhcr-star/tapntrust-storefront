@@ -58,15 +58,23 @@ export interface NewCustomerSession {
   expiresAt: string;
 }
 
+export interface MagicLinkRequestLimit {
+  identifierHash: string;
+  now: string;
+  cooldownCutoff: string;
+  windowResetCutoff: string;
+  maxRequests: number;
+}
+
 export interface CustomerRepository {
   findActiveUserByEmail(email: string): Promise<CustomerUser | null>;
-  hasMagicLinkSince(userId: string, since: string): Promise<boolean>;
+  reserveMagicLinkRequest(limit: MagicLinkRequestLimit): Promise<boolean>;
   createMagicLink(link: NewMagicLink): Promise<void>;
   deleteMagicLink(tokenHash: string): Promise<void>;
   consumeMagicLink(tokenHash: string, now: string, session: NewCustomerSession): Promise<boolean>;
   findActiveSession(tokenHash: string, now: string): Promise<CustomerSession | null>;
   revokeSession(tokenHash: string, revokedAt: string): Promise<void>;
-  deleteExpiredAuthRecords(now: string): Promise<void>;
+  deleteExpiredAuthRecords(now: string, requestLimitCutoff: string): Promise<void>;
   getCustomerSummary(user: CustomerUser, monthStart: string): Promise<CustomerInsightsSummary>;
 }
 
@@ -133,14 +141,39 @@ export function createCustomerRepository(db: D1Database): CustomerRepository {
       `).bind(email).first<CustomerUser>();
     },
 
-    async hasMagicLinkSince(userId, since) {
-      const row = await db.prepare(`
-        SELECT 1 AS found
-        FROM auth_magic_links
-        WHERE user_id = ?1 AND created_at >= ?2
-        LIMIT 1
-      `).bind(userId, since).first<{ found: number }>();
-      return row?.found === 1;
+    async reserveMagicLinkRequest(limit) {
+      const [, reservation] = await db.batch([
+        db.prepare(`
+          INSERT OR IGNORE INTO auth_request_limits (
+            identifier_hash, window_started_at, request_count, last_allowed_at
+          ) VALUES (?1, ?2, 0, '1970-01-01T00:00:00.000Z')
+        `).bind(limit.identifierHash, limit.now),
+        db.prepare(`
+          UPDATE auth_request_limits
+          SET
+            window_started_at = CASE
+              WHEN window_started_at <= ?2 THEN ?3
+              ELSE window_started_at
+            END,
+            request_count = CASE
+              WHEN window_started_at <= ?2 THEN 1
+              ELSE request_count + 1
+            END,
+            last_allowed_at = ?3
+          WHERE identifier_hash = ?1
+            AND (
+              window_started_at <= ?2
+              OR (request_count < ?4 AND last_allowed_at <= ?5)
+            )
+        `).bind(
+          limit.identifierHash,
+          limit.windowResetCutoff,
+          limit.now,
+          limit.maxRequests,
+          limit.cooldownCutoff
+        )
+      ]);
+      return Number(reservation?.meta.changes || 0) === 1;
     },
 
     async createMagicLink(link) {
@@ -209,10 +242,11 @@ export function createCustomerRepository(db: D1Database): CustomerRepository {
       `).bind(revokedAt, tokenHash).run();
     },
 
-    async deleteExpiredAuthRecords(now) {
+    async deleteExpiredAuthRecords(now, requestLimitCutoff) {
       await db.batch([
         db.prepare("DELETE FROM auth_magic_links WHERE expires_at <= ?1").bind(now),
-        db.prepare("DELETE FROM customer_sessions WHERE expires_at <= ?1 OR revoked_at IS NOT NULL").bind(now)
+        db.prepare("DELETE FROM customer_sessions WHERE expires_at <= ?1 OR revoked_at IS NOT NULL").bind(now),
+        db.prepare("DELETE FROM auth_request_limits WHERE window_started_at <= ?1").bind(requestLimitCutoff)
       ]);
     },
 

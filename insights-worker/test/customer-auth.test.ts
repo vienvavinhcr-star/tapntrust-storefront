@@ -1,11 +1,16 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { createExecutionContext, waitOnExecutionContext } from "cloudflare:test";
 import { env } from "cloudflare:workers";
-import type { MagicLinkMailer } from "../src/auth";
+import {
+  PENDING_MAGIC_COOKIE_NAME,
+  SESSION_COOKIE_NAME,
+  type MagicLinkMailer
+} from "../src/auth";
 import type { CustomerAuthDependencies } from "../src/customer-auth";
 import { handleRequest } from "../src/index";
 
 const NOW = new Date("2026-09-12T04:30:00.000Z");
+const AUTH_ORIGIN = "https://go.tapntrust.com";
 
 interface TenantFixture {
   businessId: string;
@@ -38,6 +43,7 @@ function createTenantFixture(): TenantFixture {
 
 async function clearDatabase(): Promise<void> {
   await env.DB.batch([
+    env.DB.prepare("DELETE FROM auth_request_limits"),
     env.DB.prepare("DELETE FROM customer_sessions"),
     env.DB.prepare("DELETE FROM auth_magic_links"),
     env.DB.prepare("DELETE FROM customer_business_access"),
@@ -97,7 +103,13 @@ async function request(
   return { response, context };
 }
 
-async function signIn(email: string): Promise<{ cookie: string; magicUrl: string }> {
+function responseCookie(response: Response, name: string): string {
+  const setCookie = response.headers.get("Set-Cookie") || "";
+  const match = setCookie.match(new RegExp(`(?:^|,\\s*)${name}=([^;]*)`));
+  return match ? `${name}=${match[1]}` : "";
+}
+
+async function requestMagicLink(email: string): Promise<string> {
   let magicUrl = "";
   const mailer: MagicLinkMailer = {
     async sendMagicLink(recipient, url) {
@@ -107,23 +119,63 @@ async function signIn(email: string): Promise<{ cookie: string; magicUrl: string
   };
   const linkRequest = await request("/api/auth/request-link", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", Origin: AUTH_ORIGIN },
     body: JSON.stringify({ email })
   }, { mailer });
   expect(linkRequest.response.status).toBe(202);
   await waitOnExecutionContext(linkRequest.context);
   expect(magicUrl).toContain("/auth/verify?token=");
+  return magicUrl;
+}
 
+async function prepareConfirmation(magicUrl: string): Promise<string> {
   const verifyUrl = new URL(magicUrl);
   const verification = await request(`${verifyUrl.pathname}${verifyUrl.search}`);
   expect(verification.response.status).toBe(303);
-  expect(verification.response.headers.get("Location")).toBe("/app");
+  expect(verification.response.headers.get("Location")).toBe("/auth/confirm");
+  expect(verification.response.headers.get("Location")).not.toContain("token");
   const setCookie = verification.response.headers.get("Set-Cookie") || "";
+  expect(setCookie).toContain("Max-Age=900");
   expect(setCookie).toContain("HttpOnly");
   expect(setCookie).toContain("Secure");
   expect(setCookie).toContain("SameSite=Lax");
+  const pendingCookie = responseCookie(verification.response, PENDING_MAGIC_COOKIE_NAME);
+  expect(pendingCookie).toContain(`${PENDING_MAGIC_COOKIE_NAME}=`);
+  return pendingCookie;
+}
 
-  return { cookie: setCookie.split(";")[0] || "", magicUrl };
+async function confirmMagicLink(pendingCookie: string): Promise<Response> {
+  const confirmation = await request("/auth/confirm", {
+    method: "POST",
+    headers: {
+      Cookie: pendingCookie,
+      Origin: AUTH_ORIGIN,
+      "Content-Type": "application/x-www-form-urlencoded"
+    },
+    body: "confirm=1"
+  });
+  return confirmation.response;
+}
+
+async function signIn(email: string): Promise<{ cookie: string; magicUrl: string }> {
+  const magicUrl = await requestMagicLink(email);
+  const pendingCookie = await prepareConfirmation(magicUrl);
+  const confirmationPageResponse = await request("/auth/confirm", {
+    headers: { Cookie: pendingCookie }
+  });
+  expect(confirmationPageResponse.response.status).toBe(200);
+  expect(await confirmationPageResponse.response.text()).toContain("Continue to Insights");
+
+  const confirmation = await confirmMagicLink(pendingCookie);
+  expect(confirmation.status).toBe(303);
+  expect(confirmation.headers.get("Location")).toBe("/app");
+  const setCookie = confirmation.headers.get("Set-Cookie") || "";
+  expect(setCookie).toContain("HttpOnly");
+  expect(setCookie).toContain("Secure");
+  expect(setCookie).toContain("SameSite=Lax");
+  const cookie = responseCookie(confirmation, SESSION_COOKIE_NAME);
+  expect(cookie).toContain(`${SESSION_COOKIE_NAME}=`);
+  return { cookie, magicUrl };
 }
 
 beforeEach(async () => {
@@ -147,6 +199,99 @@ describe("customer magic-link authentication", () => {
     const embeddedScript = page.match(/<script>([\s\S]*?)<\/script>/)?.[1];
     expect(embeddedScript).toBeTruthy();
     expect(() => new Function(embeddedScript || "")).not.toThrow();
+  });
+
+  it("does not consume a magic link during GET verification", async () => {
+    const magicUrl = await requestMagicLink(tenantA.email);
+    const rawToken = new URL(magicUrl).searchParams.get("token") || "";
+    await prepareConfirmation(magicUrl);
+
+    const stored = await env.DB.prepare(`
+      SELECT token_hash, used_at FROM auth_magic_links WHERE user_id = ?1
+    `).bind(tenantA.userId).first<{ token_hash: string; used_at: string | null }>();
+    const sessions = await env.DB.prepare("SELECT COUNT(*) AS count FROM customer_sessions")
+      .first<{ count: number }>();
+
+    expect(stored?.token_hash).not.toBe(rawToken);
+    expect(stored?.token_hash).toMatch(/^[a-f0-9]{64}$/);
+    expect(stored?.used_at).toBeNull();
+    expect(Number(sessions?.count || 0)).toBe(0);
+  });
+
+  it("allows the customer to use a link after an automated GET prefetch", async () => {
+    const magicUrl = await requestMagicLink(tenantA.email);
+    const scannerCookie = await prepareConfirmation(magicUrl);
+    const scannerPage = await request("/auth/confirm", { headers: { Cookie: scannerCookie } });
+    expect(scannerPage.response.status).toBe(200);
+
+    const customerCookie = await prepareConfirmation(magicUrl);
+    const confirmed = await confirmMagicLink(customerCookie);
+    expect(confirmed.status).toBe(303);
+    expect(confirmed.headers.get("Location")).toBe("/app");
+
+    const scannerReuse = await confirmMagicLink(scannerCookie);
+    expect(scannerReuse.status).toBe(401);
+  });
+
+  it("requires JSON for magic-link requests", async () => {
+    const missing = await request("/api/auth/request-link", {
+      method: "POST",
+      headers: { Origin: AUTH_ORIGIN },
+      body: JSON.stringify({ email: tenantA.email })
+    });
+    const wrong = await request("/api/auth/request-link", {
+      method: "POST",
+      headers: { Origin: AUTH_ORIGIN, "Content-Type": "text/plain" },
+      body: JSON.stringify({ email: tenantA.email })
+    });
+
+    expect(missing.response.status).toBe(415);
+    expect(wrong.response.status).toBe(415);
+  });
+
+  it("rejects cross-origin magic-link requests", async () => {
+    let sent = false;
+    const { response, context } = await request("/api/auth/request-link", {
+      method: "POST",
+      headers: { Origin: "https://cross-origin.example", "Content-Type": "application/json" },
+      body: JSON.stringify({ email: tenantA.email })
+    }, { mailer: { async sendMagicLink() { sent = true; } } });
+    await waitOnExecutionContext(context);
+
+    expect(response.status).toBe(403);
+    expect(sent).toBe(false);
+  });
+
+  it("rate-limits known and unknown emails with the same public response", async () => {
+    let sent = 0;
+    const mailer: MagicLinkMailer = { async sendMagicLink() { sent += 1; } };
+    const requestBody = (email: string) => ({
+      method: "POST",
+      headers: { Origin: AUTH_ORIGIN, "Content-Type": "application/json" },
+      body: JSON.stringify({ email })
+    });
+
+    const knownFirst = await request("/api/auth/request-link", requestBody(tenantA.email), { mailer });
+    await waitOnExecutionContext(knownFirst.context);
+    const knownLimited = await request("/api/auth/request-link", requestBody(tenantA.email), { mailer });
+    await waitOnExecutionContext(knownLimited.context);
+
+    const unknownEmail = `account-${crypto.randomUUID()}@example.invalid`;
+    const unknownFirst = await request("/api/auth/request-link", requestBody(unknownEmail), { mailer });
+    await waitOnExecutionContext(unknownFirst.context);
+    const unknownLimited = await request("/api/auth/request-link", requestBody(unknownEmail), { mailer });
+    await waitOnExecutionContext(unknownLimited.context);
+
+    const responses = await Promise.all([
+      knownFirst.response.text(),
+      knownLimited.response.text(),
+      unknownFirst.response.text(),
+      unknownLimited.response.text()
+    ]);
+    expect([knownFirst, knownLimited, unknownFirst, unknownLimited].map(({ response }) => response.status))
+      .toEqual([202, 202, 202, 202]);
+    expect(new Set(responses).size).toBe(1);
+    expect(sent).toBe(1);
   });
 
   it("allows an authenticated customer to access only their own business", async () => {
@@ -199,7 +344,7 @@ describe("customer magic-link authentication", () => {
     let sent = false;
     const { response, context } = await request("/api/auth/request-link", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", Origin: AUTH_ORIGIN },
       body: JSON.stringify({ email: unlinkedEmail })
     }, {
       mailer: { async sendMagicLink() { sent = true; } }
@@ -222,9 +367,13 @@ describe("customer magic-link authentication", () => {
     );
   });
 
-  it("stores only a hash and accepts each magic link once", async () => {
-    const { magicUrl } = await signIn(tenantA.email);
+  it("consumes a magic link exactly once only after POST confirmation", async () => {
+    const magicUrl = await requestMagicLink(tenantA.email);
     const token = new URL(magicUrl).searchParams.get("token") || "";
+    const pendingCookie = await prepareConfirmation(magicUrl);
+    const confirmed = await confirmMagicLink(pendingCookie);
+    expect(confirmed.status).toBe(303);
+
     const stored = await env.DB.prepare(`
       SELECT token_hash, used_at FROM auth_magic_links WHERE user_id = ?1
     `).bind(tenantA.userId).first<{ token_hash: string; used_at: string | null }>();
@@ -233,8 +382,11 @@ describe("customer magic-link authentication", () => {
     expect(stored?.token_hash).toMatch(/^[a-f0-9]{64}$/);
     expect(stored?.used_at).toBe(NOW.toISOString());
 
-    const verifyUrl = new URL(magicUrl);
-    const reused = await request(`${verifyUrl.pathname}${verifyUrl.search}`);
-    expect(reused.response.status).toBe(401);
+    const secondPendingCookie = await prepareConfirmation(magicUrl);
+    const reused = await confirmMagicLink(secondPendingCookie);
+    const sessions = await env.DB.prepare("SELECT COUNT(*) AS count FROM customer_sessions")
+      .first<{ count: number }>();
+    expect(reused.status).toBe(401);
+    expect(Number(sessions?.count || 0)).toBe(1);
   });
 });

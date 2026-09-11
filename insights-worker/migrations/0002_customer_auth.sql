@@ -34,6 +34,13 @@ CREATE TABLE customer_sessions (
   created_at TEXT NOT NULL
 );
 
+CREATE TABLE auth_request_limits (
+  identifier_hash TEXT PRIMARY KEY,
+  window_started_at TEXT NOT NULL,
+  request_count INTEGER NOT NULL DEFAULT 0 CHECK (request_count >= 0),
+  last_allowed_at TEXT NOT NULL
+);
+
 CREATE INDEX customer_business_access_business_idx
   ON customer_business_access (business_id, user_id);
 CREATE INDEX auth_magic_links_user_created_idx
@@ -44,3 +51,5 @@ CREATE INDEX customer_sessions_user_idx
   ON customer_sessions (user_id);
 CREATE INDEX customer_sessions_expiry_idx
   ON customer_sessions (expires_at);
+CREATE INDEX auth_request_limits_window_idx
+  ON auth_request_limits (window_started_at);

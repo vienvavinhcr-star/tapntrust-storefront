@@ -1,5 +1,6 @@
 const TOKEN_BYTES = 32;
 export const SESSION_COOKIE_NAME = "__Host-tnt_insights_session";
+export const PENDING_MAGIC_COOKIE_NAME = "__Host-tnt_magic_pending";
 
 export interface MagicLinkMailer {
   sendMagicLink(email: string, magicUrl: string): Promise<void>;
@@ -26,16 +27,24 @@ export async function hashToken(value: string): Promise<string> {
   return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
-export function readSessionToken(request: Request): string | null {
+function readCookieToken(request: Request, expectedName: string): string | null {
   const cookie = request.headers.get("Cookie") || "";
   for (const part of cookie.split(";")) {
     const [name, ...valueParts] = part.trim().split("=");
-    if (name === SESSION_COOKIE_NAME) {
+    if (name === expectedName) {
       const value = valueParts.join("=");
       return /^[A-Za-z0-9_-]{40,100}$/.test(value) ? value : null;
     }
   }
   return null;
+}
+
+export function readSessionToken(request: Request): string | null {
+  return readCookieToken(request, SESSION_COOKIE_NAME);
+}
+
+export function readPendingMagicToken(request: Request): string | null {
+  return readCookieToken(request, PENDING_MAGIC_COOKIE_NAME);
 }
 
 export function createSessionCookie(token: string, maxAgeSeconds: number): string {
@@ -44,6 +53,14 @@ export function createSessionCookie(token: string, maxAgeSeconds: number): strin
 
 export function clearSessionCookie(): string {
   return `${SESSION_COOKIE_NAME}=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax`;
+}
+
+export function createPendingMagicCookie(token: string, maxAgeSeconds: number): string {
+  return `${PENDING_MAGIC_COOKIE_NAME}=${token}; Path=/; Max-Age=${maxAgeSeconds}; HttpOnly; Secure; SameSite=Lax`;
+}
+
+export function clearPendingMagicCookie(): string {
+  return `${PENDING_MAGIC_COOKIE_NAME}=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax`;
 }
 
 function escapeHtml(value: string): string {
