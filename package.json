@@ -4,8 +4,9 @@
   "type": "module",
   "packageManager": "pnpm@11.19.0",
   "scripts": {
-    "check": "node scripts/check-imports.mjs && node scripts/check-cart-integrity.mjs && node scripts/check-welcome-offer.mjs && node scripts/check-clarity-events.mjs && node scripts/check-invariants.mjs && wrangler types --check -c insights-worker/wrangler.jsonc insights-worker/worker-configuration.d.ts && tsc -p insights-worker/tsconfig.json --noEmit && vitest run --config insights-worker/vitest.config.ts",
+    "check": "node scripts/check-imports.mjs && node scripts/check-cart-integrity.mjs && node scripts/check-welcome-offer.mjs && node scripts/check-clarity-events.mjs && node scripts/check-invariants.mjs",
     "check:insights": "wrangler types --check -c insights-worker/wrangler.jsonc insights-worker/worker-configuration.d.ts && tsc -p insights-worker/tsconfig.json --noEmit && vitest run --config insights-worker/vitest.config.ts",
+    "check:all": "pnpm run check && pnpm run check:insights",
     "dev:insights": "wrangler dev -c insights-worker/wrangler.jsonc"
   },
   "devDependencies": {

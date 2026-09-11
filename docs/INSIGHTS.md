@@ -138,7 +138,7 @@ The redirect is a permanent product function. If a future insights subscription 
 Run:
 
 ```bash
-pnpm run check
+pnpm run check:all
 ```
 
 The Worker integration tests cover valid redirects, separate tracking for shared destinations, unknown and inactive cards, destination allowlisting, database write failure with redirect continuity, admin protection, and label/placement updates that preserve token and destination.
