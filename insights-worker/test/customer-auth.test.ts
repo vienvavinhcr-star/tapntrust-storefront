@@ -146,15 +146,21 @@ async function prepareConfirmation(magicUrl: string): Promise<{
 
 async function confirmMagicLink(
   rawToken: string,
-  options: { now?: Date; origin?: string } = {}
+  options: {
+    now?: Date;
+    origin?: string | null;
+    referer?: string | null;
+    secFetchSite?: string | null;
+  } = {}
 ): Promise<Response> {
   const testNow = options.now;
+  const headers = new Headers({ "Content-Type": "application/x-www-form-urlencoded" });
+  if (options.origin !== null) headers.set("Origin", options.origin || AUTH_ORIGIN);
+  if (options.referer) headers.set("Referer", options.referer);
+  if (options.secFetchSite) headers.set("Sec-Fetch-Site", options.secFetchSite);
   const confirmation = await request("/auth/confirm", {
     method: "POST",
-    headers: {
-      Origin: options.origin || AUTH_ORIGIN,
-      "Content-Type": "application/x-www-form-urlencoded"
-    },
+    headers,
     body: new URLSearchParams({ token: rawToken }).toString()
   }, testNow ? { now: () => testNow } : {});
   return confirmation.response;
@@ -222,7 +228,7 @@ describe("customer magic-link authentication", () => {
     const confirmation = await prepareConfirmation(magicUrl);
 
     expect(confirmation.response.headers.get("Cache-Control")).toBe("no-store");
-    expect(confirmation.response.headers.get("Referrer-Policy")).toBe("no-referrer");
+    expect(confirmation.response.headers.get("Referrer-Policy")).toBe("origin");
     expect(confirmation.response.headers.get("Content-Type")).toContain("text/html");
     expect(confirmation.html).toContain('method="post" action="/auth/confirm"');
     expect(confirmation.html).not.toMatch(/<(?:img|link|iframe|script)\b/i);
@@ -258,22 +264,98 @@ describe("customer magic-link authentication", () => {
   it("rejects malformed tokens on both GET and POST", async () => {
     const malformedGet = await request("/auth/verify?token=not-valid");
     const malformedPost = await confirmMagicLink("not-valid");
+    const missingPost = await confirmMagicLink("");
     const sessions = await env.DB.prepare("SELECT COUNT(*) AS count FROM customer_sessions")
       .first<{ count: number }>();
 
     expect(malformedGet.response.status).toBe(401);
     expect(malformedPost.status).toBe(401);
+    expect(missingPost.status).toBe(401);
     expect(Number(sessions?.count || 0)).toBe(0);
   });
 
-  it("rejects a wrong-origin confirmation without consuming the token", async () => {
+  it("accepts an exact expected Origin", async () => {
     const magicUrl = await requestMagicLink(tenantA.email);
     const { rawToken } = await prepareConfirmation(magicUrl);
-    const rejected = await confirmMagicLink(rawToken, { origin: "https://cross-origin.example" });
+    const accepted = await confirmMagicLink(rawToken, { origin: AUTH_ORIGIN });
+
+    expect(accepted.status).toBe(303);
+    expect(accepted.headers.get("Location")).toBe("/app");
+  });
+
+  it("rejects a supplied wrong Origin even when Fetch Metadata says same-origin", async () => {
+    const magicUrl = await requestMagicLink(tenantA.email);
+    const { rawToken } = await prepareConfirmation(magicUrl);
+    const rejected = await confirmMagicLink(rawToken, {
+      origin: "https://cross-origin.example",
+      secFetchSite: "same-origin"
+    });
     const accepted = await confirmMagicLink(rawToken);
 
     expect(rejected.status).toBe(401);
     expect(accepted.status).toBe(303);
+  });
+
+  it("accepts absent Origin with same-origin Fetch Metadata", async () => {
+    const magicUrl = await requestMagicLink(tenantA.email);
+    const { rawToken } = await prepareConfirmation(magicUrl);
+    const accepted = await confirmMagicLink(rawToken, {
+      origin: null,
+      secFetchSite: "same-origin"
+    });
+
+    expect(accepted.status).toBe(303);
+    expect(accepted.headers.get("Location")).toBe("/app");
+  });
+
+  it("accepts an exact-origin Referer fallback when Origin and Fetch Metadata are absent", async () => {
+    const magicUrl = await requestMagicLink(tenantA.email);
+    const { rawToken } = await prepareConfirmation(magicUrl);
+    const accepted = await confirmMagicLink(rawToken, {
+      origin: null,
+      referer: `${AUTH_ORIGIN}/`
+    });
+
+    expect(accepted.status).toBe(303);
+  });
+
+  it("rejects absent Origin with cross-site Fetch Metadata without consuming the token", async () => {
+    const magicUrl = await requestMagicLink(tenantA.email);
+    const { rawToken } = await prepareConfirmation(magicUrl);
+    const rejected = await confirmMagicLink(rawToken, {
+      origin: null,
+      referer: `${AUTH_ORIGIN}/`,
+      secFetchSite: "cross-site"
+    });
+    const accepted = await confirmMagicLink(rawToken);
+
+    expect(rejected.status).toBe(401);
+    expect(accepted.status).toBe(303);
+  });
+
+  it("logs only safe reason and request-source metadata on confirmation failure", async () => {
+    const magicUrl = await requestMagicLink(tenantA.email);
+    const { rawToken } = await prepareConfirmation(magicUrl);
+    const consoleWarn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+
+    try {
+      const rejected = await confirmMagicLink(rawToken, {
+        origin: "https://cross-origin.example/private/path?token=must-not-appear",
+        secFetchSite: "same-origin"
+      });
+      const logs = consoleWarn.mock.calls.flat().join(" ");
+
+      expect(rejected.status).toBe(401);
+      expect(logs).toContain('"reason":"bad_origin"');
+      expect(logs).toContain('"origin":"https://cross-origin.example"');
+      expect(logs).toContain('"secFetchSite":"same-origin"');
+      expect(logs).not.toContain(rawToken);
+      expect(logs).not.toContain("private/path");
+      expect(logs).not.toContain("must-not-appear");
+      expect(logs).not.toContain(tenantA.email);
+    } finally {
+      consoleWarn.mockRestore();
+    }
   });
 
   it("requires form content type without consuming the token", async () => {
