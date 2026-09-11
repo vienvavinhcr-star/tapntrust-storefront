@@ -13,6 +13,16 @@
   "secrets": {
     "required": ["ADMIN_API_TOKEN"]
   },
+  "vars": {
+    "AUTH_BASE_URL": "https://go.tapntrust.com",
+    "AUTH_FROM_EMAIL": "contact@tapntrust.com"
+  },
+  "send_email": [
+    {
+      "name": "AUTH_EMAIL",
+      "allowed_sender_addresses": ["contact@tapntrust.com"]
+    }
+  ],
   "observability": {
     "enabled": true,
     "head_sampling_rate": 1

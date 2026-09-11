@@ -7,6 +7,11 @@ const REVIEW_URL = "https://search.google.com/local/writereview?placeid=ChIJ-exa
 
 async function clearDatabase(): Promise<void> {
   await env.DB.batch([
+    env.DB.prepare("DELETE FROM auth_request_limits"),
+    env.DB.prepare("DELETE FROM customer_sessions"),
+    env.DB.prepare("DELETE FROM auth_magic_links"),
+    env.DB.prepare("DELETE FROM customer_business_access"),
+    env.DB.prepare("DELETE FROM customer_users"),
     env.DB.prepare("DELETE FROM tap_events"),
     env.DB.prepare("DELETE FROM cards"),
     env.DB.prepare("DELETE FROM locations"),
