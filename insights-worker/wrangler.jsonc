@@ -1,0 +1,28 @@
+{
+  "$schema": "../node_modules/wrangler/config-schema.json",
+  "name": "tapntrust-insights-redirect",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-09-11",
+  "compatibility_flags": ["nodejs_compat"],
+  "routes": [
+    {
+      "pattern": "go.tapntrust.com",
+      "custom_domain": true
+    }
+  ],
+  "secrets": {
+    "required": ["ADMIN_API_TOKEN"]
+  },
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "tapntrust-insights",
+      "database_id": "f0961fc6-3fff-4ce4-bed5-6900ee0c0d73",
+      "migrations_dir": "migrations"
+    }
+  ]
+}

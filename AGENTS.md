@@ -26,6 +26,7 @@ Use the smallest relevant surface area.
 - Cart, packages, extras, discounts: read `docs/COMMERCE.md`, then `js/cart.js` and `js/shopify.js`.
 - Meta Pixel / Clarity / analytics / test mode: read `docs/ANALYTICS.md`, then `js/test-mode.js`, `js/analytics/meta.js`, `js/clarity-events.js`, and only relevant callers.
 - SEO/runtime structured metadata: inspect `js/metadata.js`.
+- Tap redirect tracking / owner tap insights: read `docs/INSIGHTS.md`, then inspect `insights-worker/` only. Do not change storefront fulfilment URLs unless the task explicitly activates tracked-card fulfilment.
 - Cross-cutting architectural changes: read `docs/ARCHITECTURE.md`.
 
 ## Non-negotiable invariants
@@ -52,6 +53,7 @@ Use the smallest relevant surface area.
 20. The Google Apps Script lead endpoint is public-by-design, but no private Google credential may be embedded in browser code. Payment credentials must never be sent to the lead sheet.
 21. Tapntrust owner test mode must suppress Microsoft Clarity, browser-side Meta Pixel/events, and Google Analytics on the owner's browser. `?test=1` enables the persistent browser flag and `?test=0` disables it. Shopify and the Google Sheet lead funnel remain active for functional testing. Do not weaken this suppression without explicit owner approval.
 22. A 5-card package includes one physical Counter Stand and that gift must be a **real Shopify line item**, not UI-only text. The storefront adds the normal Counter Stand as the Y item, while Shopify's active automatic Buy X get Y discount must make that linked gift line A$0. The gift must be linked to its parent package, removed when the parent is removed/changed away from 5 cards, and must never reach checkout with a non-zero line total. Do not create a separate A$0 bundle variant while this automatic discount flow is active.
+23. A provisioned NFC card's public redirect token is immutable. Card labels and placement may change, but disabling future paid insights must never break the card's redirect to its stored Google review destination.
 
 ## Seasonal decorations — reusable every year
 
@@ -112,6 +114,7 @@ For sensitive changes, explicitly confirm in the final work summary that the pro
 - `js/google-review.js` — Google review URL helpers.
 - `js/fulfilment.js` — fulfilment attribute keys and transformations.
 - `js/clarity-events.js` — Microsoft Clarity funnel events plus persistent owner test-mode opt-out.
+- `insights-worker/` — isolated Cloudflare Worker + D1 service for immutable per-card redirect tokens, privacy-minimised tap events and protected owner tap summaries.
 - `js/config.js` — public browser configuration, including the public lead endpoint and welcome offer settings.
 - `js/page.js` — shared behaviour on supporting pages.
 - `integrations/google-apps-script/lead-capture.gs` — Apps Script Web App source for the Tapntrust Leads Google Sheet.
@@ -125,6 +128,7 @@ For sensitive changes, explicitly confirm in the final work summary that the pro
 - Commerce/cart/checkout: `docs/COMMERCE.md`
 - Analytics/Pixel/Clarity: `docs/ANALYTICS.md`
 - Business/review fulfilment data: `docs/FULFILMENT.md`
+- Tap redirects and owner insights: `docs/INSIGHTS.md`
 
 ## Adding future notes
 
