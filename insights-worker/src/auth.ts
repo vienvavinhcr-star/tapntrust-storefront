@@ -62,29 +62,3 @@ export function createPendingMagicCookie(token: string, maxAgeSeconds: number): 
 export function clearPendingMagicCookie(): string {
   return `${PENDING_MAGIC_COOKIE_NAME}=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax`;
 }
-
-function escapeHtml(value: string): string {
-  return value.replace(/[&<>"']/g, (character) => ({
-    "&": "&amp;",
-    "<": "&lt;",
-    ">": "&gt;",
-    '"': "&quot;",
-    "'": "&#39;"
-  })[character] || character);
-}
-
-export function createCloudflareMagicLinkMailer(binding: SendEmail, fromEmail: string): MagicLinkMailer {
-  return {
-    async sendMagicLink(email, magicUrl) {
-      const safeUrl = escapeHtml(magicUrl);
-      await binding.send({
-        to: email,
-        from: { email: fromEmail, name: "Tapntrust Support" },
-        replyTo: "contact@tapntrust.com",
-        subject: "Your Tapntrust Insights sign-in link",
-        text: `Open your Tapntrust Insights dashboard: ${magicUrl}\n\nThis single-use link expires in 15 minutes. If you did not request it, you can ignore this email.`,
-        html: `<p>Open your Tapntrust Insights dashboard:</p><p><a href="${safeUrl}">Sign in to Tapntrust Insights</a></p><p>This single-use link expires in 15 minutes. If you did not request it, you can ignore this email.</p>`
-      });
-    }
-  };
-}

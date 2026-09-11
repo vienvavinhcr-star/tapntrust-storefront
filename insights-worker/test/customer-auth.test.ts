@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createExecutionContext, waitOnExecutionContext } from "cloudflare:test";
 import { env } from "cloudflare:workers";
 import {
@@ -8,6 +8,7 @@ import {
 } from "../src/auth";
 import type { CustomerAuthDependencies } from "../src/customer-auth";
 import { handleRequest } from "../src/index";
+import { createZeptoMailMagicLinkMailer } from "../src/zeptomail";
 
 const NOW = new Date("2026-09-12T04:30:00.000Z");
 const AUTH_ORIGIN = "https://go.tapntrust.com";
@@ -292,6 +293,43 @@ describe("customer magic-link authentication", () => {
       .toEqual([202, 202, 202, 202]);
     expect(new Set(responses).size).toBe(1);
     expect(sent).toBe(1);
+  });
+
+  it("deletes a newly-created magic link when delivery fails without logging sensitive details", async () => {
+    const apiKey = `test-only-${crypto.randomUUID()}`;
+    const providerDetail = `provider-detail-${crypto.randomUUID()}`;
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+    try {
+      const failed = await request("/api/auth/request-link", {
+        method: "POST",
+        headers: { Origin: AUTH_ORIGIN, "Content-Type": "application/json" },
+        body: JSON.stringify({ email: tenantA.email })
+      }, {
+        mailer: createZeptoMailMagicLinkMailer(
+          apiKey,
+          "contact@tapntrust.com",
+          async () => new Response(providerDetail, { status: 401 })
+        )
+      });
+      expect(failed.response.status).toBe(202);
+      expect(await failed.response.json()).toEqual({
+        message: "If this email has Tapntrust Insights access, a sign-in link is on its way."
+      });
+      await waitOnExecutionContext(failed.context);
+
+      const storedLinks = await env.DB.prepare("SELECT COUNT(*) AS count FROM auth_magic_links")
+        .first<{ count: number }>();
+      const logs = consoleError.mock.calls.flat().join(" ");
+      expect(Number(storedLinks?.count || 0)).toBe(0);
+      expect(logs).toContain("provider_rejected");
+      expect(logs).toContain('"status":401');
+      expect(logs).not.toContain(apiKey);
+      expect(logs).not.toContain(providerDetail);
+      expect(logs).not.toContain(tenantA.email);
+    } finally {
+      consoleError.mockRestore();
+    }
   });
 
   it("allows an authenticated customer to access only their own business", async () => {
