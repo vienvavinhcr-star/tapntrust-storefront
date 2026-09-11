@@ -1,0 +1,18 @@
+{
+  "$schema": "../node_modules/wrangler/config-schema.json",
+  "name": "tapntrust-insights-redirect",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-09-11",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "tapntrust-insights",
+      "migrations_dir": "migrations"
+    }
+  ]
+}
