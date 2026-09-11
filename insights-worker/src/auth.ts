@@ -1,6 +1,6 @@
 const TOKEN_BYTES = 32;
+const OPAQUE_TOKEN_PATTERN = /^[A-Za-z0-9_-]{40,100}$/;
 export const SESSION_COOKIE_NAME = "__Host-tnt_insights_session";
-export const PENDING_MAGIC_COOKIE_NAME = "__Host-tnt_magic_pending";
 
 export interface MagicLinkMailer {
   sendMagicLink(email: string, magicUrl: string): Promise<void>;
@@ -27,13 +27,17 @@ export async function hashToken(value: string): Promise<string> {
   return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
+export function isValidOpaqueToken(value: string): boolean {
+  return OPAQUE_TOKEN_PATTERN.test(value);
+}
+
 function readCookieToken(request: Request, expectedName: string): string | null {
   const cookie = request.headers.get("Cookie") || "";
   for (const part of cookie.split(";")) {
     const [name, ...valueParts] = part.trim().split("=");
     if (name === expectedName) {
       const value = valueParts.join("=");
-      return /^[A-Za-z0-9_-]{40,100}$/.test(value) ? value : null;
+      return isValidOpaqueToken(value) ? value : null;
     }
   }
   return null;
@@ -43,22 +47,10 @@ export function readSessionToken(request: Request): string | null {
   return readCookieToken(request, SESSION_COOKIE_NAME);
 }
 
-export function readPendingMagicToken(request: Request): string | null {
-  return readCookieToken(request, PENDING_MAGIC_COOKIE_NAME);
-}
-
 export function createSessionCookie(token: string, maxAgeSeconds: number): string {
   return `${SESSION_COOKIE_NAME}=${token}; Path=/; Max-Age=${maxAgeSeconds}; HttpOnly; Secure; SameSite=Lax`;
 }
 
 export function clearSessionCookie(): string {
   return `${SESSION_COOKIE_NAME}=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax`;
-}
-
-export function createPendingMagicCookie(token: string, maxAgeSeconds: number): string {
-  return `${PENDING_MAGIC_COOKIE_NAME}=${token}; Path=/; Max-Age=${maxAgeSeconds}; HttpOnly; Secure; SameSite=Lax`;
-}
-
-export function clearPendingMagicCookie(): string {
-  return `${PENDING_MAGIC_COOKIE_NAME}=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax`;
 }

@@ -2,7 +2,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createExecutionContext, waitOnExecutionContext } from "cloudflare:test";
 import { env } from "cloudflare:workers";
 import {
-  PENDING_MAGIC_COOKIE_NAME,
   SESSION_COOKIE_NAME,
   type MagicLinkMailer
 } from "../src/auth";
@@ -129,45 +128,44 @@ async function requestMagicLink(email: string): Promise<string> {
   return magicUrl;
 }
 
-async function prepareConfirmation(magicUrl: string): Promise<string> {
+async function prepareConfirmation(magicUrl: string): Promise<{
+  html: string;
+  rawToken: string;
+  response: Response;
+}> {
   const verifyUrl = new URL(magicUrl);
   const verification = await request(`${verifyUrl.pathname}${verifyUrl.search}`);
-  expect(verification.response.status).toBe(303);
-  expect(verification.response.headers.get("Location")).toBe("/auth/confirm");
-  expect(verification.response.headers.get("Location")).not.toContain("token");
-  const setCookie = verification.response.headers.get("Set-Cookie") || "";
-  expect(setCookie).toContain("Max-Age=900");
-  expect(setCookie).toContain("HttpOnly");
-  expect(setCookie).toContain("Secure");
-  expect(setCookie).toContain("SameSite=Lax");
-  const pendingCookie = responseCookie(verification.response, PENDING_MAGIC_COOKIE_NAME);
-  expect(pendingCookie).toContain(`${PENDING_MAGIC_COOKIE_NAME}=`);
-  return pendingCookie;
+  const rawToken = verifyUrl.searchParams.get("token") || "";
+  const html = await verification.response.text();
+  expect(verification.response.status).toBe(200);
+  expect(verification.response.headers.get("Location")).toBeNull();
+  expect(verification.response.headers.get("Set-Cookie")).toBeNull();
+  expect(html).toContain(`name="token" value="${rawToken}"`);
+  return { html, rawToken, response: verification.response };
 }
 
-async function confirmMagicLink(pendingCookie: string): Promise<Response> {
+async function confirmMagicLink(
+  rawToken: string,
+  options: { now?: Date; origin?: string } = {}
+): Promise<Response> {
+  const testNow = options.now;
   const confirmation = await request("/auth/confirm", {
     method: "POST",
     headers: {
-      Cookie: pendingCookie,
-      Origin: AUTH_ORIGIN,
+      Origin: options.origin || AUTH_ORIGIN,
       "Content-Type": "application/x-www-form-urlencoded"
     },
-    body: "confirm=1"
-  });
+    body: new URLSearchParams({ token: rawToken }).toString()
+  }, testNow ? { now: () => testNow } : {});
   return confirmation.response;
 }
 
 async function signIn(email: string): Promise<{ cookie: string; magicUrl: string }> {
   const magicUrl = await requestMagicLink(email);
-  const pendingCookie = await prepareConfirmation(magicUrl);
-  const confirmationPageResponse = await request("/auth/confirm", {
-    headers: { Cookie: pendingCookie }
-  });
-  expect(confirmationPageResponse.response.status).toBe(200);
-  expect(await confirmationPageResponse.response.text()).toContain("Continue to Insights");
+  const confirmationPageResponse = await prepareConfirmation(magicUrl);
+  expect(confirmationPageResponse.html).toContain("Continue to Insights");
 
-  const confirmation = await confirmMagicLink(pendingCookie);
+  const confirmation = await confirmMagicLink(confirmationPageResponse.rawToken);
   expect(confirmation.status).toBe(303);
   expect(confirmation.headers.get("Location")).toBe("/app");
   const setCookie = confirmation.headers.get("Set-Cookie") || "";
@@ -219,19 +217,77 @@ describe("customer magic-link authentication", () => {
     expect(Number(sessions?.count || 0)).toBe(0);
   });
 
-  it("allows the customer to use a link after an automated GET prefetch", async () => {
+  it("renders the no-store confirmation form directly without a pending cookie", async () => {
     const magicUrl = await requestMagicLink(tenantA.email);
-    const scannerCookie = await prepareConfirmation(magicUrl);
-    const scannerPage = await request("/auth/confirm", { headers: { Cookie: scannerCookie } });
-    expect(scannerPage.response.status).toBe(200);
+    const confirmation = await prepareConfirmation(magicUrl);
 
-    const customerCookie = await prepareConfirmation(magicUrl);
-    const confirmed = await confirmMagicLink(customerCookie);
+    expect(confirmation.response.headers.get("Cache-Control")).toBe("no-store");
+    expect(confirmation.response.headers.get("Referrer-Policy")).toBe("no-referrer");
+    expect(confirmation.response.headers.get("Content-Type")).toContain("text/html");
+    expect(confirmation.html).toContain('method="post" action="/auth/confirm"');
+    expect(confirmation.html).not.toMatch(/<(?:img|link|iframe|script)\b/i);
+
+    const confirmed = await confirmMagicLink(confirmation.rawToken);
     expect(confirmed.status).toBe(303);
     expect(confirmed.headers.get("Location")).toBe("/app");
+  });
 
-    const scannerReuse = await confirmMagicLink(scannerCookie);
-    expect(scannerReuse.status).toBe(401);
+  it("allows the customer to use a link after an automated GET prefetch", async () => {
+    const magicUrl = await requestMagicLink(tenantA.email);
+    const scannerPage = await prepareConfirmation(magicUrl);
+    expect(scannerPage.response.status).toBe(200);
+
+    const customerPage = await prepareConfirmation(magicUrl);
+    const confirmed = await confirmMagicLink(customerPage.rawToken);
+    expect(confirmed.status).toBe(303);
+    expect(confirmed.headers.get("Location")).toBe("/app");
+  });
+
+  it("rejects an expired magic link without creating a session", async () => {
+    const magicUrl = await requestMagicLink(tenantA.email);
+    const { rawToken } = await prepareConfirmation(magicUrl);
+    const expiredAt = new Date(NOW.getTime() + (15 * 60 * 1000) + 1);
+    const expired = await confirmMagicLink(rawToken, { now: expiredAt });
+    const sessions = await env.DB.prepare("SELECT COUNT(*) AS count FROM customer_sessions")
+      .first<{ count: number }>();
+
+    expect(expired.status).toBe(401);
+    expect(Number(sessions?.count || 0)).toBe(0);
+  });
+
+  it("rejects malformed tokens on both GET and POST", async () => {
+    const malformedGet = await request("/auth/verify?token=not-valid");
+    const malformedPost = await confirmMagicLink("not-valid");
+    const sessions = await env.DB.prepare("SELECT COUNT(*) AS count FROM customer_sessions")
+      .first<{ count: number }>();
+
+    expect(malformedGet.response.status).toBe(401);
+    expect(malformedPost.status).toBe(401);
+    expect(Number(sessions?.count || 0)).toBe(0);
+  });
+
+  it("rejects a wrong-origin confirmation without consuming the token", async () => {
+    const magicUrl = await requestMagicLink(tenantA.email);
+    const { rawToken } = await prepareConfirmation(magicUrl);
+    const rejected = await confirmMagicLink(rawToken, { origin: "https://cross-origin.example" });
+    const accepted = await confirmMagicLink(rawToken);
+
+    expect(rejected.status).toBe(401);
+    expect(accepted.status).toBe(303);
+  });
+
+  it("requires form content type without consuming the token", async () => {
+    const magicUrl = await requestMagicLink(tenantA.email);
+    const { rawToken } = await prepareConfirmation(magicUrl);
+    const rejected = await request("/auth/confirm", {
+      method: "POST",
+      headers: { Origin: AUTH_ORIGIN, "Content-Type": "text/plain" },
+      body: new URLSearchParams({ token: rawToken }).toString()
+    });
+    const accepted = await confirmMagicLink(rawToken);
+
+    expect(rejected.response.status).toBe(401);
+    expect(accepted.status).toBe(303);
   });
 
   it("requires JSON for magic-link requests", async () => {
@@ -408,8 +464,8 @@ describe("customer magic-link authentication", () => {
   it("consumes a magic link exactly once only after POST confirmation", async () => {
     const magicUrl = await requestMagicLink(tenantA.email);
     const token = new URL(magicUrl).searchParams.get("token") || "";
-    const pendingCookie = await prepareConfirmation(magicUrl);
-    const confirmed = await confirmMagicLink(pendingCookie);
+    const { rawToken } = await prepareConfirmation(magicUrl);
+    const confirmed = await confirmMagicLink(rawToken);
     expect(confirmed.status).toBe(303);
 
     const stored = await env.DB.prepare(`
@@ -420,8 +476,7 @@ describe("customer magic-link authentication", () => {
     expect(stored?.token_hash).toMatch(/^[a-f0-9]{64}$/);
     expect(stored?.used_at).toBe(NOW.toISOString());
 
-    const secondPendingCookie = await prepareConfirmation(magicUrl);
-    const reused = await confirmMagicLink(secondPendingCookie);
+    const reused = await confirmMagicLink(rawToken);
     const sessions = await env.DB.prepare("SELECT COUNT(*) AS count FROM customer_sessions")
       .first<{ count: number }>();
     expect(reused.status).toBe(401);

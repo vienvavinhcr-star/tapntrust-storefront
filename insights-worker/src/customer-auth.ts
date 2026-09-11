@@ -1,14 +1,12 @@
 import {
-  clearPendingMagicCookie,
   clearSessionCookie,
-  createPendingMagicCookie,
   createSessionCookie,
   generateOpaqueToken,
   hashToken,
   isValidEmail,
+  isValidOpaqueToken,
   type MagicLinkMailer,
   normaliseEmail,
-  readPendingMagicToken,
   readSessionToken
 } from "./auth";
 import { CUSTOMER_PAGE } from "./customer-page";
@@ -16,7 +14,6 @@ import { createCustomerRepository, type CustomerRepository } from "./customer-re
 import { createZeptoMailMagicLinkMailer, safeMailFailure } from "./zeptomail";
 
 const MAGIC_LINK_TTL_MS = 15 * 60 * 1000;
-const MAGIC_LINK_TTL_SECONDS = MAGIC_LINK_TTL_MS / 1000;
 const MAGIC_LINK_COOLDOWN_MS = 60 * 1000;
 const MAGIC_LINK_RATE_WINDOW_MS = 15 * 60 * 1000;
 const MAGIC_LINK_MAX_REQUESTS = 3;
@@ -112,21 +109,19 @@ function hasContentType(request: Request, expected: string): boolean {
   return mediaType.trim().toLowerCase() === expected;
 }
 
-function invalidLinkPage(clearPending = false): Response {
-  const headers = new Headers({
-    ...SECURITY_HEADERS,
-    "Content-Type": "text/html; charset=utf-8"
-  });
-  if (clearPending) headers.append("Set-Cookie", clearPendingMagicCookie());
+function invalidLinkPage(): Response {
   return new Response("<!doctype html><title>Tapntrust Insights</title><h1>This sign-in link is invalid or has expired.</h1><p>Return to the Tapntrust Insights sign-in page and request a new link.</p>", {
     status: 401,
-    headers
+    headers: {
+      ...SECURITY_HEADERS,
+      "Content-Type": "text/html; charset=utf-8"
+    }
   });
 }
 
-function confirmationPage(): Response {
+function confirmationPage(rawToken: string): Response {
   return new Response(`<!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>Continue to Tapntrust Insights</title><style>body{margin:0;background:#f4f7fb;color:#061a45;font:16px/1.5 system-ui,sans-serif}.panel{width:min(560px,calc(100% - 32px));margin:12vh auto;background:#fff;border:1px solid #d7e2f1;border-radius:22px;box-shadow:0 18px 45px rgba(6,26,69,.08);padding:32px;box-sizing:border-box}h1{font-size:clamp(2rem,7vw,3.2rem);line-height:1.05;letter-spacing:-.04em}.button{width:100%;border:0;border-radius:12px;background:#1769ed;color:#fff;padding:14px 18px;font:inherit;font-weight:800;cursor:pointer}</style></head><body><main class="panel"><p>Tapntrust Insights</p><h1>Continue to your dashboard</h1><p>Confirm below to securely sign in. This keeps automated email scanners from using your one-time link.</p><form method="post" action="/auth/confirm"><input type="hidden" name="confirm" value="1"><button class="button" type="submit">Continue to Insights</button></form></main></body></html>`, {
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>Continue to Tapntrust Insights</title><style>body{margin:0;background:#f4f7fb;color:#061a45;font:16px/1.5 system-ui,sans-serif}.panel{width:min(560px,calc(100% - 32px));margin:12vh auto;background:#fff;border:1px solid #d7e2f1;border-radius:22px;box-shadow:0 18px 45px rgba(6,26,69,.08);padding:32px;box-sizing:border-box}h1{font-size:clamp(2rem,7vw,3.2rem);line-height:1.05;letter-spacing:-.04em}.button{width:100%;border:0;border-radius:12px;background:#1769ed;color:#fff;padding:14px 18px;font:inherit;font-weight:800;cursor:pointer}</style></head><body><main class="panel"><p>Tapntrust Insights</p><h1>Continue to your dashboard</h1><p>Confirm below to securely sign in. This keeps automated email scanners from using your one-time link.</p><form method="post" action="/auth/confirm"><input type="hidden" name="token" value="${rawToken}"><button class="button" type="submit">Continue to Insights</button></form></main></body></html>`, {
     headers: {
       "Cache-Control": "no-store",
       "Content-Type": "text/html; charset=utf-8",
@@ -230,16 +225,8 @@ function prepareMagicLink(
 ): Response {
   if (request.method !== "GET") return methodNotAllowed("GET");
   const rawToken = url.searchParams.get("token") || "";
-  if (!/^[A-Za-z0-9_-]{40,100}$/.test(rawToken)) return invalidLinkPage();
-
-  return new Response(null, {
-    status: 303,
-    headers: {
-      ...SECURITY_HEADERS,
-      Location: "/auth/confirm",
-      "Set-Cookie": createPendingMagicCookie(rawToken, MAGIC_LINK_TTL_SECONDS)
-    }
-  });
+  if (!isValidOpaqueToken(rawToken)) return invalidLinkPage();
+  return confirmationPage(rawToken);
 }
 
 async function confirmMagicLink(
@@ -248,18 +235,16 @@ async function confirmMagicLink(
   repository: CustomerRepository,
   now: Date
 ): Promise<Response> {
-  const rawToken = readPendingMagicToken(request);
-  if (request.method === "GET") return rawToken ? confirmationPage() : invalidLinkPage();
-  if (request.method !== "POST") return methodNotAllowed("GET, POST");
+  if (request.method !== "POST") return methodNotAllowed("POST");
   if (!hasContentType(request, "application/x-www-form-urlencoded")) {
-    return invalidLinkPage(true);
+    return invalidLinkPage();
   }
-  if (!hasExpectedOrigin(request, env)) return invalidLinkPage(true);
-  if (!rawToken) return invalidLinkPage(true);
-  const confirmation = await readBoundedText(request, 64);
-  if (confirmation.status || new URLSearchParams(confirmation.text || "").get("confirm") !== "1") {
-    return invalidLinkPage(true);
-  }
+  if (!hasExpectedOrigin(request, env)) return invalidLinkPage();
+  const confirmation = await readBoundedText(request, 256);
+  const rawToken = confirmation.status
+    ? ""
+    : new URLSearchParams(confirmation.text || "").get("token") || "";
+  if (!isValidOpaqueToken(rawToken)) return invalidLinkPage();
 
   const sessionToken = generateOpaqueToken();
   const createdAt = now.toISOString();
@@ -269,11 +254,10 @@ async function confirmMagicLink(
     createdAt,
     expiresAt: new Date(now.getTime() + SESSION_TTL_MS).toISOString()
   });
-  if (!consumed) return invalidLinkPage(true);
+  if (!consumed) return invalidLinkPage();
 
   const headers = new Headers({ ...SECURITY_HEADERS, Location: "/app" });
   headers.append("Set-Cookie", createSessionCookie(sessionToken, SESSION_TTL_SECONDS));
-  headers.append("Set-Cookie", clearPendingMagicCookie());
   return new Response(null, {
     status: 303,
     headers
