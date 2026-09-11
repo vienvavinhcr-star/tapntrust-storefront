@@ -104,6 +104,77 @@ function hasExpectedOrigin(request: Request, env: CustomerEnv): boolean {
   return Boolean(expectedOrigin && request.headers.get("Origin") === expectedOrigin);
 }
 
+type ConfirmationFailureReason =
+  | "bad_origin"
+  | "bad_content_type"
+  | "bad_token_format"
+  | "token_not_consumable";
+
+function hasExpectedRefererOrigin(request: Request, expectedOrigin: string): boolean {
+  const referer = request.headers.get("Referer");
+  if (!referer) return false;
+
+  try {
+    return new URL(referer).origin === expectedOrigin;
+  } catch {
+    return false;
+  }
+}
+
+function hasSafeConfirmationSource(request: Request, env: CustomerEnv): boolean {
+  const expectedOrigin = expectedAuthOrigin(env);
+  if (!expectedOrigin) return false;
+
+  const origin = request.headers.get("Origin");
+  const fetchSite = request.headers.get("Sec-Fetch-Site")?.toLowerCase() || "";
+  if (fetchSite === "cross-site") return false;
+
+  // A supplied Origin is authoritative. Never let another header override a mismatch.
+  if (origin !== null) return origin === expectedOrigin;
+
+  // Modern browsers provide an unforgeable same-origin signal even when a WebView
+  // omits Origin on a navigation-mode form POST.
+  if (fetchSite === "same-origin") return true;
+
+  // Older or privacy-restricted clients may omit Fetch Metadata. The confirmation
+  // page sends only its origin as Referer, never the token-bearing path/query.
+  if (fetchSite && fetchSite !== "same-site" && fetchSite !== "none") return false;
+  return hasExpectedRefererOrigin(request, expectedOrigin);
+}
+
+function safeOriginForLog(request: Request): string | undefined {
+  const origin = request.headers.get("Origin");
+  if (!origin) return undefined;
+
+  try {
+    const url = new URL(origin);
+    if ((url.protocol !== "https:" && url.protocol !== "http:") || url.username || url.password) {
+      return undefined;
+    }
+    return url.origin;
+  } catch {
+    return undefined;
+  }
+}
+
+function safeFetchSiteForLog(request: Request): string {
+  const value = request.headers.get("Sec-Fetch-Site")?.toLowerCase();
+  return value && ["same-origin", "same-site", "cross-site", "none"].includes(value)
+    ? value
+    : value ? "other" : "missing";
+}
+
+function logConfirmationFailure(request: Request, reason: ConfirmationFailureReason): void {
+  const origin = safeOriginForLog(request);
+  console.warn(JSON.stringify({
+    message: "magic link confirmation rejected",
+    reason,
+    originPresent: request.headers.has("Origin"),
+    ...(origin ? { origin } : {}),
+    secFetchSite: safeFetchSiteForLog(request)
+  }));
+}
+
 function hasContentType(request: Request, expected: string): boolean {
   const mediaType = (request.headers.get("Content-Type") || "").split(";", 1)[0] || "";
   return mediaType.trim().toLowerCase() === expected;
@@ -126,7 +197,7 @@ function confirmationPage(rawToken: string): Response {
       "Cache-Control": "no-store",
       "Content-Type": "text/html; charset=utf-8",
       "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'",
-      "Referrer-Policy": "no-referrer",
+      "Referrer-Policy": "origin",
       "X-Content-Type-Options": "nosniff"
     }
   });
@@ -237,14 +308,21 @@ async function confirmMagicLink(
 ): Promise<Response> {
   if (request.method !== "POST") return methodNotAllowed("POST");
   if (!hasContentType(request, "application/x-www-form-urlencoded")) {
+    logConfirmationFailure(request, "bad_content_type");
     return invalidLinkPage();
   }
-  if (!hasExpectedOrigin(request, env)) return invalidLinkPage();
+  if (!hasSafeConfirmationSource(request, env)) {
+    logConfirmationFailure(request, "bad_origin");
+    return invalidLinkPage();
+  }
   const confirmation = await readBoundedText(request, 256);
   const rawToken = confirmation.status
     ? ""
     : new URLSearchParams(confirmation.text || "").get("token") || "";
-  if (!isValidOpaqueToken(rawToken)) return invalidLinkPage();
+  if (!isValidOpaqueToken(rawToken)) {
+    logConfirmationFailure(request, "bad_token_format");
+    return invalidLinkPage();
+  }
 
   const sessionToken = generateOpaqueToken();
   const createdAt = now.toISOString();
@@ -254,7 +332,10 @@ async function confirmMagicLink(
     createdAt,
     expiresAt: new Date(now.getTime() + SESSION_TTL_MS).toISOString()
   });
-  if (!consumed) return invalidLinkPage();
+  if (!consumed) {
+    logConfirmationFailure(request, "token_not_consumable");
+    return invalidLinkPage();
+  }
 
   const headers = new Headers({ ...SECURITY_HEADERS, Location: "/app" });
   headers.append("Set-Cookie", createSessionCookie(sessionToken, SESSION_TTL_SECONDS));
