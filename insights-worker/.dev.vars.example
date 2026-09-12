@@ -1,3 +1,4 @@
 # Copy this file to .dev.vars for local development. Never commit the real value.
 ADMIN_API_TOKEN=replace-with-a-long-random-secret
 ZEPTOMAIL_API_KEY=replace-with-your-zeptomail-agent-send-api-key
+GOOGLE_PLACES_API_KEY=replace-with-your-restricted-google-places-api-key

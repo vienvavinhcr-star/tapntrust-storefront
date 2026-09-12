@@ -8,6 +8,7 @@ export default defineConfig({
       miniflare: {
         bindings: {
           ADMIN_API_TOKEN: "test-admin-token-that-is-not-a-production-secret",
+          GOOGLE_PLACES_API_KEY: "test-google-places-key-not-a-production-secret",
           TEST_MIGRATIONS: await readD1Migrations("./insights-worker/migrations")
         }
       }

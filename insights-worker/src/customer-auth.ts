@@ -11,6 +11,18 @@ import {
 } from "./auth";
 import { CUSTOMER_PAGE } from "./customer-page";
 import { createCustomerRepository, type CustomerRepository } from "./customer-repository";
+import {
+  createCustomerInsightsRepository,
+  parseInsightsPeriod,
+  parseTimezoneOffset,
+  selectCustomerLocation,
+  type CustomerInsightsRepository
+} from "./customer-insights";
+import {
+  createGooglePlacesProvider,
+  GooglePlacesProviderError,
+  type GooglePlacesProvider
+} from "./places-provider";
 import { createZeptoMailMagicLinkMailer, safeMailFailure } from "./zeptomail";
 
 const MAGIC_LINK_TTL_MS = 15 * 60 * 1000;
@@ -20,16 +32,24 @@ const MAGIC_LINK_MAX_REQUESTS = 3;
 const REQUEST_LIMIT_RETENTION_MS = 24 * 60 * 60 * 1000;
 const SESSION_TTL_SECONDS = 30 * 24 * 60 * 60;
 const SESSION_TTL_MS = SESSION_TTL_SECONDS * 1000;
+const GOOGLE_RATE_WINDOW_MS = 60 * 60 * 1000;
+const GOOGLE_RATE_POLICIES = {
+  summary: { maxRequests: 30, cooldownMs: 30 * 1000 },
+  reviews: { maxRequests: 12, cooldownMs: 2 * 60 * 1000 }
+} as const;
 const GENERIC_LINK_MESSAGE = "If this email has Tapntrust Insights access, a sign-in link is on its way.";
 
 type CustomerEnv = Env & {
   AUTH_BASE_URL: string;
   AUTH_FROM_EMAIL: string;
   ZEPTOMAIL_API_KEY: string;
+  GOOGLE_PLACES_API_KEY?: string;
 };
 
 export interface CustomerAuthDependencies {
   repository?: CustomerRepository;
+  insightsRepository?: CustomerInsightsRepository;
+  placesProvider?: GooglePlacesProvider;
   mailer?: MagicLinkMailer;
   now?: () => Date;
 }
@@ -362,6 +382,88 @@ async function customerSummary(
   return json(await repository.getCustomerSummary(customer, monthStartUtc(now)));
 }
 
+async function authenticatedInsights(
+  request: Request,
+  url: URL,
+  repository: CustomerRepository,
+  insightsRepository: CustomerInsightsRepository,
+  now: Date
+): Promise<Response> {
+  if (request.method !== "GET") return methodNotAllowed("GET");
+  const customer = await authenticateCustomer(request, repository, now);
+  if (!customer) return json({ error: "Unauthorized" }, 401);
+  const locations = await insightsRepository.listEntitledLocations(customer.id);
+  const location = selectCustomerLocation(locations, url.searchParams.get("locationId"));
+  if (!location) {
+    return url.searchParams.has("locationId")
+      ? json({ error: "Not found" }, 404)
+      : json({ error: "Insights is not active for a location." }, 403);
+  }
+  return json(await insightsRepository.getLocationInsights(
+    location,
+    locations,
+    parseInsightsPeriod(url.searchParams.get("period")),
+    parseTimezoneOffset(url.searchParams.get("timezoneOffsetMinutes")),
+    now
+  ));
+}
+
+async function authenticatedGooglePlace(
+  request: Request,
+  url: URL,
+  env: CustomerEnv,
+  repository: CustomerRepository,
+  insightsRepository: CustomerInsightsRepository,
+  placesProvider: GooglePlacesProvider,
+  now: Date,
+  kind: "summary" | "reviews"
+): Promise<Response> {
+  if (request.method !== "GET") return methodNotAllowed("GET");
+  const customer = await authenticateCustomer(request, repository, now);
+  if (!customer) return json({ error: "Unauthorized" }, 401);
+  const locations = await insightsRepository.listEntitledLocations(customer.id);
+  const location = selectCustomerLocation(locations, url.searchParams.get("locationId"));
+  if (!location) return json({ error: "Not found" }, 404);
+  if (!location.googlePlaceId || !env.GOOGLE_PLACES_API_KEY) {
+    return json({ status: "unavailable" });
+  }
+  const policy = GOOGLE_RATE_POLICIES[kind];
+  const identifierHash = await hashToken(JSON.stringify([
+    "google-places-rate-v1",
+    kind,
+    customer.id,
+    location.id
+  ]));
+  const providerRequestAllowed = await insightsRepository.reserveGoogleProviderRequest({
+    identifierHash,
+    now: now.toISOString(),
+    cooldownCutoff: new Date(now.getTime() - policy.cooldownMs).toISOString(),
+    windowResetCutoff: new Date(now.getTime() - GOOGLE_RATE_WINDOW_MS).toISOString(),
+    maxRequests: policy.maxRequests
+  });
+  if (!providerRequestAllowed) {
+    return json(
+      { status: "rate_limited" },
+      429,
+      { "Retry-After": String(Math.ceil(policy.cooldownMs / 1000)) }
+    );
+  }
+
+  try {
+    const data = kind === "summary"
+      ? await placesProvider.fetchSummary(location.googlePlaceId, env.GOOGLE_PLACES_API_KEY)
+      : await placesProvider.fetchReviews(location.googlePlaceId, env.GOOGLE_PLACES_API_KEY);
+    return json({ status: "available", locationId: location.id, data });
+  } catch (error) {
+    console.warn(JSON.stringify({
+      message: "google places request failed",
+      kind,
+      reason: error instanceof GooglePlacesProviderError ? error.code : "provider_unavailable"
+    }));
+    return json({ status: "unavailable" });
+  }
+}
+
 async function logoutCustomer(
   request: Request,
   repository: CustomerRepository,
@@ -384,6 +486,8 @@ export async function handleCustomerRequest(
   dependencies: CustomerAuthDependencies = {}
 ): Promise<Response | null> {
   const repository = dependencies.repository || createCustomerRepository(env.DB);
+  const insightsRepository = dependencies.insightsRepository || createCustomerInsightsRepository(env.DB);
+  const placesProvider = dependencies.placesProvider || createGooglePlacesProvider();
   const now = (dependencies.now || (() => new Date()))();
 
   if (url.pathname === "/app") {
@@ -392,7 +496,7 @@ export async function handleCustomerRequest(
       headers: {
         "Cache-Control": "no-store",
         "Content-Type": "text/html; charset=utf-8",
-        "Content-Security-Policy": "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'",
+        "Content-Security-Policy": "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' https://*.googleusercontent.com; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'",
         "Referrer-Policy": "no-referrer",
         "X-Content-Type-Options": "nosniff"
       }
@@ -409,5 +513,18 @@ export async function handleCustomerRequest(
   }
   if (url.pathname === "/api/auth/logout") return logoutCustomer(request, repository, now);
   if (url.pathname === "/api/customer/summary") return customerSummary(request, repository, now);
+  if (url.pathname === "/api/customer/insights") {
+    return authenticatedInsights(request, url, repository, insightsRepository, now);
+  }
+  if (url.pathname === "/api/customer/google-place/summary") {
+    return authenticatedGooglePlace(
+      request, url, env, repository, insightsRepository, placesProvider, now, "summary"
+    );
+  }
+  if (url.pathname === "/api/customer/google-place/reviews") {
+    return authenticatedGooglePlace(
+      request, url, env, repository, insightsRepository, placesProvider, now, "reviews"
+    );
+  }
   return null;
 }
