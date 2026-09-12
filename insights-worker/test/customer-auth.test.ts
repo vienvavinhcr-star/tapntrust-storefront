@@ -186,6 +186,7 @@ async function signIn(email: string): Promise<{ cookie: string; magicUrl: string
   expect(setCookie).toContain("HttpOnly");
   expect(setCookie).toContain("Secure");
   expect(setCookie).toContain("SameSite=Lax");
+  expect(setCookie).toContain("Max-Age=2592000");
   const cookie = responseCookie(confirmation, SESSION_COOKIE_NAME);
   expect(cookie).toContain(`${SESSION_COOKIE_NAME}=`);
   return { cookie, magicUrl };
@@ -208,10 +209,49 @@ describe("customer magic-link authentication", () => {
     expect(page).toContain("Passwordless sign in");
     expect(page).not.toContain("ADMIN_API_TOKEN");
     expect(page).not.toContain("tnt-admin-token");
+    expect(page).toContain("const REFRESH_INTERVAL_MS=60000");
+    expect(page).toContain("if(summaryRequest)return summaryRequest");
+    expect(page).toContain("if(refreshTimer!==null)return");
+    expect(page).toContain("document.visibilityState!=='hidden'");
+    expect(page).toContain("document.addEventListener('visibilitychange'");
+    expect(page).toContain("window.addEventListener('focus'");
+    expect(page).toContain("if(response.status===401){showLogin();return}");
 
     const embeddedScript = page.match(/<script>([\s\S]*?)<\/script>/)?.[1];
     expect(embeddedScript).toBeTruthy();
     expect(() => new Function(embeddedScript || "")).not.toThrow();
+  });
+
+  it("restores legacy GET confirmation safely without consuming a link or creating a session", async () => {
+    const magicUrl = await requestMagicLink(tenantA.email);
+    const rawToken = new URL(magicUrl).searchParams.get("token") || "";
+    const restored = await request(`/auth/confirm?token=${encodeURIComponent(rawToken)}`);
+    const stored = await env.DB.prepare(`
+      SELECT used_at FROM auth_magic_links WHERE user_id = ?1
+    `).bind(tenantA.userId).first<{ used_at: string | null }>();
+    const sessions = await env.DB.prepare("SELECT COUNT(*) AS count FROM customer_sessions")
+      .first<{ count: number }>();
+    const unauthenticated = await request("/api/customer/summary");
+
+    expect(restored.response.status).toBe(303);
+    expect(restored.response.headers.get("Location")).toBe("/app");
+    expect(restored.response.headers.get("Set-Cookie")).toBeNull();
+    expect(stored?.used_at).toBeNull();
+    expect(Number(sessions?.count || 0)).toBe(0);
+    expect(unauthenticated.response.status).toBe(401);
+  });
+
+  it("restores an existing authenticated session through GET confirmation", async () => {
+    const { cookie } = await signIn(tenantA.email);
+    const restored = await request("/auth/confirm", { headers: { Cookie: cookie } });
+    const page = await request("/app", { headers: { Cookie: cookie } });
+    const summary = await request("/api/customer/summary", { headers: { Cookie: cookie } });
+
+    expect(restored.response.status).toBe(303);
+    expect(restored.response.headers.get("Location")).toBe("/app");
+    expect(restored.response.headers.get("Set-Cookie")).toBeNull();
+    expect(page.response.status).toBe(200);
+    expect(summary.response.status).toBe(200);
   });
 
   it("does not consume a magic link during GET verification", async () => {
@@ -517,6 +557,45 @@ describe("customer magic-link authentication", () => {
     const { response } = await request("/api/customer/summary");
     expect(response.status).toBe(401);
     expect(await response.json()).toEqual({ error: "Unauthorized" });
+  });
+
+  it("keeps a session valid beyond the magic-link window and expires it at the fixed 30-day boundary", async () => {
+    const { cookie } = await signIn(tenantA.email);
+    const afterMagicLinkWindow = new Date(NOW.getTime() + (16 * 60 * 1000));
+    const beforeSessionExpiry = new Date(NOW.getTime() + (30 * 24 * 60 * 60 * 1000) - 1);
+    const atSessionExpiry = new Date(NOW.getTime() + (30 * 24 * 60 * 60 * 1000));
+
+    const afterFifteenMinutes = await request(
+      "/api/customer/summary",
+      { headers: { Cookie: cookie } },
+      { now: () => afterMagicLinkWindow }
+    );
+    const beforeThirtyDays = await request(
+      "/api/customer/summary",
+      { headers: { Cookie: cookie } },
+      { now: () => beforeSessionExpiry }
+    );
+    const afterThirtyDays = await request(
+      "/api/customer/summary",
+      { headers: { Cookie: cookie } },
+      { now: () => atSessionExpiry }
+    );
+
+    expect(afterFifteenMinutes.response.status).toBe(200);
+    expect(beforeThirtyDays.response.status).toBe(200);
+    expect(afterThirtyDays.response.status).toBe(401);
+  });
+
+  it("rejects a revoked customer session", async () => {
+    const { cookie } = await signIn(tenantA.email);
+    const logout = await request("/api/auth/logout", {
+      method: "POST",
+      headers: { Cookie: cookie }
+    });
+    const summary = await request("/api/customer/summary", { headers: { Cookie: cookie } });
+
+    expect(logout.response.status).toBe(204);
+    expect(summary.response.status).toBe(401);
   });
 
   it("does not issue a sign-in link to an account without explicit business access", async () => {
