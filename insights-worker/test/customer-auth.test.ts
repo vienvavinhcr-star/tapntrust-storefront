@@ -6,6 +6,11 @@ import {
   type MagicLinkMailer
 } from "../src/auth";
 import type { CustomerAuthDependencies } from "../src/customer-auth";
+import {
+  COMPACT_OPPORTUNITY_COUNT_CHARACTERS,
+  hasEstablishedDashboardSignal
+} from "../src/customer-page";
+import { LOW_DATA_THRESHOLD } from "../src/customer-insights";
 import { handleRequest } from "../src/index";
 import { createZeptoMailMagicLinkMailer } from "../src/zeptomail";
 
@@ -192,6 +197,30 @@ async function signIn(email: string): Promise<{ cookie: string; magicUrl: string
   return { cookie, magicUrl };
 }
 
+describe("dashboard signal threshold", () => {
+  it.each([
+    [0, false],
+    [1, false],
+    [4, false],
+    [LOW_DATA_THRESHOLD, true],
+    [25, true]
+  ])("treats %i review opportunities as established=%s", (count, expected) => {
+    expect(hasEstablishedDashboardSignal(count)).toBe(expected);
+  });
+
+  it.each([
+    [9, false],
+    [99, false],
+    [999, false],
+    [1_284, true],
+    [12_450, true],
+    [100_000, true]
+  ])("uses compact hero typography for %i=%s", (count, expected) => {
+    const formatted = count.toLocaleString("en-AU");
+    expect(formatted.length >= COMPACT_OPPORTUNITY_COUNT_CHARACTERS).toBe(expected);
+  });
+});
+
 beforeEach(async () => {
   await clearDatabase();
   tenantA = createTenantFixture();
@@ -217,6 +246,7 @@ describe("customer magic-link authentication", () => {
     expect(page).toContain("window.addEventListener('focus'");
     expect(page).toContain("if(response.status===401){showLogin();return}");
     expect(page).toContain('src="/tapntrust-insights-mascot.png"');
+    expect(page.match(/src="\/tapntrust-insights-mascot\.png"/g)).toHaveLength(1);
     expect(page).toContain("const GOOGLE_REFRESH_COOLDOWN_MS=300000");
     expect(page).toContain("if(!currentLocationId||googleSummaryRequest)return googleSummaryRequest");
     expect(page).toContain("if(!currentLocationId||reviewsRequest)return reviewsRequest");
@@ -231,9 +261,44 @@ describe("customer magic-link authentication", () => {
     expect(page).toContain("font-size:12px;font-style:normal;font-weight:400;letter-spacing:normal");
     expect(page).toContain("text-transform:none;white-space:nowrap");
     expect(page).not.toContain("google-dot");
-    expect(page).toContain('<span id="opportunity-count">0</span> Review Opportunities');
+    expect(page).toContain('<span class="hero-count" id="opportunity-count">0</span><small>Review Opportunities</small>');
+    expect(page).toContain("opportunityCount.classList.toggle('is-compact',count.length>=COMPACT_OPPORTUNITY_COUNT_CHARACTERS)");
+    expect(page).toContain("font-size:clamp(2.75rem,12.2vw,3.15rem)");
     expect(page).not.toContain("customer taps");
     expect(page).toContain("Recorded opens are counted individually.");
+    expect(page).toContain("Recommended next step");
+    expect(page).toContain("Your Tapntrust Cards");
+    expect(page).toContain("Its secure NFC link and recorded history stay exactly the same.");
+    expect(page).toContain("maxlength=\"40\"");
+    expect(page).toContain("Front Counter");
+    expect(page).toContain("Waiting Area");
+    expect(page).toContain("Label this card");
+    expect(page).toContain("Custom name");
+    expect(page).not.toContain('<span class="kpi-label">Placement</span>');
+    expect(page).toContain("data-original-placement-type");
+    expect(page).toContain("data-generic-label");
+    expect(page).toContain("form.dataset.placementChanged='true'");
+    expect(page).toContain("cardUpdatePayload(cardForm,preset,customInput)");
+    expect(page).toContain("'/api/customer/cards/'");
+    expect(page).toContain("cardSettings.addEventListener('change'");
+    expect(page).toContain("cardSettings.addEventListener('input'");
+    expect(page).toContain("custom.hidden=select.value!=='other'");
+    expect(page).toContain("updatingCards.has(cardId)");
+    expect(page).toContain("if(summaryRequest)await summaryRequest;await load({forceCardSettings:true})");
+    expect(page).not.toContain("location.reload");
+    expect(page).toContain("What is driving activity");
+    expect(page).toContain("Know which placements deserve attention");
+    expect(page).toContain("Strongest card");
+    expect(page).not.toContain("Strongest placement");
+    expect(page).toContain("Top performer");
+    expect(page).toContain("Needs attention");
+    expect(page).toContain("Low activity");
+    expect(page).toContain("Your activity is starting to take shape.");
+    expect(page).toContain("Early signal");
+    expect(page).toContain("data.reviewOpportunities<LOW_DATA_THRESHOLD");
+    expect(page).toContain("Google data is temporarily unavailable. Tap activity insights are still available.");
+    expect(page).not.toContain("Recent activity");
+    expect(page).not.toContain('id="recent-body"');
     expect(page).toContain("data.trendDirection==='unavailable'?'—'");
     expect(page).toContain("data.period==='all'?'No comparison for all-time'");
     expect(page).toContain("review.author.photoUri");
@@ -247,6 +312,49 @@ describe("customer magic-link authentication", () => {
     const polling = page.match(/function startPolling\(\)\{[\s\S]*?\}\n    function chartMarkup/)?.[0] || "";
     expect(polling).not.toContain("google-place");
     expect(polling).not.toContain("loadGoogleSummary");
+    expect(polling).toContain("void load()");
+    expect(polling).not.toContain("forceCardSettings");
+    const cardEditor = page.match(/function cardSettingsMarkup\([\s\S]*?\}\n    function recommendation/)?.[0] || "";
+    const presetSource = page.match(/function selectedPreset\(card\)\{[^\n]+\}/)?.[0] || "";
+    const presetResolver = new Function("CARD_PRESETS", `${presetSource};return selectedPreset;`)([
+      { value: "front-counter", label: "Front Counter", placementType: "counter" },
+      { value: "table", label: "Table", placementType: "table" },
+      { value: "other", label: "Other", placementType: "other" }
+    ]) as (card: { label: string; placementType: string }) => { value: string };
+    expect(presetResolver({ label: "Card 1", placementType: "counter" }).value).toBe("front-counter");
+    expect(presetResolver({ label: "Coffee Station", placementType: "counter" }).value).toBe("other");
+    expect(presetResolver({ label: "Front Counter", placementType: "counter" }).value).toBe("front-counter");
+    const payloadSource = page.match(/function cardUpdatePayload\(cardForm,preset,customInput\)\{[^\n]+\}/)?.[0] || "";
+    const payloadResolver = new Function(`${payloadSource};return cardUpdatePayload;`)() as (
+      cardForm: { dataset: Record<string, string | undefined> },
+      preset: { value: string; label: string; placementType: string },
+      customInput: { value: string }
+    ) => { label: string; placementType: string };
+    const frontCounter = { value: "front-counter", label: "Front Counter", placementType: "counter" };
+    const reception = { value: "reception", label: "Reception", placementType: "reception" };
+    const other = { value: "other", label: "Other", placementType: "other" };
+    expect(payloadResolver({
+      dataset: { originalLabel: "Card 1", originalPlacementType: "counter", genericLabel: "true" }
+    }, frontCounter, { value: "" })).toEqual({ label: "Front Counter", placementType: "counter" });
+    expect(payloadResolver({
+      dataset: { originalLabel: "Coffee Station", originalPlacementType: "counter", genericLabel: "false" }
+    }, other, { value: "Coffee Station" })).toEqual({ label: "Coffee Station", placementType: "counter" });
+    expect(payloadResolver({
+      dataset: { originalLabel: "Coffee Station", originalPlacementType: "counter", genericLabel: "false", placementChanged: "true" }
+    }, reception, { value: "Coffee Station" })).toEqual({ label: "Reception", placementType: "reception" });
+    expect(payloadResolver({
+      dataset: { originalLabel: "Front Counter", originalPlacementType: "counter", genericLabel: "false", placementChanged: "true" }
+    }, other, { value: "Waiting Room" })).toEqual({ label: "Waiting Room", placementType: "other" });
+    expect(cardEditor).toContain("isGeneric=/^card\\s*0*\\d+$/i.test(card.label.trim())");
+    expect(cardEditor).toContain("displayLabel=isGeneric?'Tapntrust Card':card.label");
+    expect(cardEditor).not.toContain("String(index+1)");
+    expect(cardEditor).toContain("dirty=cardSettings.querySelector('[data-dirty=\"true\"]')");
+    expect(cardEditor).toContain("focused=cardSettings.contains(document.activeElement)");
+    expect(cardEditor).toContain("if(!locationChanged&&!force&&(dirty||focused))return");
+    expect(cardEditor).toContain("cardSettings.innerHTML=cardSettingsMarkup(data.cards)");
+    const analyticsRender = page.match(/function renderInsights\([\s\S]*?\}\n    function renderGoogleUnavailable/)?.[0] || "";
+    expect(analyticsRender).toContain("renderCardSettings(data,{force:forceCardSettings})");
+    expect(analyticsRender).not.toContain("cardSettings.innerHTML");
     const visibilityHandler = page.match(/document\.addEventListener\('visibilitychange',[^\n]+/)?.[0] || "";
     const focusHandler = page.match(/window\.addEventListener\('focus',[^\n]+/)?.[0] || "";
     expect(visibilityHandler).not.toContain("Google");

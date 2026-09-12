@@ -1,5 +1,7 @@
 export type InsightsPeriod = "7d" | "30d" | "all";
 
+export const LOW_DATA_THRESHOLD = 5;
+
 export interface EntitledLocation {
   id: string;
   businessId: string;
@@ -17,6 +19,7 @@ export interface TrendPoint {
 
 export interface CardPerformance {
   id: string;
+  publicToken: string;
   label: string;
   placementType: string;
   active: boolean;
@@ -72,6 +75,7 @@ interface TrendRow {
 
 interface CardRow {
   id: string;
+  public_token: string;
   label: string;
   placement_type: string;
   active: number;
@@ -213,10 +217,16 @@ function primaryInsight(
       body: "No taps were recorded in this period. Keep your card visible at the point where customers finish their experience."
     };
   }
-  const strongest = cards[0];
-  if (strongest && strongest.sharePercent >= 45 && current >= 4) {
+  if (current < LOW_DATA_THRESHOLD) {
     return {
-      title: `${strongest.label} is your strongest placement.`,
+      title: "Your activity is starting to take shape.",
+      body: `We have recorded ${current} review ${current === 1 ? "opportunity" : "opportunities"} so far. Keep your cards visible; more activity will make placement and timing recommendations more useful.`
+    };
+  }
+  const strongest = cards[0];
+  if (strongest && strongest.sharePercent >= 45) {
+    return {
+      title: `${strongest.label} is your strongest card.`,
       body: `It created ${strongest.sharePercent}% of your review opportunities in this period. Keep it easy to see and tap.`
     };
   }
@@ -320,6 +330,7 @@ export function createCustomerInsightsRepository(db: D1Database): CustomerInsigh
         db.prepare(`
           SELECT
             c.id,
+            c.public_token,
             c.label,
             c.placement_type,
             c.active,
@@ -365,6 +376,7 @@ export function createCustomerInsightsRepository(db: D1Database): CustomerInsigh
       const trend = calculateTrend(reviewOpportunities, previousPeriodOpportunities);
       const cards = (cardsResult.results as unknown as CardRow[]).map((row) => ({
         id: row.id,
+        publicToken: row.public_token,
         label: row.label,
         placementType: row.placement_type,
         active: Number(row.active) === 1,
