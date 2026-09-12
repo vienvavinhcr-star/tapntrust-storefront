@@ -66,6 +66,20 @@ export interface MagicLinkRequestLimit {
   maxRequests: number;
 }
 
+export interface CustomerCardUpdate {
+  label: string;
+  placementType: PlacementType;
+}
+
+export interface CustomerCardIdentity {
+  id: string;
+  publicToken: string;
+  label: string;
+  placementType: PlacementType;
+  active: boolean;
+  locationId: string;
+}
+
 export interface CustomerRepository {
   findActiveUserByEmail(email: string): Promise<CustomerUser | null>;
   reserveMagicLinkRequest(limit: MagicLinkRequestLimit): Promise<boolean>;
@@ -76,6 +90,12 @@ export interface CustomerRepository {
   revokeSession(tokenHash: string, revokedAt: string): Promise<void>;
   deleteExpiredAuthRecords(now: string, requestLimitCutoff: string): Promise<void>;
   getCustomerSummary(user: CustomerUser, monthStart: string): Promise<CustomerInsightsSummary>;
+  updateOwnedCard(
+    userId: string,
+    cardId: string,
+    update: CustomerCardUpdate,
+    updatedAt: string
+  ): Promise<CustomerCardIdentity | null>;
 }
 
 interface CustomerSessionRow {
@@ -109,6 +129,15 @@ interface CustomerRecentTapRow {
   public_token: string;
   label: string;
   tapped_at: string;
+}
+
+interface CustomerCardIdentityRow {
+  id: string;
+  public_token: string;
+  label: string;
+  placement_type: PlacementType;
+  active: number;
+  location_id: string;
 }
 
 function mapCard(row: CustomerCardRow): CustomerCardSummary {
@@ -342,6 +371,36 @@ export function createCustomerRepository(db: D1Database): CustomerRepository {
         monthTapCount: businesses.reduce((total, business) => total + business.monthTapCount, 0),
         businesses
       };
+    },
+
+    async updateOwnedCard(userId, cardId, update, updatedAt) {
+      const row = await db.prepare(`
+        UPDATE cards
+        SET label = ?1,
+            placement_type = ?2,
+            updated_at = ?3
+        WHERE id = ?4
+          AND EXISTS (
+            SELECT 1
+            FROM locations l
+            JOIN customer_business_access a
+              ON a.business_id = l.business_id AND a.user_id = ?5
+            JOIN insights_entitlements e
+              ON e.location_id = l.id AND e.status = 'active'
+            WHERE l.id = cards.location_id AND l.active = 1
+          )
+        RETURNING id, public_token, label, placement_type, active, location_id
+      `).bind(update.label, update.placementType, updatedAt, cardId, userId)
+        .first<CustomerCardIdentityRow>();
+
+      return row ? {
+        id: row.id,
+        publicToken: row.public_token,
+        label: row.label,
+        placementType: row.placement_type,
+        active: row.active === 1,
+        locationId: row.location_id
+      } : null;
     }
   };
 }

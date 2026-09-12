@@ -3,6 +3,7 @@ import { createExecutionContext } from "cloudflare:test";
 import { env } from "cloudflare:workers";
 import { generateOpaqueToken, hashToken, SESSION_COOKIE_NAME } from "../src/auth";
 import type { CustomerAuthDependencies } from "../src/customer-auth";
+import { LOW_DATA_THRESHOLD } from "../src/customer-insights";
 import { handleRequest } from "../src/index";
 import type { GooglePlacesProvider } from "../src/places-provider";
 
@@ -93,6 +94,37 @@ async function request(
 beforeEach(clearDatabase);
 
 describe("tenant-scoped customer insights", () => {
+  it.each([
+    [0, "no_activity"],
+    [1, "early"],
+    [4, "early"],
+    [LOW_DATA_THRESHOLD, "established"]
+  ])("keeps primary insight product truth consistent at %i opportunities", async (count, expectedState) => {
+    const prefix = `signal${count}`;
+    const tenant = await seedTenant(prefix, `${prefix}@example.invalid`);
+    for (let index = 0; index < count; index += 1) {
+      await addTap(tenant.cardId, new Date(NOW.getTime() - index - 1).toISOString());
+    }
+
+    const response = await request("/api/customer/insights?period=30d", tenant.cookie);
+    const data = await response.json<Record<string, any>>();
+    const title = String(data.primaryInsight?.title || "");
+
+    expect(response.status).toBe(200);
+    expect(data.reviewOpportunities).toBe(count);
+    if (expectedState === "no_activity") {
+      expect(title).toBe("Your next review opportunity starts with visibility.");
+      expect(title.toLowerCase()).not.toContain("strongest");
+    } else if (expectedState === "early") {
+      expect(title).toBe("Your activity is starting to take shape.");
+      expect(data.primaryInsight.body).toContain(`recorded ${count} review`);
+      expect(JSON.stringify(data.primaryInsight).toLowerCase()).not.toContain("strongest");
+    } else {
+      expect(title).toBe(`${prefix} Front Counter is your strongest card.`);
+      expect(title).not.toContain("strongest placement");
+    }
+  });
+
   it("computes exact period boundaries, card share, trend and all-time values from owned taps", async () => {
     const tenant = await seedTenant("alpha", "alpha@example.invalid");
     const sevenDayStart = new Date(NOW.getTime() - 7 * 86_400_000);
@@ -111,7 +143,12 @@ describe("tenant-scoped customer insights", () => {
     expect(data.previousPeriodOpportunities).toBe(1);
     expect(data.allTimeOpportunities).toBe(3);
     expect(data.activeCardCount).toBe(1);
-    expect(data.cards[0]).toMatchObject({ periodTaps: 2, previousPeriodTaps: 1, sharePercent: 100 });
+    expect(data.cards[0]).toMatchObject({
+      publicToken: "TNT-ALPHA12345",
+      periodTaps: 2,
+      previousPeriodTaps: 1,
+      sharePercent: 100
+    });
     expect(data.timezoneLabel).toBe("Your browser time (UTC+10:00)");
     expect(JSON.stringify(data)).not.toContain("googlePlaceId");
     expect(JSON.stringify(data)).not.toContain("google_review_url");

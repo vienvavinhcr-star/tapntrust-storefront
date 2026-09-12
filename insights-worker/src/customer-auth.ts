@@ -10,7 +10,11 @@ import {
   readSessionToken
 } from "./auth";
 import { CUSTOMER_PAGE } from "./customer-page";
-import { createCustomerRepository, type CustomerRepository } from "./customer-repository";
+import {
+  createCustomerRepository,
+  type CustomerCardUpdate,
+  type CustomerRepository
+} from "./customer-repository";
 import {
   createCustomerInsightsRepository,
   parseInsightsPeriod,
@@ -23,6 +27,7 @@ import {
   GooglePlacesProviderError,
   type GooglePlacesProvider
 } from "./places-provider";
+import type { PlacementType } from "./repository";
 import { createZeptoMailMagicLinkMailer, safeMailFailure } from "./zeptomail";
 
 const MAGIC_LINK_TTL_MS = 15 * 60 * 1000;
@@ -33,6 +38,13 @@ const REQUEST_LIMIT_RETENTION_MS = 24 * 60 * 60 * 1000;
 const SESSION_TTL_SECONDS = 30 * 24 * 60 * 60;
 const SESSION_TTL_MS = SESSION_TTL_SECONDS * 1000;
 const GOOGLE_RATE_WINDOW_MS = 60 * 60 * 1000;
+const CUSTOMER_CARD_UPDATE_BODY_BYTES = 1024;
+const CUSTOMER_CARD_LABEL_MAX_LENGTH = 40;
+const CUSTOMER_CARD_ID_PATTERN = /^[A-Za-z0-9_-]{1,128}$/;
+const CUSTOMER_CARD_PLACEMENT_TYPES = new Set<PlacementType>([
+  "counter", "table", "reception", "register", "other"
+]);
+const CONTROL_CHARACTER_PATTERN = /[\u0000-\u001f\u007f]/;
 const GOOGLE_RATE_POLICIES = {
   summary: { maxRequests: 30, cooldownMs: 30 * 1000 },
   reviews: { maxRequests: 12, cooldownMs: 2 * 60 * 1000 }
@@ -198,6 +210,24 @@ function logConfirmationFailure(request: Request, reason: ConfirmationFailureRea
 function hasContentType(request: Request, expected: string): boolean {
   const mediaType = (request.headers.get("Content-Type") || "").split(";", 1)[0] || "";
   return mediaType.trim().toLowerCase() === expected;
+}
+
+function parseCustomerCardUpdate(value: unknown): CustomerCardUpdate | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const record = value as Record<string, unknown>;
+  const keys = Object.keys(record);
+  if (keys.length !== 2 || !keys.includes("label") || !keys.includes("placementType")) return null;
+
+  const label = typeof record.label === "string" ? record.label.trim() : "";
+  const placementType = typeof record.placementType === "string" ? record.placementType : "";
+  if (
+    !label
+    || label.length > CUSTOMER_CARD_LABEL_MAX_LENGTH
+    || CONTROL_CHARACTER_PATTERN.test(label)
+    || !CUSTOMER_CARD_PLACEMENT_TYPES.has(placementType as PlacementType)
+  ) return null;
+
+  return { label, placementType: placementType as PlacementType };
 }
 
 function invalidLinkPage(): Response {
@@ -382,6 +412,36 @@ async function customerSummary(
   return json(await repository.getCustomerSummary(customer, monthStartUtc(now)));
 }
 
+async function updateCustomerCard(
+  request: Request,
+  cardId: string,
+  env: CustomerEnv,
+  repository: CustomerRepository,
+  now: Date
+): Promise<Response> {
+  if (request.method !== "PATCH") return methodNotAllowed("PATCH");
+  const customer = await authenticateCustomer(request, repository, now);
+  if (!customer) return json({ error: "Unauthorized" }, 401);
+  if (!hasExpectedOrigin(request, env)) return json({ error: "Request not allowed" }, 403);
+  if (!hasContentType(request, "application/json")) {
+    return json({ error: "Content-Type must be application/json" }, 415);
+  }
+  if (!CUSTOMER_CARD_ID_PATTERN.test(cardId)) return json({ error: "Not found" }, 404);
+
+  const contentLength = Number(request.headers.get("Content-Length") || 0);
+  if (contentLength > CUSTOMER_CARD_UPDATE_BODY_BYTES) {
+    return json({ error: "Request body too large" }, 413);
+  }
+  const body = await readBoundedJson(request, CUSTOMER_CARD_UPDATE_BODY_BYTES);
+  if (body.status === 413) return json({ error: "Request body too large" }, 413);
+  if (body.status === 400) return json({ error: "Invalid JSON" }, 400);
+  const update = parseCustomerCardUpdate(body.value);
+  if (!update) return json({ error: "Enter a valid card label and placement" }, 400);
+
+  const card = await repository.updateOwnedCard(customer.id, cardId, update, now.toISOString());
+  return card ? json({ card }) : json({ error: "Not found" }, 404);
+}
+
 async function authenticatedInsights(
   request: Request,
   url: URL,
@@ -512,6 +572,16 @@ export async function handleCustomerRequest(
     return requestMagicLink(request, env, ctx, repository, mailer, now);
   }
   if (url.pathname === "/api/auth/logout") return logoutCustomer(request, repository, now);
+  const customerCardMatch = url.pathname.match(/^\/api\/customer\/cards\/([^/]+)$/);
+  if (customerCardMatch) {
+    let cardId = "";
+    try {
+      cardId = decodeURIComponent(customerCardMatch[1] || "");
+    } catch {
+      return json({ error: "Not found" }, 404);
+    }
+    return updateCustomerCard(request, cardId, env, repository, now);
+  }
   if (url.pathname === "/api/customer/summary") return customerSummary(request, repository, now);
   if (url.pathname === "/api/customer/insights") {
     return authenticatedInsights(request, url, repository, insightsRepository, now);

@@ -1,4 +1,4 @@
-# Tapntrust Insights — Phase 1 + Phase 2A + Phase 2B
+# Tapntrust Insights — Phase 1 through Phase 3B
 
 ## Scope and product truth
 
@@ -166,7 +166,7 @@ Phase 3A uses the `google_place_id` already stored on each location. It does not
 
 The premium `/app` experience is location-scoped and combines two deliberately separate data sources:
 
-- Tapntrust-owned analytics: review opportunities, trend, active-card count, daily/monthly activity, card leaderboard and placement share, engagement timing, recent activity and the deterministic mascot recommendation.
+- Tapntrust-owned analytics: review opportunities, trend, active-card count, daily/monthly activity, card leaderboard and placement share, engagement timing and the deterministic mascot recommendation.
 - live Google Places data: current rating/count and, only on request, the reviews currently selected by Google.
 
 A **review opportunity** means one successful `tap_events` record created when an NFC card directed a visitor to its stored Google review destination. It is not proof that the visitor submitted a review, and the UI does not present it as a conversion or a unique-customer count. Each recorded open is counted individually because Tapntrust deliberately stores no visitor identity, fingerprint or deduplication identifier.
@@ -190,6 +190,25 @@ This per-user, per-location limiter is intentionally modest rather than a comple
 Google responses are live display data and are never persisted in D1. There are no rating, review, reviewer, review-time or snapshot tables. Google failure returns only a calm unavailable status and cannot block Tapntrust analytics or the mascot recommendation. Provider errors log only a safe reason category; the API key, provider response body, Place ID and review content are not logged.
 
 The Worker calls the official Places API (New) Place Details endpoint with an explicit minimal `X-Goog-FieldMask`; wildcard masks are forbidden. Containers displaying Google-provided rating, rating-count or selected-review data include the exact text attribution `Google Maps` with `translate="no"`; it is visually separate from Tapntrust KPI labels and no custom mark is presented as a Google logo. Review display preserves every available author avatar, name and profile link, each individual Google Maps source link, publish information and `visitDate`, clearly states that Google selects and relevance-orders the sample, and links customers back to Google Maps. The approved mascot is served as the exact repository asset `insights-worker/assets/tapntrust-insights-mascot.png`.
+
+## Phase 3B customer dashboard experience
+
+Phase 3B is primarily a presentation and retention update. It adds one narrowly scoped card-details route but introduces no database migration, provider, authentication or entitlement-model change. The customer dashboard intentionally uses a small set of focused areas rather than an admin-style collection of raw metrics:
+
+- a selected-period hero with Review Opportunities, comparable-period momentum, the strongest active card, active-card count and retained all-time history;
+- one mascot-led recommendation that converts the visible card/day/time data into a concrete next action;
+- one compact **Your Tapntrust Cards** area where a customer can give each owned physical card a useful placement name;
+- one combined performance and timing area for the strongest card, busiest day, strongest time window and activity pattern;
+- an active-card comparison with customer-facing placement names, share, trend and clear status badges;
+- one Google Presence area containing the live rating snapshot and opt-in Selected Google Reviews.
+
+The hero count uses responsive number typography so comma-formatted values through `100,000+` remain contained at a 390px viewport. A deterministic low-data threshold of five Review Opportunities avoids calling a card, day or time window a confident top performer too early. Zero activity receives a useful setup prompt; one through four opportunities are presented as an early signal; normal strongest-card/day/time recommendations begin at five. The underlying activity remains visible throughout.
+
+The recent-event table is deliberately not rendered in the customer experience because individual timestamps add noise without changing the action a small-business owner should take. Empty and low-data states encourage better card visibility without inventing activity, and the approved mascot appears once as the recommendation guide rather than as repeated decoration. Google failure cannot suppress Tapntrust-owned activity; the page tells the customer that tap insights remain available.
+
+Recommendations are deterministic and derived only from the current response: active cards, period opportunities, placement, activity share, weekday totals and the strongest available time window. They do not claim review submissions, unique visitors or outcomes that Tapntrust does not measure.
+
+Customer card editing uses `PATCH /api/customer/cards/{cardId}` with exact same-origin enforcement, the existing 30-day session, `application/json`, a bounded body, the existing placement enum and a trimmed 40-character label without control characters. The server resolves ownership by joining the authenticated user through `customer_business_access`, an active location and an active Insights entitlement; it never accepts a client business or location ID. A successful update can change only `cards.label`, `cards.placement_type` and `cards.updated_at`. The immutable public token, card/location identity, Google destination, active state, provisioning records and tap history cannot be changed by this route. Presets map to the existing enum: Front Counter → `counter`, Table → `table`, Reception → `reception`, Payment Area → `register`, while Wall, Waiting Area, Entrance and a validated custom name use `other`. On Apply, a generic placeholder such as `Card 1` adopts the known placement preset already shown to the customer; a real custom label keeps its existing placement classification until the customer explicitly changes the dropdown. Passive 60-second analytics refreshes do not rebuild a dirty or focused editor. A successful Apply or a location change renders the canonical saved state again. Card Performance may rank cards for the selected period, but the settings area uses the immutable public token—not a changing list index—as the stable physical identifier.
 
 ### Phase 3A manual production setup
 
