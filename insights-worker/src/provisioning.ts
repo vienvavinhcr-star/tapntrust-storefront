@@ -1,7 +1,7 @@
 import { isAllowedGoogleReviewUrl } from "./destinations";
 
 const PUBLIC_TOKEN_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-const PUBLIC_TOKEN_LENGTH = 20;
+const PUBLIC_TOKEN_LENGTH = 26;
 
 export type ProvisioningBusinessIntent =
   | { mode: "new"; name: string }

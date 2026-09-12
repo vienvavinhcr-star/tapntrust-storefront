@@ -2,7 +2,9 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { createExecutionContext, waitOnExecutionContext } from "cloudflare:test";
 import { env } from "cloudflare:workers";
 import { createSessionCookie, generateOpaqueToken, hashToken } from "../src/auth";
+import { isValidPublicToken } from "../src/destinations";
 import { handleRequest } from "../src/index";
+import { generatePublicCardToken } from "../src/provisioning";
 
 const ORIGIN = "https://go.tapntrust.com";
 const ADMIN_TOKEN = "test-admin-token-that-is-not-a-production-secret";
@@ -99,6 +101,19 @@ async function customerSummary(cookie: string): Promise<Response> {
 
 beforeEach(clearDatabase);
 
+describe("physical-card public token generation", () => {
+  it("generates unique 26-character suffixes from the approved 32-character alphabet", () => {
+    const tokens = Array.from({ length: 256 }, () => generatePublicCardToken());
+
+    expect(new Set(tokens).size).toBe(tokens.length);
+    for (const token of tokens) {
+      expect(token).toMatch(/^TNT-[A-HJ-NP-Z2-9]{26}$/);
+      expect(isValidPublicToken(token)).toBe(true);
+    }
+    expect(isValidPublicToken("TNT-A7K29")).toBe(true);
+  });
+});
+
 describe("universal physical-card provisioning", () => {
   it("provisions non-Insights cards without creating customer access and records taps from day one", async () => {
     const body = provisioningBody({ physicalCardCount: 3 });
@@ -109,7 +124,7 @@ describe("universal physical-card provisioning", () => {
     expect(result.manifest.physicalCardCount).toBe(3);
     expect(new Set(result.manifest.cards.map((card) => card.publicToken)).size).toBe(3);
     for (const card of result.manifest.cards) {
-      expect(card.publicToken).toMatch(/^TNT-[A-Z2-9]{20}$/);
+      expect(card.publicToken).toMatch(/^TNT-[A-HJ-NP-Z2-9]{26}$/);
       expect(card.programmingUrl).toBe(`${ORIGIN}/t/${card.publicToken}`);
     }
 
