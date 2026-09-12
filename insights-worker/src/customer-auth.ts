@@ -306,7 +306,13 @@ async function confirmMagicLink(
   repository: CustomerRepository,
   now: Date
 ): Promise<Response> {
-  if (request.method !== "POST") return methodNotAllowed("POST");
+  if (request.method === "GET") {
+    return new Response(null, {
+      status: 303,
+      headers: { ...SECURITY_HEADERS, Location: "/app" }
+    });
+  }
+  if (request.method !== "POST") return methodNotAllowed("GET, POST");
   if (!hasContentType(request, "application/x-www-form-urlencoded")) {
     logConfirmationFailure(request, "bad_content_type");
     return invalidLinkPage();
