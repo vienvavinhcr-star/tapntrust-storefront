@@ -160,6 +160,53 @@ It contains no email, purchaser PII, admin credential or other secret. An identi
 
 Phase 2B deliberately keeps the future Shopify webhook out of scope. A signed `orders/paid` webhook can later call the same idempotent provisioning service after Shopify event, line-quantity and exception-handling rules are approved.
 
+## Phase 3A Places-first customer dashboard
+
+Phase 3A uses the `google_place_id` already stored on each location. It does not add Google Business Profile OAuth, refresh tokens, customer Google-account linking or background review synchronisation. No D1 migration is required.
+
+The premium `/app` experience is location-scoped and combines two deliberately separate data sources:
+
+- Tapntrust-owned analytics: review opportunities, trend, active-card count, daily/monthly activity, card leaderboard and placement share, engagement timing, recent activity and the deterministic mascot recommendation.
+- live Google Places data: current rating/count and, only on request, the reviews currently selected by Google.
+
+A **review opportunity** means one successful `tap_events` record created when an NFC card directed a visitor to its stored Google review destination. It is not proof that the visitor submitted a review, and the UI does not present it as a conversion or a unique-customer count. Each recorded open is counted individually because Tapntrust deliberately stores no visitor identity, fingerprint or deduplication identifier.
+
+The reporting periods are exact half-open ranges ending at request time: `[now - 7 days, now)` and `[now - 30 days, now)`. Their comparisons use the immediately preceding equal-length range. `all` includes all recorded taps and has no artificial prior-period percentage. Daily/monthly and engagement-time groupings use the browser's current UTC offset when supplied; the dashboard labels this as browser time. This is a fixed-offset presentation choice and can be one hour off across a daylight-saving transition in a historical range until location time zones are explicitly stored.
+
+Every Insights request authenticates the existing 30-day session, derives allowed locations by joining `customer_business_access` to active `insights_entitlements`, and verifies an optional `locationId` against that server-derived list. A client cannot make an arbitrary Place ID request, and neither `google_place_id` nor `GOOGLE_PLACES_API_KEY` is returned to the browser.
+
+Customer routes:
+
+- `GET /api/customer/insights?period=7d|30d|all&locationId=...&timezoneOffsetMinutes=...` — aggregated Tapntrust-owned location analytics. SQL returns bounded aggregates rather than raw event history.
+- `GET /api/customer/google-place/summary?locationId=...` — one lightweight live request for `rating`, `userRatingCount` and `googleMapsLinks.placeUri`. Its field mask never includes `reviews`.
+- `GET /api/customer/google-place/reviews?locationId=...` — a separate request for `reviews` and the reviews link, called only after the authenticated customer explicitly opens Selected Google Reviews.
+
+Google loading is intentionally cost-controlled. The page normally makes one summary request per location during a page session and zero review requests. Tapntrust's 60-second analytics refresh, `visibilitychange` and window focus do not refetch Google data. A manual summary refresh has a five-minute browser-session cooldown and blocks overlapping requests. Successfully loaded selected reviews remain in page memory when the section is closed and reopened. There is no background prefetch.
+
+The browser cooldown is supplemented by a distributed D1 limiter on both authenticated provider routes. Tenant access is resolved first. The limiter then hashes a versioned namespace containing only the request kind, authenticated customer user ID and entitled location ID before persistence in the existing `auth_request_limits` table. Summary and review traffic have independent namespaces. Summary permits at most 30 provider calls per hour with at least 30 seconds between calls; reviews permit at most 12 per hour with at least two minutes between calls. A rejected request returns a calm `429` response and never reaches Google. The limiter does not persist email, Place ID, API key, visitor IP, user agent or browser fingerprint.
+
+This per-user, per-location limiter is intentionally modest rather than a complete global abuse-control system. An attacker controlling many valid customer accounts or entitled locations could still spread requests across keys. Keep conservative Google Cloud quotas and billing alerts in place; a future WAF/global quota layer can be added if real traffic warrants it without changing the tenant model.
+
+Google responses are live display data and are never persisted in D1. There are no rating, review, reviewer, review-time or snapshot tables. Google failure returns only a calm unavailable status and cannot block Tapntrust analytics or the mascot recommendation. Provider errors log only a safe reason category; the API key, provider response body, Place ID and review content are not logged.
+
+The Worker calls the official Places API (New) Place Details endpoint with an explicit minimal `X-Goog-FieldMask`; wildcard masks are forbidden. Containers displaying Google-provided rating, rating-count or selected-review data include the exact text attribution `Google Maps` with `translate="no"`; it is visually separate from Tapntrust KPI labels and no custom mark is presented as a Google logo. Review display preserves every available author avatar, name and profile link, each individual Google Maps source link, publish information and `visitDate`, clearly states that Google selects and relevance-orders the sample, and links customers back to Google Maps. The approved mascot is served as the exact repository asset `insights-worker/assets/tapntrust-insights-mascot.png`.
+
+### Phase 3A manual production setup
+
+After review and merge, but before deploying:
+
+1. Enable **Places API (New)** in the intended Google Cloud project and apply API restrictions so the key can call only the required Maps Platform API. Configure conservative quota and billing alerts appropriate to the customer count.
+2. Add the server-only Worker secret interactively:
+
+   ```bash
+   pnpm exec wrangler secret put GOOGLE_PLACES_API_KEY -c insights-worker/wrangler.jsonc
+   ```
+
+   Never put the real value in source, `.dev.vars.example`, test fixtures, logs, Git history or the browser. For local work, use only the ignored `insights-worker/.dev.vars`.
+3. Confirm every Insights-enabled location has the correct existing `google_place_id`. Missing or malformed IDs produce a calm Google-unavailable state and never fall back to client search.
+4. Run `pnpm run check:all` and the Wrangler deploy dry-run, then deploy manually. No D1 migration is applied for Phase 3A.
+5. With one controlled tenant, verify that the location cannot access another tenant, Tapntrust analytics continue when the provider is unavailable, the initial Google request omits reviews, and selected reviews load only after the explicit button click.
+
 ## Local development
 
 Install dependencies, copy the local secret template, apply migrations and start the Worker:

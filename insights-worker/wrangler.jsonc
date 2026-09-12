@@ -11,7 +11,10 @@
     }
   ],
   "secrets": {
-    "required": ["ADMIN_API_TOKEN", "ZEPTOMAIL_API_KEY"]
+    "required": ["ADMIN_API_TOKEN", "ZEPTOMAIL_API_KEY", "GOOGLE_PLACES_API_KEY"]
+  },
+  "assets": {
+    "directory": "./assets"
   },
   "vars": {
     "AUTH_BASE_URL": "https://go.tapntrust.com",
