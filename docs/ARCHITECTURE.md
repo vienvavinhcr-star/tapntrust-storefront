@@ -22,6 +22,12 @@ Facebook / Instagram / Google / direct traffic
           Shopify Checkout
                 ↓
         Shopify order/payment
+                ↓
+     owner-controlled provisioning
+                ↓
+ Cloudflare Worker + D1 card tokens
+                ↓
+ physical card -> go.tapntrust.com/t/{publicToken}
 ```
 
 ## Ownership boundaries
@@ -51,6 +57,21 @@ Owns:
 
 ### Google Places
 Owns discovery of the selected business/location and links returned by Google. The storefront captures the business identity and review destination required for fulfilment.
+
+### Tapntrust Insights Worker + D1
+Owns:
+- universal server-side provisioning of immutable public tokens for every physical NFC card;
+- the permanent `go.tapntrust.com/t/{publicToken}` lookup, privacy-minimised tap record and approved Google redirect;
+- owner-only provisioning and recovery operations;
+- customer passwordless sessions, business ownership and location-level Insights entitlement.
+
+Does not own:
+- Shopify payment or authoritative order state;
+- browser-side order completion;
+- Google review/rating/comment ingestion;
+- subscription billing in Phase 2B.
+
+Provisioning and Insights activation are separate services. A normal card order is provisioned without a D1 customer identity. If Insights is activated later, it grants dashboard access to existing records and historical taps without changing the card or token.
 
 ## Module boundaries
 

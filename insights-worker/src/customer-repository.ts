@@ -257,6 +257,12 @@ export function createCustomerRepository(db: D1Database): CustomerRepository {
           FROM customer_business_access a
           JOIN businesses b ON b.id = a.business_id
           WHERE a.user_id = ?1
+            AND EXISTS (
+              SELECT 1
+              FROM locations l
+              JOIN insights_entitlements e ON e.location_id = l.id
+              WHERE l.business_id = b.id AND e.status = 'active'
+            )
           ORDER BY b.created_at ASC, b.id ASC
         `).bind(user.id).all<BusinessRow>(),
         db.prepare(`
@@ -275,6 +281,7 @@ export function createCustomerRepository(db: D1Database): CustomerRepository {
           FROM customer_business_access a
           JOIN businesses b ON b.id = a.business_id
           JOIN locations l ON l.business_id = b.id
+          JOIN insights_entitlements e ON e.location_id = l.id AND e.status = 'active'
           JOIN cards c ON c.location_id = l.id
           LEFT JOIN tap_events t ON t.card_id = c.id
           WHERE a.user_id = ?1
@@ -291,6 +298,7 @@ export function createCustomerRepository(db: D1Database): CustomerRepository {
           FROM customer_business_access a
           JOIN businesses b ON b.id = a.business_id
           JOIN locations l ON l.business_id = b.id
+          JOIN insights_entitlements e ON e.location_id = l.id AND e.status = 'active'
           JOIN cards c ON c.location_id = l.id
           JOIN tap_events t ON t.card_id = c.id
           WHERE a.user_id = ?1

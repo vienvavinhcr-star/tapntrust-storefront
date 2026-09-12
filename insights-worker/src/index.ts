@@ -1,4 +1,5 @@
 import { ADMIN_PAGE } from "./admin-page";
+import { handleAdminProvisioningRequest } from "./admin-provisioning";
 import { handleCustomerRequest, type CustomerAuthDependencies } from "./customer-auth";
 import { isAllowedGoogleReviewUrl, isValidPublicToken, normalisePublicToken } from "./destinations";
 import { createD1Repository, type CardUpdate, type InsightsRepository, type PlacementType } from "./repository";
@@ -153,6 +154,14 @@ async function handleAdmin(
     if (request.method !== "GET") return methodNotAllowed("GET");
     return json(await repository.getSummary(monthStartUtc(new Date())));
   }
+
+  const provisioningResponse = await handleAdminProvisioningRequest(
+    request,
+    pathname,
+    env.DB,
+    env.AUTH_BASE_URL
+  );
+  if (provisioningResponse) return provisioningResponse;
 
   const match = pathname.match(/^\/api\/admin\/cards\/([^/]+)$/);
   if (!match) return json({ error: "Not found" }, 404);

@@ -48,6 +48,9 @@ async function clearDatabase(): Promise<void> {
     env.DB.prepare("DELETE FROM auth_magic_links"),
     env.DB.prepare("DELETE FROM customer_business_access"),
     env.DB.prepare("DELETE FROM customer_users"),
+    env.DB.prepare("DELETE FROM provisioning_batch_cards"),
+    env.DB.prepare("DELETE FROM provisioning_batches"),
+    env.DB.prepare("DELETE FROM insights_entitlements"),
     env.DB.prepare("DELETE FROM tap_events"),
     env.DB.prepare("DELETE FROM cards"),
     env.DB.prepare("DELETE FROM locations"),
@@ -83,7 +86,12 @@ async function seedTenant(tenant: TenantFixture, tappedAt: string): Promise<void
     env.DB.prepare(`
       INSERT INTO customer_business_access (user_id, business_id)
       VALUES (?1, ?2)
-    `).bind(tenant.userId, tenant.businessId)
+    `).bind(tenant.userId, tenant.businessId),
+    env.DB.prepare(`
+      INSERT INTO insights_entitlements (
+        location_id, status, source, activated_at, updated_at
+      ) VALUES (?1, 'active', 'test', ?2, ?2)
+    `).bind(tenant.locationId, tappedAt)
   ]);
 }
 
