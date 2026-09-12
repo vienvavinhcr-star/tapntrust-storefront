@@ -2,7 +2,15 @@
 
 ## Purpose
 
-Every NFC card order must contain enough information to identify the selected business and program the card to the correct review destination without manually searching again.
+Every NFC card order must contain enough information to identify the selected business and provision the card against the correct review destination without manually searching again.
+
+The Google review URL in Shopify is fulfilment input. Every physical Tapntrust NFC card is programmed with its immutable Tapntrust redirect URL:
+
+```text
+https://go.tapntrust.com/t/{publicToken}
+```
+
+There is no separate direct-Google physical-card architecture. The Worker stores the approved Google destination, records a privacy-minimised tap and redirects. Card operation and tap recording do not depend on Tapntrust Insights access.
 
 The source of truth for fulfilment attribute names and transformations is `js/fulfilment.js`.
 
@@ -43,6 +51,8 @@ Rules:
 
 Counter Stand is not programmed and does not need business/review data. It may carry only the item-role metadata needed to classify it.
 
+Counter Stand does not create a D1 card record or public token. A 5-card package with its free Counter Stand still produces exactly five NFC card tokens.
+
 ## Google business selection
 
 `js/business-finder.js` handles business selection. Review destination helpers are in `js/google-review.js`.
@@ -57,6 +67,8 @@ Choose package
   -> add Shopify cart line
   -> Shopify checkout
   -> Shopify order contains programming data
+  -> staff provisions one immutable token per physical NFC card
+  -> staff writes go.tapntrust.com/t/{publicToken} to each card
 ```
 
 The storefront must not bypass business selection for a product that requires programming.
@@ -64,6 +76,14 @@ The storefront must not bypass business selection for a product that requires pr
 ## Manual fallback
 
 If the customer cannot find the business through Google Places, the manual path may be used. Manual data must still be validated and stored using the same fulfilment structure so the Shopify order remains actionable.
+
+Before provisioning, staff must confirm that the supplied destination passes the Worker's Google destination allowlist. A general HTTPS URL accepted as storefront fallback data must not be provisioned if the redirect Worker would reject it.
+
+## Phase 2B provisioning boundary
+
+The browser-generated setup ID groups related Shopify lines but is not a trusted D1 business or location identifier. In the protected owner workflow, staff explicitly creates or selects the D1 business/location and confirms the total physical NFC card quantity, including Extra NFC Cards and excluding Counter Stands.
+
+Provisioning is required for card orders whether Insights is purchased or not. Non-Insights provisioning does not create a customer login or store purchaser email in D1. Later Insights activation reuses the existing business, location, cards, tokens and tap history without NFC reprogramming.
 
 ## Safe edit guidance
 

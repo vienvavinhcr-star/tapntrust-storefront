@@ -10,7 +10,7 @@ export function normalisePublicToken(value: string): string {
 }
 
 export function isValidPublicToken(value: string): boolean {
-  return /^TNT-[A-Z0-9]{5,20}$/.test(normalisePublicToken(value));
+  return /^TNT-[A-Z0-9]{5,26}$/.test(normalisePublicToken(value));
 }
 
 export function isAllowedGoogleReviewUrl(value: string): boolean {

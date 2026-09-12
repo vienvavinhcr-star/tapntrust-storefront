@@ -1,8 +1,8 @@
-# Tapntrust Insights — Phase 1 + Phase 2A
+# Tapntrust Insights — Phase 1 + Phase 2A + Phase 2B
 
 ## Scope and product truth
 
-Phase 1 gives each physical NFC card an immutable public Tapntrust URL:
+Every physical Tapntrust NFC card, with or without Insights access, receives an immutable public Tapntrust URL:
 
 ```text
 https://go.tapntrust.com/t/TNT-A7K29
@@ -25,6 +25,8 @@ Physical NFC card
 Owner
   -> go.tapntrust.com/admin
   -> Bearer-protected admin API
+  -> universal card provisioning + programming manifests
+  -> optional location-level Insights activation and recovery
   -> card counts, recent taps, editable label and placement
 
 Customer
@@ -50,6 +52,11 @@ Cloudflare Worker + D1 was chosen for this phase because the redirect and databa
 - `auth_magic_links`: a single-use SHA-256 token hash with a 15-minute expiry.
 - `customer_sessions`: a SHA-256 session-token hash with expiry and revocation state.
 - `auth_request_limits`: temporary SHA-256 email identifiers and per-email request counters used only for abuse control.
+- `provisioning_batches`: idempotent Shopify order/setup association for one reviewed physical-card provisioning intent; contains no purchaser email.
+- `provisioning_batch_cards`: ordered mapping between a provisioning batch and its physical card records.
+- `insights_entitlements`: location-level dashboard state, independent of card redirects and tap recording.
+
+Migration `0003_provisioning.sql` follows the existing D1 convention: lifecycle timestamps are ISO UTC `TEXT` values. Numeric columns such as physical-card quantity and ordinal remain `INTEGER` because they are counts, not timestamps.
 
 Several cards can point to the same location. They still produce distinct per-card counts.
 
@@ -82,6 +89,12 @@ Protected routes:
 
 - `GET /api/admin/summary` — this-month count, per-card counts and 30 recent tap events.
 - `PATCH /api/admin/cards/{publicToken}` — updates only `label` and `placementType`.
+- `POST /api/admin/provisioning/batches` — provisions one immutable token per physical NFC card or safely replays an identical request.
+- `GET /api/admin/provisioning/batches` and `GET /api/admin/provisioning/batches/{id}` — recent work and programming manifests.
+- `GET /api/admin/provisioning/options` — existing business/location choices and entitlement status for the owner UI.
+- `POST /api/admin/insights/activations` — creates/reuses a customer user, grants business access and activates one existing location.
+- `POST /api/admin/insights/access/revoke` — removes one explicitly targeted user's access to one business.
+- `POST /api/admin/insights/entitlements/deactivate` — hides one location from customer Insights without changing its cards or taps.
 
 Allowed placement values are `counter`, `table`, `reception`, `register`, and `other`. The update query cannot modify the token, location or Google destination.
 
@@ -113,6 +126,40 @@ Email delivery remains isolated behind the `MagicLinkMailer` interface and uses 
 
 ZeptoMail response bodies and credentials are never returned to customers or copied into logs. If the provider rejects a request or is unavailable, the public response remains enumeration-safe, the newly-created magic-link row is deleted, and the Worker logs only a safe failure category plus an HTTP status when one exists.
 
+## Phase 2B universal provisioning and entitlement
+
+Universal provisioning and Insights activation are separate services and lifecycle concepts.
+
+For every legitimate physical NFC card order, staff uses `/admin` to enter the Shopify order/setup reference, explicitly create or select the business/location, confirm the Google destination and confirm the physical NFC card quantity. The server generates one cryptographically random immutable token per physical card and returns the programming manifest. Extra NFC Cards receive their own tokens. Counter Stand does not create a card or token.
+
+All cards record taps from day one. Provisioning without Insights creates only the business, location, cards and order association. It does not create a customer user, grant business access, send authentication email or copy purchaser email from Shopify into D1.
+
+The protected manual endpoint currently accepts between 1 and 100 physical NFC cards in one batch. This upper bound is an operational guard against accidental or abusive oversized writes; larger legitimate fulfilment runs must be split into separately referenced setup operations.
+
+If Insights is activated at purchase time or later, the owner enters a confirmed customer email and selects the existing business/location. The activation service creates or reuses `customer_users`, grants `customer_business_access` and activates the selected `insights_entitlements` row. It does not recreate or update cards, tokens, destinations or taps. The customer uses the existing production magic-link flow and can see historical taps for actively entitled locations only.
+
+Deactivating entitlement hides that location from `/app`; revoking access removes only the selected user/business relationship. Neither operation disables the location/card, changes a public token, deletes tap history or alters `/t/{publicToken}` behaviour. Re-activation makes the retained history visible again.
+
+### Idempotency and conflict detection
+
+The provisioning key is the canonical combination of:
+
+- `source` (`admin_shopify` in Phase 2B);
+- external Shopify order reference;
+- external business setup reference.
+
+The stored SHA-256 request fingerprint contains only these validated canonical provisioning fields, in a fixed versioned structure:
+
+- source, order reference and setup reference;
+- business action plus new business name or selected business ID;
+- location action plus new address/Google Place ID or selected location ID;
+- canonical approved Google review destination;
+- physical NFC card quantity.
+
+It contains no email, purchaser PII, admin credential or other secret. An identical retry returns the original manifest. Reusing the same key with a different fingerprint returns HTTP `409`; changed quantities, destinations, business selection or location selection cannot silently replay the earlier card set. A D1 unique constraint plus an atomic batch prevents concurrent identical requests from creating duplicate cards.
+
+Phase 2B deliberately keeps the future Shopify webhook out of scope. A signed `orders/paid` webhook can later call the same idempotent provisioning service after Shopify event, line-quantity and exception-handling rules are approved.
+
 ## Local development
 
 Install dependencies, copy the local secret template, apply migrations and start the Worker:
@@ -134,19 +181,20 @@ Copy `insights-worker/examples/seed.example.sql` to the ignored `insights-worker
 
 ## Production status
 
-Phase 1 production infrastructure was verified on 12 September 2026:
+Phase 1 and Phase 2A production infrastructure were verified on 12 September 2026:
 
 - Worker: `tapntrust-insights-redirect`.
 - Custom domain: `go.tapntrust.com`; `/health` returns HTTP 200.
-- D1: `tapntrust-insights`, bound as `DB` in the OC region with migration `0001_initial.sql` applied.
+- D1: `tapntrust-insights`, bound as `DB` in the OC region with migrations `0001_initial.sql` and `0002_customer_auth.sql` applied.
 - The required `ADMIN_API_TOKEN` name is declared in `wrangler.jsonc`, while its value exists only as an encrypted Cloudflare Worker secret.
 - A physical NFC card completed the tracked redirect flow successfully.
+- ZeptoMail delivery and the complete iPhone/Gmail flow were verified: request link -> email -> non-consuming GET confirmation -> explicit POST -> 30-day session -> `/app`.
 
 The committed `wrangler.jsonc` is the deployment source of truth for the public custom domain, D1 binding, compatibility settings and required secret name. It must never contain the secret value. Production and test records are operational data and must never be copied from D1 or a working `seed.sql` into Git.
 
-## Phase 2A production setup — manual
+## Existing Phase 2A production configuration
 
-This change does not apply a production migration or deploy the Worker. The ZeptoMail Agent and verified `tapntrust.com` sender domain must exist in the AU data centre before deployment. Then:
+The ZeptoMail Agent and verified `tapntrust.com` sender domain exist in the AU data centre. Preserve the following configuration for future releases:
 
 1. In the ZeptoMail AU console, copy the Agent-specific **Send API key** for the Agent that owns the verified `contact@tapntrust.com` sender. Do not use a Zoho OAuth token or expose the Send API key in client code.
 2. Create the encrypted Worker secret from an interactive terminal prompt:
@@ -173,7 +221,7 @@ This change does not apply a production migration or deploy the Worker. The Zept
 5. Provision each customer and each allowed business link through a protected owner/server-side process. Do not add real addresses or access mappings to example SQL or Git.
 6. With a controlled customer account, request a sign-in link and verify delivery from `contact@tapntrust.com`. Confirm the link opens the non-consuming confirmation page, the explicit POST signs in exactly once, reuse fails, logout works and cross-tenant data remains inaccessible before inviting customers.
 
-Customer provisioning must create a `customer_users` row and at least one matching `customer_business_access` row. Removing or deactivating that access affects dashboard visibility only; it must never alter card tokens or redirect availability.
+Insights activation creates a `customer_users` row and matching `customer_business_access`; universal card provisioning does not. Removing access affects dashboard visibility only and must never alter card tokens or redirect availability.
 
 For future releases, confirm pending migrations, run the checks, then deploy:
 
@@ -186,11 +234,36 @@ pnpm exec wrangler deploy -c insights-worker/wrangler.jsonc
 
 Provision each purchased business, location and card only through a protected owner/server-side process. Use `wrangler secret put ADMIN_API_TOKEN -c insights-worker/wrangler.jsonc` when rotating the admin token; never write the value into the repository.
 
+## Phase 2B production rollout — manual after merge
+
+The Phase 2B pull request must not migrate or deploy production automatically. Before applying `0003_provisioning.sql`, report the exact number of existing locations that its access-preservation backfill will activate:
+
+```sql
+SELECT COUNT(DISTINCT l.id) AS locations_to_receive_active_entitlement
+FROM locations l
+JOIN customer_business_access a ON a.business_id = l.business_id;
+```
+
+This query contains no customer records in Git; run it directly against the production D1 database during the approved rollout. Review the count before continuing.
+
+After approval, the production sequence is:
+
+1. Confirm the backfill count and a current D1 recovery point/export.
+2. Apply pending migration `0003_provisioning.sql` manually.
+3. Verify that the number of `phase2a_backfill` entitlement rows equals the approved count.
+4. Deploy the Worker manually.
+5. Provision one controlled non-Insights card batch and confirm there are no customer/access rows.
+6. Tap its URL and confirm redirect plus tap recording.
+7. Activate Insights for that existing location and confirm the historical tap appears through the unchanged magic-link flow.
+8. Exercise revoke/deactivate on controlled data and confirm the physical redirect continues.
+
+No real secret, customer record or production query result belongs in Git or the pull request.
+
 ## Fulfilment transition
 
-Current orders carry the direct Google review URL described in `docs/FULFILMENT.md`; Phase 1 does not change that code or Shopify attributes.
+Current orders carry the direct Google review URL described in `docs/FULFILMENT.md`; Phase 2B does not change that storefront code or any Shopify attributes. The URL is input for the protected provisioning workflow and becomes the location's stored redirect destination.
 
-The production Worker, D1, custom domain and physical redirect path are verified. Future tracked cards can be deliberately programmed with `https://go.tapntrust.com/t/{publicToken}` instead of the direct Google review URL. The stored location destination remains the Google URL from the existing fulfilment data.
+Every physical Tapntrust NFC card must be programmed with `https://go.tapntrust.com/t/{publicToken}`. There is no normal-card/direct-Google variant and no Insights-only card variant. Insights changes dashboard entitlement only.
 
 The mapping must be created server-side during fulfilment. The browser must never receive D1 write credentials or Cloudflare admin secrets. Extra NFC cards require their own token even when they share the primary card's location.
 
