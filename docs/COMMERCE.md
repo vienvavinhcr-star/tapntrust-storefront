@@ -117,6 +117,6 @@ Confirmed Shopify identities:
 
 The same monthly selling plan is used for the first payment and renewals. Eligible businesses receive a short-lived, single-use A$8 Shopify discount code restricted to the Insights subscription variant with 'recurringCycleLimit: 1'. That makes the first successful charge A$1.99 while later billing cycles remain A$9.99. The Worker requires the Shopify Admin app token to have 'write_discounts' before production rollout.
 
-Intro eligibility is keyed to the business, preferring Google Place ID. Manual businesses use a SHA-256 business/review-destination identity. The authoritative once-per-business redemption remains 'business_insights_intro_redemptions' after payment; pre-checkout offer issuance is an eligibility gate, not proof of payment.
+Intro eligibility is keyed to a Google Place ID that the Worker verifies server-side with Google Places before any A$8 discount can be created. The authoritative once-per-business redemption remains 'business_insights_intro_redemptions' after payment; pre-checkout offer issuance is an eligibility gate, not proof of payment. Manual businesses are intentionally treated as unverified in Phase 4C: they can still buy the physical NFC card and add Insights at the standard A$9.99/month price, but they do not receive the A$1.99 intro discount until a verifiable Google business identity is available.
 
 A cart may contain only one Insights location during Phase 4C to avoid ambiguous stacking of multiple first-cycle product discounts. Physical card purchases remain available without Insights.
