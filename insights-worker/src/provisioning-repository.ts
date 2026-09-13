@@ -399,7 +399,8 @@ export async function listAdminBusinessOptions(db: D1Database): Promise<AdminBus
 export async function activateInsights(
   db: D1Database,
   input: InsightsActivationInput,
-  now: string
+  now: string,
+  source: "admin" | "shopify_orders_paid" = "admin"
 ): Promise<{ userId: string; businessId: string; locationId: string }> {
   const location = await db.prepare(`
     SELECT id FROM locations WHERE id = ?1 AND business_id = ?2 LIMIT 1
@@ -422,17 +423,17 @@ export async function activateInsights(
     db.prepare(`
       INSERT INTO insights_entitlements (
         location_id, status, source, activated_at, deactivated_at, updated_at
-      ) VALUES (?1, 'active', 'admin', ?2, NULL, ?2)
+      ) VALUES (?1, 'active', ?3, ?2, NULL, ?2)
       ON CONFLICT(location_id) DO UPDATE SET
         status = 'active',
-        source = 'admin',
+        source = excluded.source,
         activated_at = CASE
           WHEN insights_entitlements.status = 'active' THEN insights_entitlements.activated_at
           ELSE excluded.activated_at
         END,
         deactivated_at = NULL,
         updated_at = excluded.updated_at
-    `).bind(input.locationId, now)
+    `).bind(input.locationId, now, source)
   ]);
 
   const user = await db.prepare("SELECT id FROM customer_users WHERE email = ?1 COLLATE NOCASE LIMIT 1")

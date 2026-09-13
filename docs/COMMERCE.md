@@ -53,6 +53,16 @@ Rules:
 - Before checkout, any orphan Extra NFC Card must be removed from the Shopify cart.
 - A 5-card package must have its linked Counter Stand gift line and Shopify must return that line at A$0 before checkout.
 
+## Insights billing boundary
+
+Phase 4A does not alter this storefront or its checkout transport. A future Insights purchase flow will remain inside Shopify and must clearly state **A$1.99 for the first month, then A$9.99 monthly until cancelled**. The storefront must not collect payment-card data or treat a checkout click as payment.
+
+The Insights Worker mirrors verified `orders/paid` events only. Its webhook secret and Shopify Admin API token are private server credentials and must never reuse or expose the public Storefront API token. Product identity starts with the configured Insights variant in the HMAC-verified webhook, then the Worker confirms selling-plan identity from the corresponding order line through server-side Shopify Admin GraphQL. Price alone cannot grant access.
+
+The existing private `_Business Setup ID` line attribute is the bridge to server-reviewed provisioning. Phase 4A does not rename, repurpose or remove any current fulfilment attribute. `_Insights Selling Plan ID`, if present, is diagnostic metadata only: a cart or line custom property is never accepted as proof that an order is a subscription.
+
+Subscription cancellation, payment failure, refunds and checkout-side intro eligibility are later phases. None of those states may disable an NFC card redirect or delete Tapntrust tap history.
+
 ## Upsells
 
 ### Extra NFC Card

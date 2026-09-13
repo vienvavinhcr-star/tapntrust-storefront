@@ -9,6 +9,13 @@ export default defineConfig({
         bindings: {
           ADMIN_API_TOKEN: "test-admin-token-that-is-not-a-production-secret",
           GOOGLE_PLACES_API_KEY: "test-google-places-key-not-a-production-secret",
+          SHOPIFY_WEBHOOK_SECRET: "test-shopify-webhook-secret-not-for-production",
+          SHOPIFY_ADMIN_API_ACCESS_TOKEN: "test-shopify-admin-token-not-for-production",
+          SHOPIFY_SHOP_DOMAIN: "tapntrust-test.myshopify.com",
+          SHOPIFY_ADMIN_API_VERSION: "2026-07",
+          SHOPIFY_INSIGHTS_VARIANT_ID: "400000000001",
+          SHOPIFY_INSIGHTS_INTRO_SELLING_PLAN_ID: "500000000001",
+          SHOPIFY_INSIGHTS_STANDARD_SELLING_PLAN_ID: "500000000002",
           TEST_MIGRATIONS: await readD1Migrations("./insights-worker/migrations")
         }
       }
