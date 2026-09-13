@@ -1,4 +1,4 @@
-# Tapntrust Insights — Phase 1 through Phase 3C
+# Tapntrust Insights — Phase 1 through Phase 4A
 
 ## Scope and product truth
 
@@ -55,6 +55,10 @@ Cloudflare Worker + D1 was chosen for this phase because the redirect and databa
 - `provisioning_batches`: idempotent Shopify order/setup association for one reviewed physical-card provisioning intent; contains no purchaser email.
 - `provisioning_batch_cards`: ordered mapping between a provisioning batch and its physical card records.
 - `insights_entitlements`: location-level dashboard state, independent of card redirects and tap recording.
+- `insights_subscriptions`: Tapntrust's location-level mirror of normalized paid billing state; it does not replace entitlement as the authorization gate.
+- `insights_billing_events`: append-only normalized Shopify payment and application history, without raw webhook payloads or card-payment data.
+- `shopify_webhook_receipts`: safe delivery IDs, hashes and outcomes used for webhook idempotency.
+- `business_insights_intro_redemptions`: one durable AUD 1.99 introductory-offer redemption per business.
 
 Migration `0003_provisioning.sql` follows the existing D1 convention: lifecycle timestamps are ISO UTC `TEXT` values. Numeric columns such as physical-card quantity and ordinal remain `INTEGER` because they are counts, not timestamps.
 
@@ -223,6 +227,81 @@ Recent taps remain Tapntrust events only. They do not contain a visitor identity
 The approved `insights-worker/assets/tapntrust-insights-mascot.png` is a four-pose source sheet supplied by the owner. CSS crops the exact quadrants for welcome, positive-performance, analytical-recommendation and low-activity guidance contexts. No character is regenerated or restyled, and the mascot is used only where it explains the state or next action.
 
 The Billing area is a support-request flow, not billing-provider integration or instant self-service cancellation. The customer selects a reason, confirms the request and opens a prepared email to `support@tapntrust.com`. No subscription, invoice, entitlement or card state changes in the dashboard. Tapntrust staff must process the request in the actual billing system and confirm the outcome. Until that confirmation, access remains active. Any later automated cancellation implementation must preserve the rule that subscription state never disables NFC redirect or tap recording.
+
+## Phase 4A Shopify billing foundation
+
+Phase 4A adds a backend-only payment mirror. It does not redesign `/app` or `/admin`, register a live webhook, own Shopify `SubscriptionContract` objects, or implement cancellation, refunds, failed-payment grace, expiry or automatic deactivation.
+
+`POST /api/shopify/webhooks/orders-paid` treats a verified Shopify `orders/paid` delivery as the authoritative payment event. The handler reads a bounded raw body before JSON parsing, verifies `X-Shopify-Hmac-Sha256` with the dedicated `SHOPIFY_WEBHOOK_SECRET`, uses constant-time comparison, then validates the exact topic and configured `myshopify.com` domain. Browser Origin/CSRF checks are intentionally not used on this provider route; Shopify HMAC is its authentication boundary.
+
+Only safe normalized data is retained. D1 never stores the raw body, webhook HMAC, Admin API token, card-payment data or customer session cookies. Delivery ID, optional event ID, topic, normalized payload hash and provider order/line keys provide two layers of idempotency. Event-ID uniqueness is scoped by shop and topic so later Phase 4B webhook topics do not collide. Re-delivery cannot create a second payment event, subscription, customer account, access grant or entitlement.
+
+### Order classification and tenant resolution
+
+An order line is eligible for billing processing only when all of these checks pass:
+
+- the Shopify variant ID matches `SHOPIFY_INSIGHTS_VARIANT_ID`;
+- a server-side Shopify Admin GraphQL order lookup confirms that exact line belongs to the configured variant and provides its authoritative `sellingPlan.sellingPlanId`;
+- the authoritative selling-plan ID and exact paid amount form an allowed pair: intro plan + AUD 1.99 is the intro cycle; intro plan + AUD 9.99 is a normal renewal; standard plan + AUD 9.99 is standard billing;
+- the order contains a normalized billing/contact email and the existing `_Business Setup ID` fulfilment property;
+- server-side provisioning proves exactly one location/business target for that order/setup. A standard renewal may instead reuse an existing subscription only when both its setup reference and Shopify customer reference match.
+
+Price alone never identifies Insights. Payload `business_id`, `location_id`, business name and email never select the tenant. Any such arbitrary client line properties are ignored. A setup reference is not a bearer credential: an intro/new payment never gains access through setup alone, and ambiguous setup resolution is held for review and grants nothing.
+
+The signed webhook payload may provide a selling-plan allocation or private `_Insights Selling Plan ID` as diagnostic metadata, but neither is authoritative and neither can activate access. After HMAC, shop, topic and webhook variant checks pass, the Worker queries only the minimum Shopify Admin order fields needed for the matching line: line ID, variant ID and `sellingPlan { sellingPlanId name }`. The Admin API access token remains a Worker secret and requires ordinary `read_orders`; Phase 4A does not request protected subscription-contract scopes. Each outbound Admin GraphQL request is aborted after about 2.5 seconds so a slow provider call cannot consume Shopify's webhook delivery window. If the lookup times out, is unavailable or malformed, the Worker returns a generic retryable `503`, leaves the receipt unprocessed and grants nothing. A later delivery of the same webhook can therefore retry safely. A successful lookup with no selling plan is recorded for review and grants nothing.
+
+Shopify test orders are recorded only as `test_ignored` and cannot activate production access. Phase 4A deliberately provides no production override for this guard.
+
+### Pending reconciliation and activation
+
+Payment may arrive before staff provisioning. A valid recognized payment is then retained as a normalized pending event; Tapntrust does not invent a business or choose a location. After the existing protected provisioning operation creates or replays the matching order/setup batch, it invokes the same billing reconciliation service. A uniquely proven payment then:
+
+1. creates or reuses one Shopify billing mirror for the location;
+2. appends a `payment_applied` event tied to the original paid event;
+3. creates or reuses the customer user and business access;
+4. activates or reuses the existing location entitlement with source `shopify_orders_paid`.
+
+All writes are retry-safe. A mid-operation retry repeats deterministic upserts and the unique application event closes the work exactly once. Phase 4A stores the observed paid/current-period-start timestamp, but leaves `expected_next_billing_at` and `current_period_ends_at` `NULL`: it does not pretend a calendar-month estimate is Shopify's authoritative billing anchor. Phase 4B may populate authoritative lifecycle dates when provider data supports them.
+
+The first legitimate A$1.99 intro payment inserts the business-scoped redemption. The same intro selling plan may then charge A$9.99 on cycle two and later; those payments are normalized as standard renewals and do not create another intro redemption. A later A$1.99 intro payment for another location in the same business still preserves the paid access period but cannot create a second redemption and marks the affected subscription/event for owner review. Each separate business may redeem its own intro once.
+
+Billing never updates or deletes cards, public tokens, Google destinations or `tap_events`. Entitlement remains the customer dashboard authorization gate. Subscription state is not consulted by `/t/{publicToken}`, so redirects and privacy-minimised tap recording remain independent.
+
+### Phase 4A manual production prerequisites — do not execute during development
+
+After approval and merge, an operator must complete these steps manually and in this order:
+
+1. Configure a Shopify app/integration with the required `read_orders`/webhook access and a subscription provider capable of charging A$1.99 for the first month and A$9.99 for following monthly orders. Shopify checkout must clearly disclose the future recurring A$9.99 monthly price.
+2. Confirm the provider's real `orders/paid` line contains the exact Insights variant, `_Business Setup ID`, line amount/currency and billing email needed by the normalizer. Confirm the Admin GraphQL token can read the order line's `sellingPlan` with ordinary `read_orders` access.
+3. Replace the safe placeholder values in `insights-worker/wrangler.jsonc` with the real non-secret Insights variant, intro selling-plan and standard selling-plan IDs. Confirm `SHOPIFY_SHOP_DOMAIN` exactly matches the intended `myshopify.com` domain.
+4. Add both private credentials interactively; never put them in Git, generated artifacts, test fixtures or shell history:
+
+   ```bash
+   pnpm exec wrangler secret put SHOPIFY_WEBHOOK_SECRET -c insights-worker/wrangler.jsonc
+   pnpm exec wrangler secret put SHOPIFY_ADMIN_API_ACCESS_TOKEN -c insights-worker/wrangler.jsonc
+   ```
+
+5. Review a D1 backup/recovery point and apply `0005_billing_foundation.sql` manually:
+
+   ```bash
+   pnpm exec wrangler d1 migrations apply DB --remote -c insights-worker/wrangler.jsonc
+   ```
+
+6. Run the full checks and dry-run. After migration/config review, Phase 4A may be deployed only for controlled infrastructure verification. Do **not** register or enable the real-customer production `orders/paid` webhook yet. Phase 4A intentionally does not implement cancellation, cancel-at-period-end, payment-failure grace, expiry, refunds or automatic entitlement deactivation, so enabling live customer deliveries now could leave Tapntrust access active after the Shopify subscription lifecycle has changed.
+7. A controlled development/test webhook may be used only when isolated from real customer activation. The real-customer production `orders/paid` webhook to `https://go.tapntrust.com/api/shopify/webhooks/orders-paid` must remain disabled/unregistered until Phase 4B lifecycle handling has been reviewed, deployed and explicitly approved. At that point, verify intro activation, standard renewal, duplicate delivery and payment-before-provisioning reconciliation, then reconfirm tenant isolation and a physical card redirect/tap after billing activation.
+
+The Shopify app secret used for webhook HMAC and the Admin API access token are separate server credentials; neither may reuse or be exposed as the browser-safe Storefront API token. `SHOPIFY_ADMIN_API_VERSION` is non-secret deployment configuration. Phase 4A requires only `read_orders` and does not claim or require protected Shopify subscription-contract scopes. Nullable `provider_subscription_reference` fields are reserved for a real provider contract reference if one becomes authoritatively available later; Phase 4A does not derive or fake one.
+
+Migration `0005_billing_foundation.sql` already admits the approved Phase 4B status vocabulary (`cancel_at_period_end`, `grace`, `past_due`, `cancelled`, `expired`) alongside `active` and `review`. Billing event types are length-validated extensible text so failure, refund and cancellation events can be added without rebuilding the table.
+
+For local tests, use only placeholders in the ignored `insights-worker/.dev.vars`. Test fixtures sign local payloads and make no Shopify network calls. Run:
+
+```bash
+pnpm run check:all
+pnpm exec wrangler deploy --dry-run -c insights-worker/wrangler.jsonc
+```
+
+Phase 4B or later owns cancellation-at-period-end, failed-payment grace, expiry/reactivation, refunds, admin billing screens and purchase-flow eligibility enforcement.
 
 ### Phase 3C manual rollout
 

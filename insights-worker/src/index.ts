@@ -1,5 +1,6 @@
 import { ADMIN_PAGE } from "./admin-page";
 import { handleAdminProvisioningRequest } from "./admin-provisioning";
+import { handleShopifyOrdersPaidWebhook, type BillingDependencies } from "./billing-service";
 import { handleCustomerRequest, type CustomerAuthDependencies } from "./customer-auth";
 import { isAllowedGoogleReviewUrl, isValidPublicToken, normalisePublicToken } from "./destinations";
 import { createD1Repository, type CardUpdate, type InsightsRepository, type PlacementType } from "./repository";
@@ -187,12 +188,16 @@ export async function handleRequest(
   env: WorkerEnv,
   ctx: ExecutionContext,
   repository: InsightsRepository = createD1Repository(env.DB),
-  customerDependencies: CustomerAuthDependencies = {}
+  customerDependencies: CustomerAuthDependencies = {},
+  billingDependencies: BillingDependencies = {}
 ): Promise<Response> {
   const url = new URL(request.url);
 
   try {
     if (url.pathname === "/health") return json({ ok: true });
+    if (url.pathname === "/api/shopify/webhooks/orders-paid") {
+      return handleShopifyOrdersPaidWebhook(request, env, () => new Date(), billingDependencies);
+    }
     if (url.pathname === "/admin") {
       if (request.method !== "GET") return methodNotAllowed("GET");
       return new Response(ADMIN_PAGE, {

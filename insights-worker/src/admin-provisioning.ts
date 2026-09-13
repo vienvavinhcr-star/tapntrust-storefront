@@ -9,6 +9,7 @@ import {
   revokeCustomerBusinessAccess
 } from "./provisioning-repository";
 import { parseProvisioningIntent, ProvisioningError } from "./provisioning";
+import { reconcileBillingAfterProvisioning } from "./billing-service";
 
 const MAX_ADMIN_BODY_BYTES = 16_384;
 
@@ -123,6 +124,12 @@ export async function handleAdminProvisioningRequest(
       const intent = parseProvisioningIntent(body);
       if (!intent) return json({ error: "Invalid provisioning request" }, 400);
       const result = await provisionPhysicalCards(db, intent, now().toISOString());
+      await reconcileBillingAfterProvisioning(
+        db,
+        result.manifest.externalOrderReference,
+        result.manifest.externalSetupReference,
+        now().toISOString()
+      );
       return json(result, result.replayed ? 200 : 201);
     }
 
