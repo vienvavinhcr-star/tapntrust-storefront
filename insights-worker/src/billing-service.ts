@@ -13,6 +13,7 @@ import {
   type StoredPaymentEvent
 } from "./billing-repository";
 import { activateInsights } from "./provisioning-repository";
+import { applySuccessfulPaymentAccessWindow } from "./subscription-lifecycle-repository";
 import {
   createShopifyAdminProvider,
   ShopifyAdminProviderError,
@@ -186,6 +187,18 @@ async function applyStoredPaymentEvent(
       subscription = { ...subscription, status: "review", reviewRequired: true };
       result = "activated_intro_repeat_review";
     }
+  }
+
+  const access = await applySuccessfulPaymentAccessWindow(
+    db,
+    subscription.id,
+    event.id,
+    event.occurredAt,
+    now
+  );
+  if (access.eventType === "payment_after_cancellation") {
+    await markSubscriptionForReview(db, subscription.id, now);
+    if (result === "activated") result = "review";
   }
 
   await activateInsights(db, {

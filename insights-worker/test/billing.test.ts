@@ -53,6 +53,8 @@ async function clearDatabase(): Promise<void> {
   shopifyAdmin.orders.clear();
   shopifyAdmin.nextFailure = null;
   await env.DB.batch([
+    env.DB.prepare("DELETE FROM insights_subscription_lifecycle_events"),
+    env.DB.prepare("DELETE FROM insights_cancellation_requests"),
     env.DB.prepare("DELETE FROM business_insights_intro_redemptions"),
     env.DB.prepare("DELETE FROM insights_billing_events WHERE event_type = 'payment_applied'"),
     env.DB.prepare("DELETE FROM insights_billing_events"),

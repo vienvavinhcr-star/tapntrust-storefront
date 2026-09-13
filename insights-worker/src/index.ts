@@ -2,6 +2,12 @@ import { ADMIN_PAGE } from "./admin-page";
 import { handleAdminProvisioningRequest } from "./admin-provisioning";
 import { handleShopifyOrdersPaidWebhook, type BillingDependencies } from "./billing-service";
 import { handleCustomerRequest, type CustomerAuthDependencies } from "./customer-auth";
+import {
+  handleAdminSubscriptionLifecycleRequest,
+  handleCustomerBillingRequest,
+  handleShopifyRefundCreatedWebhook,
+  runSubscriptionLifecycle
+} from "./subscription-lifecycle";
 import { isAllowedGoogleReviewUrl, isValidPublicToken, normalisePublicToken } from "./destinations";
 import { createD1Repository, type CardUpdate, type InsightsRepository, type PlacementType } from "./repository";
 
@@ -156,6 +162,9 @@ async function handleAdmin(
     return json(await repository.getSummary(monthStartUtc(new Date())));
   }
 
+  const lifecycleResponse = await handleAdminSubscriptionLifecycleRequest(request, pathname, env.DB);
+  if (lifecycleResponse) return lifecycleResponse;
+
   const provisioningResponse = await handleAdminProvisioningRequest(
     request,
     pathname,
@@ -198,6 +207,11 @@ export async function handleRequest(
     if (url.pathname === "/api/shopify/webhooks/orders-paid") {
       return handleShopifyOrdersPaidWebhook(request, env, () => new Date(), billingDependencies);
     }
+    if (url.pathname === "/api/shopify/webhooks/refunds-create") {
+      return handleShopifyRefundCreatedWebhook(request, env, () => new Date(), {
+        shopifyAdminProvider: billingDependencies.shopifyAdminProvider
+      });
+    }
     if (url.pathname === "/admin") {
       if (request.method !== "GET") return methodNotAllowed("GET");
       return new Response(ADMIN_PAGE, {
@@ -208,6 +222,9 @@ export async function handleRequest(
       });
     }
     if (url.pathname.startsWith("/api/admin/")) return handleAdmin(request, url.pathname, env, repository);
+
+    const billingCustomerResponse = await handleCustomerBillingRequest(request, url, env);
+    if (billingCustomerResponse) return billingCustomerResponse;
 
     const customerResponse = await handleCustomerRequest(request, url, env, ctx, customerDependencies);
     if (customerResponse) return customerResponse;
@@ -231,5 +248,8 @@ export async function handleRequest(
 export default {
   async fetch(request, env, ctx) {
     return handleRequest(request, env as WorkerEnv, ctx);
+  },
+  async scheduled(_event, env, ctx) {
+    ctx.waitUntil(runSubscriptionLifecycle((env as WorkerEnv).DB));
   }
 } satisfies ExportedHandler<Env>;
