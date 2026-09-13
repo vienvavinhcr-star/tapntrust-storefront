@@ -3,6 +3,11 @@ import { createExecutionContext } from "cloudflare:test";
 import { env } from "cloudflare:workers";
 import { handleRequest } from "../src/index";
 import type { IntroDiscountInput, InsightsPurchaseDependencies, ShopifyDiscountProvider } from "../src/insights-purchase";
+import {
+  GooglePlacesProviderError,
+  type GooglePlacesFailureCode,
+  type GooglePlacesProvider
+} from "../src/places-provider";
 
 const WORKER_ORIGIN = "https://go.tapntrust.com";
 const STOREFRONT_ORIGIN = "https://tapntrust.com";
@@ -19,8 +24,28 @@ class MockDiscountProvider implements ShopifyDiscountProvider {
   }
 }
 
+class MockPlacesProvider implements GooglePlacesProvider {
+  readonly summaryCalls: string[] = [];
+  failCode: GooglePlacesFailureCode | null = null;
+
+  async fetchSummary(placeId: string, _apiKey: string) {
+    this.summaryCalls.push(placeId);
+    if (this.failCode) throw new GooglePlacesProviderError(this.failCode);
+    return {
+      rating: 4.8,
+      userRatingCount: 100,
+      placeUri: `https://www.google.com/maps/search/?api=1&query_place_id=${encodeURIComponent(placeId)}`
+    };
+  }
+
+  async fetchReviews(_placeId: string, _apiKey: string) {
+    return { reviewsUri: null, reviews: [] };
+  }
+}
+
 const discountProvider = new MockDiscountProvider();
-const purchaseDependencies: InsightsPurchaseDependencies = { discountProvider };
+const placesProvider = new MockPlacesProvider();
+const purchaseDependencies: InsightsPurchaseDependencies = { discountProvider, placesProvider };
 
 function unique(prefix: string) {
   return `${prefix}-${crypto.randomUUID()}`;
@@ -29,6 +54,8 @@ function unique(prefix: string) {
 async function clearDatabase() {
   discountProvider.calls.length = 0;
   discountProvider.fail = false;
+  placesProvider.summaryCalls.length = 0;
+  placesProvider.failCode = null;
   await env.DB.batch([
     env.DB.prepare("DELETE FROM insights_intro_offers"),
     env.DB.prepare("DELETE FROM insights_subscription_lifecycle_events"),
@@ -143,9 +170,22 @@ describe("Phase 4C storefront Insights offer", () => {
       reviewUrl: "https://search.google.com/local/writereview?placeid=ChIJ-test-place"
     }, "https://evil.example");
     expect(response.status).toBe(403);
+    expect(placesProvider.summaryCalls).toHaveLength(0);
   });
 
-  it("quotes a new Google business as intro eligible without creating a discount", async () => {
+  it("rejects a non-Google review URL before business verification", async () => {
+    const response = await requestOffer({
+      action: "quote",
+      businessName: "Bad Link Business",
+      googlePlaceId: "ChIJ-bad-link",
+      reviewUrl: "https://example.com/review"
+    });
+    expect(response.status).toBe(400);
+    expect(placesProvider.summaryCalls).toHaveLength(0);
+    expect(discountProvider.calls).toHaveLength(0);
+  });
+
+  it("quotes a server-verified Google business as intro eligible without creating a discount", async () => {
     const response = await requestOffer({
       action: "quote",
       businessName: "New Test Business",
@@ -157,6 +197,35 @@ describe("Phase 4C storefront Insights offer", () => {
     expect(payload.offerKind).toBe("intro");
     expect(payload.firstMonthMinor).toBe(199);
     expect(payload.recurringMinor).toBe(999);
+    expect(placesProvider.summaryCalls).toEqual(["ChIJ-new-business"]);
+    expect(discountProvider.calls).toHaveLength(0);
+  });
+
+  it("does not issue an intro when Google says the Place ID is invalid or missing", async () => {
+    placesProvider.failCode = "not_found";
+    const response = await requestOffer({
+      action: "issue",
+      setupId: unique("setup"),
+      businessName: "Fake Business",
+      googlePlaceId: "ChIJ-fake-business",
+      reviewUrl: "https://search.google.com/local/writereview?placeid=ChIJ-fake-business"
+    });
+    expect(response.status).toBe(400);
+    expect(discountProvider.calls).toHaveLength(0);
+    const row = await env.DB.prepare("SELECT id FROM insights_intro_offers LIMIT 1").first<{ id: string }>();
+    expect(row).toBeNull();
+  });
+
+  it("fails closed when Google verification is temporarily unavailable", async () => {
+    placesProvider.failCode = "timeout";
+    const response = await requestOffer({
+      action: "issue",
+      setupId: unique("setup"),
+      businessName: "Verification Timeout Business",
+      googlePlaceId: "ChIJ-timeout-business",
+      reviewUrl: "https://search.google.com/local/writereview?placeid=ChIJ-timeout-business"
+    });
+    expect(response.status).toBe(503);
     expect(discountProvider.calls).toHaveLength(0);
   });
 
@@ -183,7 +252,7 @@ describe("Phase 4C storefront Insights offer", () => {
     expect(discountProvider.calls).toHaveLength(1);
   });
 
-  it("returns standard pricing for a business that already consumed its intro", async () => {
+  it("returns standard pricing for a verified business that already consumed its intro", async () => {
     const placeId = "ChIJ-redeemed-business";
     await seedRedeemedBusiness(placeId);
     const response = await requestOffer({
@@ -198,10 +267,28 @@ describe("Phase 4C storefront Insights offer", () => {
     expect(payload.offerKind).toBe("standard");
     expect(payload.introEligible).toBe(false);
     expect(payload.firstMonthMinor).toBe(999);
+    expect(payload.reason).toBe("intro_already_used");
     expect(discountProvider.calls).toHaveLength(0);
   });
 
-  it("uses a privacy-preserving manual-business identity and can issue an intro", async () => {
+  it("quotes a manual business at standard A$9.99 without Google verification", async () => {
+    const response = await requestOffer({
+      action: "quote",
+      businessName: "Manual Business",
+      reviewUrl: "https://search.google.com/local/writereview?placeid=manual-test"
+    });
+    expect(response.status).toBe(200);
+    const payload = await response.json<Record<string, unknown>>();
+    expect(payload.offerKind).toBe("standard");
+    expect(payload.introEligible).toBe(false);
+    expect(payload.reason).toBe("manual_unverified");
+    expect(payload.firstMonthMinor).toBe(999);
+    expect(payload.recurringMinor).toBe(999);
+    expect(placesProvider.summaryCalls).toHaveLength(0);
+    expect(discountProvider.calls).toHaveLength(0);
+  });
+
+  it("never creates an intro discount for a manual business issue request", async () => {
     const response = await requestOffer({
       action: "issue",
       setupId: unique("setup"),
@@ -209,9 +296,13 @@ describe("Phase 4C storefront Insights offer", () => {
       reviewUrl: "https://search.google.com/local/writereview?placeid=manual-test"
     });
     expect(response.status).toBe(200);
-    const row = await env.DB.prepare("SELECT identity_key FROM insights_intro_offers LIMIT 1").first<{ identity_key: string }>();
-    expect(row?.identity_key).toMatch(/^manual:[a-f0-9]{64}$/);
-    expect(row?.identity_key).not.toContain("Manual Business");
+    const payload = await response.json<Record<string, unknown>>();
+    expect(payload.offerKind).toBe("standard");
+    expect(payload.reason).toBe("manual_unverified");
+    expect(payload.firstMonthMinor).toBe(999);
+    expect(discountProvider.calls).toHaveLength(0);
+    const row = await env.DB.prepare("SELECT id FROM insights_intro_offers LIMIT 1").first<{ id: string }>();
+    expect(row).toBeNull();
   });
 
   it("fails closed when Shopify cannot create the intro discount", async () => {
