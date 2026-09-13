@@ -1,4 +1,11 @@
+import { isAllowedGoogleReviewUrl } from "./destinations";
+import {
+  createGooglePlacesProvider,
+  GooglePlacesProviderError,
+  type GooglePlacesProvider
+} from "./places-provider";
 import { getShopifyAdminAccessToken } from "./shopify-admin-token";
+
 const INTRO_DISCOUNT_AMOUNT = "8.00";
 const INTRO_FIRST_MONTH_MINOR = 199;
 const STANDARD_MONTH_MINOR = 999;
@@ -7,6 +14,7 @@ const MAX_BODY_BYTES = 4096;
 
 export interface InsightsPurchaseEnv {
   DB: D1Database;
+  GOOGLE_PLACES_API_KEY: string;
   SHOPIFY_SHOP_DOMAIN: string;
   SHOPIFY_ADMIN_API_VERSION: string;
   SHOPIFY_CLIENT_ID: string;
@@ -36,6 +44,7 @@ export interface ShopifyDiscountProvider {
 
 export interface InsightsPurchaseDependencies {
   discountProvider?: ShopifyDiscountProvider;
+  placesProvider?: GooglePlacesProvider;
 }
 
 export class ShopifyDiscountProviderError extends Error {
@@ -57,7 +66,7 @@ interface EligibilityResolution {
   identityKey: string;
   businessId: string | null;
   eligibleIntro: boolean;
-  reason: "eligible" | "intro_already_used" | "ambiguous_business";
+  reason: "eligible" | "intro_already_used" | "ambiguous_business" | "manual_unverified";
 }
 
 interface OfferRow {
@@ -69,6 +78,11 @@ interface OfferRow {
   shopify_discount_node_id: string | null;
   status: string;
   expires_at: string | null;
+}
+
+interface VerificationFailure {
+  status: number;
+  message: string;
 }
 
 function clean(value: unknown, max = 200): string {
@@ -129,8 +143,8 @@ function parseBody(value: unknown): PurchaseRequestBody | null {
   const googlePlaceId = clean(record.googlePlaceId, 220);
   const reviewUrl = clean(record.reviewUrl, 1200);
   const setupId = clean(record.setupId, 120);
-  if (!action || !businessName || !reviewUrl.startsWith("https://")) return null;
-  if (googlePlaceId && !/^[A-Za-z0-9_-]{6,220}$/.test(googlePlaceId)) return null;
+  if (!action || !businessName || !isAllowedGoogleReviewUrl(reviewUrl)) return null;
+  if (googlePlaceId && !/^[A-Za-z0-9_-]{3,220}$/.test(googlePlaceId)) return null;
   if (action === "issue" && (!setupId || !/^[A-Za-z0-9_-]{8,120}$/.test(setupId))) return null;
   return { action, businessName, googlePlaceId, reviewUrl, setupId: setupId || undefined };
 }
@@ -146,29 +160,23 @@ async function identityKey(body: PurchaseRequestBody): Promise<string> {
   return `manual:${await sha256(source)}`;
 }
 
-async function resolveBusinessIds(db: D1Database, body: PurchaseRequestBody): Promise<string[]> {
-  if (body.googlePlaceId) {
-    const result = await db.prepare(`
-      SELECT DISTINCT business_id
-      FROM locations
-      WHERE google_place_id = ?
-      LIMIT 2
-    `).bind(body.googlePlaceId).all<{ business_id: string }>();
-    return (result.results || []).map((row) => row.business_id);
-  }
+async function resolveBusinessIds(db: D1Database, googlePlaceId: string): Promise<string[]> {
   const result = await db.prepare(`
     SELECT DISTINCT business_id
     FROM locations
-    WHERE lower(trim(business_name)) = lower(trim(?))
-      AND google_review_url = ?
+    WHERE google_place_id = ?
     LIMIT 2
-  `).bind(body.businessName, body.reviewUrl).all<{ business_id: string }>();
+  `).bind(googlePlaceId).all<{ business_id: string }>();
   return (result.results || []).map((row) => row.business_id);
 }
 
 async function resolveEligibility(db: D1Database, body: PurchaseRequestBody): Promise<EligibilityResolution> {
   const key = await identityKey(body);
-  const businessIds = await resolveBusinessIds(db, body);
+  if (!body.googlePlaceId) {
+    return { identityKey: key, businessId: null, eligibleIntro: false, reason: "manual_unverified" };
+  }
+
+  const businessIds = await resolveBusinessIds(db, body.googlePlaceId);
   if (businessIds.length > 1) {
     return { identityKey: key, businessId: null, eligibleIntro: false, reason: "ambiguous_business" };
   }
@@ -180,6 +188,27 @@ async function resolveEligibility(db: D1Database, body: PurchaseRequestBody): Pr
   return redemption
     ? { identityKey: key, businessId, eligibleIntro: false, reason: "intro_already_used" }
     : { identityKey: key, businessId, eligibleIntro: true, reason: "eligible" };
+}
+
+async function verifyGoogleBusiness(
+  body: PurchaseRequestBody,
+  env: InsightsPurchaseEnv,
+  dependencies: InsightsPurchaseDependencies
+): Promise<VerificationFailure | null> {
+  if (!body.googlePlaceId) return null;
+
+  const provider = dependencies.placesProvider || createGooglePlacesProvider();
+  try {
+    await provider.fetchSummary(body.googlePlaceId, env.GOOGLE_PLACES_API_KEY);
+    return null;
+  } catch (error) {
+    const code = error instanceof GooglePlacesProviderError ? error.code : "provider_unavailable";
+    console.warn(JSON.stringify({ message: "insights business verification failed", category: code }));
+    if (code === "invalid_place_id" || code === "not_found") {
+      return { status: 400, message: "Business location could not be verified." };
+    }
+    return { status: 503, message: "Business verification is temporarily unavailable. Please try again." };
+  }
 }
 
 function offerPayload(env: InsightsPurchaseEnv, eligibility: EligibilityResolution, extra: Record<string, unknown> = {}) {
@@ -313,10 +342,10 @@ export function createShopifyDiscountProvider(env: InsightsPurchaseEnv, fetcher:
           headers: {
             "Content-Type": "application/json",
             "X-Shopify-Access-Token": await getShopifyAdminAccessToken({
-        shopDomain: env.SHOPIFY_SHOP_DOMAIN,
-        clientId: env.SHOPIFY_CLIENT_ID,
-        clientSecret: env.SHOPIFY_CLIENT_SECRET
-      })
+              shopDomain: env.SHOPIFY_SHOP_DOMAIN,
+              clientId: env.SHOPIFY_CLIENT_ID,
+              clientSecret: env.SHOPIFY_CLIENT_SECRET
+            })
           },
           body: JSON.stringify({ query, variables }),
           signal: controller.signal
@@ -369,6 +398,11 @@ export async function handleInsightsPurchaseRequest(
   }
   const body = parseBody(bodyValue);
   if (!body) return json(env, { error: "Invalid offer request" }, 400);
+
+  const verificationFailure = await verifyGoogleBusiness(body, env, dependencies);
+  if (verificationFailure) {
+    return json(env, { error: verificationFailure.message }, verificationFailure.status);
+  }
 
   const eligibility = await resolveEligibility(env.DB, body);
   if (body.action === "quote" || !eligibility.eligibleIntro) {
