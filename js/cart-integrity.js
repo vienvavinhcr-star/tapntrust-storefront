@@ -38,6 +38,16 @@ export function relatedExtraIds(primaryLine, lines = []) {
     .filter(Boolean);
 }
 
+export function relatedInsightsIds(primaryLine, lines = []) {
+  if (!primaryLine || primaryLine.kind !== "primary") return [];
+  const primarySetupId = setupId(primaryLine);
+  if (!primarySetupId) return [];
+  return lines
+    .filter((line) => line.kind === "insights" && setupId(line) === primarySetupId)
+    .map((line) => line.id)
+    .filter(Boolean);
+}
+
 export function relatedBundleGiftIds(primaryLine, lines = []) {
   if (!primaryLine || primaryLine.kind !== "primary") return [];
   const parentSetupId = primarySetupId(primaryLine);
@@ -64,6 +74,15 @@ export function orphanExtraIds(lines = []) {
     .filter(Boolean);
 }
 
+export function orphanInsightsIds(lines = []) {
+  const primarySetupIds = new Set(lines.filter((line) => line.kind === "primary").map(setupId).filter(Boolean));
+  return lines
+    .filter((line) => line.kind === "insights")
+    .filter((line) => !setupId(line) || !primarySetupIds.has(setupId(line)))
+    .map((line) => line.id)
+    .filter(Boolean);
+}
+
 export function createIntegrityCartActions(baseCartActions) {
   let cleanupPromise = null;
   let bundleSyncPromise = null;
@@ -73,7 +92,8 @@ export function createIntegrityCartActions(baseCartActions) {
 
     cleanupPromise = (async () => {
       let currentState = baseCartActions.getState();
-      const orphanIds = orphanExtraIds(currentState.cart?.lines || []);
+      const lines = currentState.cart?.lines || [];
+      const orphanIds = [...orphanExtraIds(lines), ...orphanInsightsIds(lines)];
 
       for (const orphanId of orphanIds) {
         await baseCartActions.removeLine(orphanId);
@@ -189,8 +209,9 @@ export function createIntegrityCartActions(baseCartActions) {
 
     if (target?.kind === "primary") {
       const dependentExtraIds = relatedExtraIds(target, currentState.cart?.lines || []);
+      const dependentInsightsIds = relatedInsightsIds(target, currentState.cart?.lines || []);
       const dependentGiftIds = relatedBundleGiftIds(target, currentState.cart?.lines || []);
-      for (const dependentId of [...dependentExtraIds, ...dependentGiftIds]) {
+      for (const dependentId of [...dependentExtraIds, ...dependentInsightsIds, ...dependentGiftIds]) {
         await baseCartActions.removeLine(dependentId);
       }
     }
@@ -232,7 +253,8 @@ export function initialiseCheckoutIntegrityGuard(cartActions) {
     if (!checkout || checkout.getAttribute("aria-disabled") === "true") return;
 
     const currentState = cartActions.getState();
-    const needsRepair = orphanExtraIds(currentState.cart?.lines || []).length || bundleIntegrityNeeded(currentState);
+    const lines = currentState.cart?.lines || [];
+    const needsRepair = orphanExtraIds(lines).length || orphanInsightsIds(lines).length || bundleIntegrityNeeded(currentState);
     if (!needsRepair) return;
 
     event.preventDefault();

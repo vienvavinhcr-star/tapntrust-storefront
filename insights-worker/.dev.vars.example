@@ -2,5 +2,5 @@
 ADMIN_API_TOKEN=replace-with-a-long-random-secret
 ZEPTOMAIL_API_KEY=replace-with-your-zeptomail-agent-send-api-key
 GOOGLE_PLACES_API_KEY=replace-with-your-restricted-google-places-api-key
-SHOPIFY_WEBHOOK_SECRET=replace-with-your-shopify-app-webhook-secret
-SHOPIFY_ADMIN_API_ACCESS_TOKEN=replace-with-your-shopify-admin-api-access-token
+SHOPIFY_CLIENT_ID=replace-with-your-shopify-client-id
+SHOPIFY_CLIENT_SECRET=replace-with-your-shopify-client-secret

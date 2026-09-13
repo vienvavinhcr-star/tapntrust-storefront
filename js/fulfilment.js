@@ -29,7 +29,8 @@ export const LEGACY_FULFILMENT_KEYS = Object.freeze({
 export const ITEM_ROLES = Object.freeze({
   primary: "Primary Card Package",
   extra: "Extra NFC Card",
-  stand: "Counter Stand"
+  stand: "Counter Stand",
+  insights: "TapnTrust Insights"
 });
 
 function clean(value) {

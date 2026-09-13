@@ -1,0 +1,32 @@
+import fs from "node:fs";
+import assert from "node:assert/strict";
+
+const read = (path) => fs.readFileSync(path, "utf8");
+const index = read("index.html");
+const app = read("js/app.js");
+const config = read("js/config.js");
+const shopify = read("js/shopify.js");
+const cart = read("js/cart.js");
+const integrity = read("js/cart-integrity.js");
+const worker = read("insights-worker/src/index.ts");
+const purchase = read("insights-worker/src/insights-purchase.ts");
+const wrangler = read("insights-worker/wrangler.jsonc");
+
+assert.match(index, /data-insights-offer/);
+assert.match(index, /A\$1\.99 first month/);
+assert.match(app, /initialiseInsightsOffer/);
+assert.match(app, /insightsOfferController\??\.prepare/);
+assert.match(app, /insightsOfferController\.attach/);
+assert.match(config, /INSIGHTS_PRODUCT_HANDLE:\s*"tapntrust-insights"/);
+assert.match(config, /INSIGHTS_OFFER_ENDPOINT:\s*"https:\/\/go\.tapntrust\.com\/api\/storefront\/insights\/offer"/);
+assert.match(shopify, /sellingPlanGroups/);
+assert.match(cart, /ITEM_ROLES\.insights/);
+assert.match(integrity, /orphanInsightsIds/);
+assert.match(worker, /handleInsightsPurchaseRequest/);
+assert.match(purchase, /recurringCycleLimit:\s*1/);
+assert.match(purchase, /appliesOnSubscription:\s*true/);
+assert.match(purchase, /usageLimit:\s*1/);
+assert.match(wrangler, /gid:\/\/shopify\/ProductVariant\/48192855376003/);
+assert.match(wrangler, /gid:\/\/shopify\/SellingPlan\/2791899267/);
+assert.doesNotMatch([index, app, config, shopify, cart, integrity].join("\n"), /SHOPIFY_ADMIN_API_ACCESS_TOKEN|shpat_/i);
+console.log("TapnTrust Insights purchase-flow checks passed.");

@@ -97,10 +97,10 @@ export function createCartUi({ cartActions, formatMoney, updatePackagesFromCatal
     const details = document.createElement("div");
     details.className = "cart-line__details";
 
-    if (line.kind === "extra") {
+    if (line.kind === "extra" || line.kind === "insights") {
       const offer = document.createElement("span");
       offer.className = "cart-line__offer";
-      offer.textContent = "Special add-on offer";
+      offer.textContent = line.kind === "insights" ? "Monthly Insights subscription" : "Special add-on offer";
       details.append(offer);
     }
 
@@ -141,7 +141,7 @@ export function createCartUi({ cartActions, formatMoney, updatePackagesFromCatal
       }
     }
 
-    if (line.kind === "stand" || line.kind === "extra") {
+    if (line.kind === "stand" || line.kind === "extra" || line.kind === "insights") {
       const productNote = document.createElement("div");
       productNote.className = "cart-line__product-note";
       const noteTitle = document.createElement("strong");
@@ -150,6 +150,9 @@ export function createCartUi({ cartActions, formatMoney, updatePackagesFromCatal
       if (line.kind === "stand") {
         noteTitle.textContent = "Optional clear acrylic display";
         noteText.textContent = "Keeps your Tapntrust card upright, stable and easy to notice on the counter.";
+      } else if (line.kind === "insights") {
+        noteTitle.textContent = "TapnTrust Insights";
+        noteText.textContent = "The first-month intro discount is shown in the cart total when eligible. Renewal is A$9.99/month.";
       } else {
         noteTitle.textContent = "Extra card for your selected location";
         noteText.textContent = "Programmed with the same business and Google review link as your card package.";
@@ -173,10 +176,10 @@ export function createCartUi({ cartActions, formatMoney, updatePackagesFromCatal
     }
     aside.append(priceGroup);
 
-    if (line.kind === "primary") {
+    if (line.kind === "primary" || line.kind === "insights") {
       const quantity = document.createElement("span");
       quantity.className = "cart-line__variant";
-      quantity.textContent = `Qty ${line.quantity}`;
+      quantity.textContent = line.kind === "insights" ? "Monthly" : `Qty ${line.quantity}`;
       aside.append(quantity);
     } else {
       const quantity = document.createElement("div");

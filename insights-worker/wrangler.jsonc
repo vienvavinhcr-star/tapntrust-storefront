@@ -14,7 +14,7 @@
     "crons": ["0 * * * *"]
   },
   "secrets": {
-    "required": ["ADMIN_API_TOKEN", "ZEPTOMAIL_API_KEY", "GOOGLE_PLACES_API_KEY", "SHOPIFY_WEBHOOK_SECRET", "SHOPIFY_ADMIN_API_ACCESS_TOKEN"]
+    "required": ["ADMIN_API_TOKEN", "ZEPTOMAIL_API_KEY", "GOOGLE_PLACES_API_KEY", "SHOPIFY_CLIENT_ID", "SHOPIFY_CLIENT_SECRET"]
   },
   "assets": {
     "directory": "./assets"
@@ -22,11 +22,12 @@
   "vars": {
     "AUTH_BASE_URL": "https://go.tapntrust.com",
     "AUTH_FROM_EMAIL": "contact@tapntrust.com",
+    "STOREFRONT_ORIGIN": "https://tapntrust.com",
     "SHOPIFY_SHOP_DOMAIN": "iz8qif-0j.myshopify.com",
     "SHOPIFY_ADMIN_API_VERSION": "2026-07",
-    "SHOPIFY_INSIGHTS_VARIANT_ID": "REPLACE_WITH_INSIGHTS_VARIANT_ID",
-    "SHOPIFY_INSIGHTS_INTRO_SELLING_PLAN_ID": "REPLACE_WITH_INTRO_SELLING_PLAN_ID",
-    "SHOPIFY_INSIGHTS_STANDARD_SELLING_PLAN_ID": "REPLACE_WITH_STANDARD_SELLING_PLAN_ID"
+    "SHOPIFY_INSIGHTS_VARIANT_ID": "gid://shopify/ProductVariant/48192855376003",
+    "SHOPIFY_INSIGHTS_INTRO_SELLING_PLAN_ID": "gid://shopify/SellingPlan/2791899267",
+    "SHOPIFY_INSIGHTS_STANDARD_SELLING_PLAN_ID": "gid://shopify/SellingPlan/2791899267"
   },
   "observability": {
     "enabled": true,

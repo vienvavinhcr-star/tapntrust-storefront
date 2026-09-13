@@ -103,7 +103,15 @@ async function submitPackage({ fails = false, editing = false } = {}) {
   Object.assign(test.context, {
     event: { preventDefault() {} }, form: { querySelector: () => button },
     validateProductForm: () => ({}), selectedPackage: 5, editingBusinessLineId: editing ? "line" : null,
+    insightsOfferController: {
+      async prepare() { return { enabled: false }; },
+      async attach() {},
+      setEditing() {},
+    },
     cartActions: {
+      getState() {
+        return { cart: { lines: [] } };
+      },
       async addMainPackage({ packageCount }) {
         assert.equal(packageCount, 5);
         test.context.selectedPackage = 1; // Selection changes during the request.

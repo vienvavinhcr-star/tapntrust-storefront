@@ -1,3 +1,4 @@
+import { getShopifyAdminAccessToken } from "./shopify-admin-token";
 import { hashToken, readSessionToken } from "./auth";
 import {
   completeShopifyWebhookReceipt,
@@ -35,12 +36,12 @@ const CONTROL_CHARACTER_PATTERN = /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f
 export interface SubscriptionLifecycleEnv {
   DB: D1Database;
   AUTH_BASE_URL: string;
-  SHOPIFY_WEBHOOK_SECRET: string;
+  SHOPIFY_CLIENT_ID: string;
+  SHOPIFY_CLIENT_SECRET: string;
   SHOPIFY_SHOP_DOMAIN: string;
   SHOPIFY_INSIGHTS_VARIANT_ID: string;
   SHOPIFY_INSIGHTS_INTRO_SELLING_PLAN_ID: string;
   SHOPIFY_INSIGHTS_STANDARD_SELLING_PLAN_ID: string;
-  SHOPIFY_ADMIN_API_ACCESS_TOKEN: string;
   SHOPIFY_ADMIN_API_VERSION: string;
 }
 
@@ -250,7 +251,7 @@ export async function handleShopifyRefundCreatedWebhook(
   const now = nowFactory().toISOString();
   try {
     const refund = await readShopifyRefundCreatedWebhook(request, {
-      webhookSecret: env.SHOPIFY_WEBHOOK_SECRET,
+      webhookSecret: env.SHOPIFY_CLIENT_SECRET,
       shopDomain: env.SHOPIFY_SHOP_DOMAIN
     }, now);
     const reservation = await reserveShopifyWebhookReceipt(env.DB, {
@@ -273,7 +274,11 @@ export async function handleShopifyRefundCreatedWebhook(
 
     const provider = dependencies.shopifyAdminProvider || createShopifyAdminProvider({
       shopDomain: env.SHOPIFY_SHOP_DOMAIN,
-      accessToken: env.SHOPIFY_ADMIN_API_ACCESS_TOKEN,
+      accessToken: await getShopifyAdminAccessToken({
+        shopDomain: env.SHOPIFY_SHOP_DOMAIN,
+        clientId: env.SHOPIFY_CLIENT_ID,
+        clientSecret: env.SHOPIFY_CLIENT_SECRET
+      }),
       apiVersion: env.SHOPIFY_ADMIN_API_VERSION
     });
     const providerOrderReference = toOrderGid(refund.providerOrderReference);

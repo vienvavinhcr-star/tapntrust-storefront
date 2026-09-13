@@ -27,6 +27,7 @@ import {
   initialiseStepDemo
 } from "./ui/site.js";
 import { initialiseConsultationForm } from "./forms/consultation.js";
+import { initialiseInsightsOffer } from "./insights-offer.js";
 
 const cartActions = createIntegrityCartActions(baseCartActions);
 const money = new Intl.NumberFormat("en-AU", { style: "currency", currency: "AUD" });
@@ -35,6 +36,7 @@ let businessFinderController = null;
 let editingBusinessLineId = null;
 let lastMetaBusinessPlaceId = "";
 let cartUi = null;
+let insightsOfferController = null;
 
 function formatMoney(value, currency = "AUD") {
   if (currency === "AUD") return money.format(Number(value || 0)).replace("$", "A$");
@@ -171,7 +173,12 @@ function validateProductForm(form) {
 }
 
 function editBusinessForLine(line) {
+  if (insightsOfferController?.associatedInsights(line)) {
+    toast("Remove TapnTrust Insights from this business in the cart before changing the business location.", "error");
+    return;
+  }
   editingBusinessLineId = line.id;
+  insightsOfferController?.setEditing(true);
   const details = businessDetailsFromAttributes(line.attributes);
   businessFinderController?.restore(details);
   const button = document.querySelector("[data-add-to-cart]");
@@ -196,12 +203,15 @@ function initialiseProductForm() {
   const finderRoot = form.querySelector("[data-business-finder]");
   const urlInput = form.querySelector("[data-manual-review-url]");
   const warning = form.querySelector("[data-url-warning]");
+  insightsOfferController = initialiseInsightsOffer({ form, cartActions, toast });
 
   businessFinderController = initialiseBusinessFinder({
     root: finderRoot,
     apiKey: config.GOOGLE_MAPS_API_KEY,
     onChange: (details = {}) => {
       form.querySelector('[data-error-for="businessDetails"]').textContent = "";
+      if (details.mode === "selected") void insightsOfferController?.previewEligibility(details);
+      else if (details.mode !== "manual") insightsOfferController?.renderQuote();
       if (
         details.mode === "selected"
         && details.googlePlaceId
@@ -236,14 +246,33 @@ function initialiseProductForm() {
       if (editingBusinessLineId) {
         await cartActions.updateBusinessForLine(editingBusinessLineId, values);
         editingBusinessLineId = null;
+        insightsOfferController?.setEditing(false);
         status.textContent = "Business details updated in your cart.";
         button.dataset.editingBusiness = "false";
       } else {
         const packageCount = selectedPackage;
-        const addedState = await cartActions.addMainPackage({ packageCount, ...values });
+        const beforeIds = new Set((cartActions.getState().cart?.lines || []).map((line) => line.id));
+        const preparedInsights = await insightsOfferController?.prepare(values) || { enabled: false };
+        let addedState;
+        let addedPrimary = null;
+        try {
+          addedState = await cartActions.addMainPackage({
+            packageCount,
+            ...values,
+            ...(preparedInsights.enabled ? { setupId: preparedInsights.setupId } : {})
+          });
+          addedPrimary = (cartActions.getState().cart?.lines || []).find((line) => line.kind === "primary" && !beforeIds.has(line.id)) || null;
+          if (preparedInsights.enabled) {
+            if (!addedPrimary) throw new Error("The card package could not be matched to TapnTrust Insights.");
+            addedState = await insightsOfferController.attach(addedPrimary, preparedInsights);
+          }
+        } catch (error) {
+          if (addedPrimary?.id) await cartActions.removeLine(addedPrimary.id).catch(() => {});
+          throw error;
+        }
         trackClarityPackageAdded(packageCount, addedState);
         trackMetaEvent("AddToCart", packageMetaParameters(selectedPackage));
-        status.textContent = "Added to your cart.";
+        status.textContent = preparedInsights.enabled ? "Added to your cart with TapnTrust Insights." : "Added to your cart.";
       }
       cartUi?.openCart();
       toast(status.textContent);

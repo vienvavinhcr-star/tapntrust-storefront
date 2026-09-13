@@ -7,7 +7,8 @@ import {
   fetchCart,
   addCartLines,
   updateCartLines,
-  removeCartLines
+  removeCartLines,
+  updateCartDiscountCodes
 } from "./shopify.js";
 import {
   FULFILMENT_KEYS,
@@ -94,6 +95,7 @@ function classifyLine(handle, attributes) {
   if (role === ITEM_ROLES.primary || handle === config.MAIN_PRODUCT_HANDLE) return "primary";
   if (role === ITEM_ROLES.extra || handle === config.EXTRA_CARD_PRODUCT_HANDLE) return "extra";
   if (role === ITEM_ROLES.stand || handle === config.STAND_PRODUCT_HANDLE) return "stand";
+  if (role === ITEM_ROLES.insights || handle === config.INSIGHTS_PRODUCT_HANDLE) return "insights";
   return "other";
 }
 
@@ -434,7 +436,8 @@ export async function addMainPackage({
   reviewUrl,
   googleMapsUrl = "",
   reviewLinkStatus = "Ready",
-  reviewLinkSource = googlePlaceId ? "Google Places" : "Manual"
+  reviewLinkSource = googlePlaceId ? "Google Places" : "Manual",
+  setupId = businessSetupId()
 }) {
   if (state.mode === "shopify" && !state.ready) {
     throw state.error || new ShopifyError("Shopify products are not ready. Please try again.");
@@ -443,7 +446,6 @@ export async function addMainPackage({
   if (!variant) throw new ShopifyError("That card package is not available.");
   if (!variant.available) throw new ShopifyError("That card package is currently unavailable.");
 
-  const setupId = businessSetupId();
   const attributes = buildFulfilmentAttributes({
     businessName,
     businessAddress,
@@ -603,10 +605,19 @@ export async function updateBusinessForLine(lineId, details) {
 }
 
 export async function removeLine(lineId) {
+  const before = state.cart?.lines?.find((line) => line.id === lineId);
+  const beforeCodes = [...(state.cart?.discountCodes || [])];
+  const insightsOfferCode = before?.kind === "insights"
+    ? String(before.attributes?.["_Insights Offer Code"] || "").trim()
+    : "";
   setLoading(true);
   try {
     if (state.mode === "shopify") {
       saveShopifyCart(await removeCartLines(state.cart.id, [lineId]));
+      if (insightsOfferCode && state.cart?.id) {
+        const remainingCodes = beforeCodes.filter((code) => code.toLowerCase() !== insightsOfferCode.toLowerCase());
+        saveShopifyCart(await updateCartDiscountCodes(state.cart.id, remainingCodes));
+      }
     } else {
       state.cart.lines = state.cart.lines.filter((line) => line.id !== lineId);
       recalculatePreviewCart(state.cart);

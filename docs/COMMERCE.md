@@ -105,3 +105,18 @@ For Extra Card dependency/cleanup or 5-card gift work, inspect `js/cart-integrit
 ## Insights subscription lifecycle
 
 Shopify remains authoritative for payment and the first-party Shopify Subscriptions app remains the provider contract owner. TapnTrust does not collect card details and Phase 4B does not call protected SubscriptionContract cancellation APIs. Verified `orders/paid` events establish TapnTrust internal paid-access windows. Support-managed cancellation is performed in Shopify Subscriptions Admin and then confirmed in TapnTrust so access ends at the already-paid period boundary. Shopify retry settings remain provider-controlled; TapnTrust independently provides a three-day Insights grace window when no successful renewal has been observed. `refunds/create` is recorded for support review and does not itself revoke paid access.
+
+## Phase 4C purchase flow
+
+The storefront presents TapnTrust Insights as an optional add-on beside the physical card setup. Ticking the option does **not** activate Insights. It adds a Shopify subscription line using the confirmed TapnTrust Insights variant and monthly selling plan. Activation remains payment-authoritative through the existing verified 'orders/paid' pipeline.
+
+Confirmed Shopify identities:
+- variant: 'gid://shopify/ProductVariant/48192855376003'
+- monthly selling plan: 'gid://shopify/SellingPlan/2791899267'
+- base recurring price: A$9.99 AUD/month
+
+The same monthly selling plan is used for the first payment and renewals. Eligible businesses receive a short-lived, single-use A$8 Shopify discount code restricted to the Insights subscription variant with 'recurringCycleLimit: 1'. That makes the first successful charge A$1.99 while later billing cycles remain A$9.99. The Worker requires the Shopify Admin app token to have 'write_discounts' before production rollout.
+
+Intro eligibility is keyed to the business, preferring Google Place ID. Manual businesses use a SHA-256 business/review-destination identity. The authoritative once-per-business redemption remains 'business_insights_intro_redemptions' after payment; pre-checkout offer issuance is an eligibility gate, not proof of payment.
+
+A cart may contain only one Insights location during Phase 4C to avoid ambiguous stacking of multiple first-cycle product discounts. Physical card purchases remain available without Insights.

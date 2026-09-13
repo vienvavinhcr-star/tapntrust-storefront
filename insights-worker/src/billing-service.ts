@@ -1,3 +1,4 @@
+import { getShopifyAdminAccessToken } from "./shopify-admin-token";
 import {
   appendAppliedPaymentEvent,
   completeShopifyWebhookReceipt,
@@ -34,12 +35,12 @@ const STANDARD_PRICE_MINOR = 999;
 
 export interface BillingWorkerEnv {
   DB: D1Database;
-  SHOPIFY_WEBHOOK_SECRET: string;
+  SHOPIFY_CLIENT_ID: string;
+  SHOPIFY_CLIENT_SECRET: string;
   SHOPIFY_SHOP_DOMAIN: string;
   SHOPIFY_INSIGHTS_VARIANT_ID: string;
   SHOPIFY_INSIGHTS_INTRO_SELLING_PLAN_ID: string;
   SHOPIFY_INSIGHTS_STANDARD_SELLING_PLAN_ID: string;
-  SHOPIFY_ADMIN_API_ACCESS_TOKEN: string;
   SHOPIFY_ADMIN_API_VERSION: string;
 }
 
@@ -75,7 +76,7 @@ function json(data: unknown, status = 200, allow?: string): Response {
 
 function configuration(env: BillingWorkerEnv): ShopifyBillingConfiguration {
   return {
-    webhookSecret: env.SHOPIFY_WEBHOOK_SECRET,
+    webhookSecret: env.SHOPIFY_CLIENT_SECRET,
     shopDomain: env.SHOPIFY_SHOP_DOMAIN,
     insightsVariantId: env.SHOPIFY_INSIGHTS_VARIANT_ID,
     introSellingPlanId: env.SHOPIFY_INSIGHTS_INTRO_SELLING_PLAN_ID,
@@ -319,7 +320,11 @@ export async function handleShopifyOrdersPaidWebhook(
     const order = await readShopifyOrdersPaidWebhook(request, config, receivedAt);
     const provider = dependencies.shopifyAdminProvider || createShopifyAdminProvider({
       shopDomain: env.SHOPIFY_SHOP_DOMAIN,
-      accessToken: env.SHOPIFY_ADMIN_API_ACCESS_TOKEN,
+      accessToken: await getShopifyAdminAccessToken({
+        shopDomain: env.SHOPIFY_SHOP_DOMAIN,
+        clientId: env.SHOPIFY_CLIENT_ID,
+        clientSecret: env.SHOPIFY_CLIENT_SECRET
+      }),
       apiVersion: env.SHOPIFY_ADMIN_API_VERSION
     });
     const result = await processShopifyPaidOrder(env.DB, order, receivedAt, provider, config);
