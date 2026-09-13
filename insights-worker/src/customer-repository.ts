@@ -3,6 +3,9 @@ import type { PlacementType } from "./repository";
 export interface CustomerUser {
   id: string;
   email: string;
+  nickname: string | null;
+  nicknamePromptDismissedAt: string | null;
+  onboardingDismissedAt: string | null;
 }
 
 export interface CustomerSession extends CustomerUser {
@@ -39,8 +42,24 @@ export interface CustomerBusinessSummary {
 
 export interface CustomerInsightsSummary {
   email: string;
+  profile: {
+    nickname: string | null;
+    nicknamePromptDismissed: boolean;
+    onboardingDismissed: boolean;
+  };
   monthTapCount: number;
   businesses: CustomerBusinessSummary[];
+}
+
+export type CustomerProfileUpdate =
+  | { action: "save_nickname"; nickname: string | null }
+  | { action: "skip_nickname" }
+  | { action: "dismiss_onboarding" };
+
+export interface CustomerProfileState {
+  nickname: string | null;
+  nicknamePromptDismissed: boolean;
+  onboardingDismissed: boolean;
 }
 
 export interface NewMagicLink {
@@ -90,6 +109,11 @@ export interface CustomerRepository {
   revokeSession(tokenHash: string, revokedAt: string): Promise<void>;
   deleteExpiredAuthRecords(now: string, requestLimitCutoff: string): Promise<void>;
   getCustomerSummary(user: CustomerUser, monthStart: string): Promise<CustomerInsightsSummary>;
+  updateCustomerProfile(
+    userId: string,
+    update: CustomerProfileUpdate,
+    updatedAt: string
+  ): Promise<CustomerProfileState | null>;
   updateOwnedCard(
     userId: string,
     cardId: string,
@@ -102,6 +126,23 @@ interface CustomerSessionRow {
   session_id: string;
   id: string;
   email: string;
+  nickname: string | null;
+  nickname_prompt_dismissed_at: string | null;
+  onboarding_dismissed_at: string | null;
+}
+
+interface CustomerUserRow {
+  id: string;
+  email: string;
+  nickname: string | null;
+  nickname_prompt_dismissed_at: string | null;
+  onboarding_dismissed_at: string | null;
+}
+
+interface CustomerProfileRow {
+  nickname: string | null;
+  nickname_prompt_dismissed_at: string | null;
+  onboarding_dismissed_at: string | null;
 }
 
 interface BusinessRow {
@@ -155,11 +196,29 @@ function mapCard(row: CustomerCardRow): CustomerCardSummary {
   };
 }
 
+function mapUser(row: CustomerUserRow): CustomerUser {
+  return {
+    id: row.id,
+    email: row.email,
+    nickname: row.nickname,
+    nicknamePromptDismissedAt: row.nickname_prompt_dismissed_at,
+    onboardingDismissedAt: row.onboarding_dismissed_at
+  };
+}
+
+function mapProfile(row: CustomerProfileRow): CustomerProfileState {
+  return {
+    nickname: row.nickname,
+    nicknamePromptDismissed: Boolean(row.nickname_prompt_dismissed_at),
+    onboardingDismissed: Boolean(row.onboarding_dismissed_at)
+  };
+}
+
 export function createCustomerRepository(db: D1Database): CustomerRepository {
   return {
     async findActiveUserByEmail(email) {
-      return db.prepare(`
-        SELECT id, email
+      const row = await db.prepare(`
+        SELECT id, email, nickname, nickname_prompt_dismissed_at, onboarding_dismissed_at
         FROM customer_users u
         WHERE email = ?1 COLLATE NOCASE
           AND active = 1
@@ -167,7 +226,8 @@ export function createCustomerRepository(db: D1Database): CustomerRepository {
             SELECT 1 FROM customer_business_access a WHERE a.user_id = u.id
           )
         LIMIT 1
-      `).bind(email).first<CustomerUser>();
+      `).bind(email).first<CustomerUserRow>();
+      return row ? mapUser(row) : null;
     },
 
     async reserveMagicLinkRequest(limit) {
@@ -247,7 +307,13 @@ export function createCustomerRepository(db: D1Database): CustomerRepository {
 
     async findActiveSession(tokenHash, now) {
       const row = await db.prepare(`
-        SELECT s.id AS session_id, u.id, u.email
+        SELECT
+          s.id AS session_id,
+          u.id,
+          u.email,
+          u.nickname,
+          u.nickname_prompt_dismissed_at,
+          u.onboarding_dismissed_at
         FROM customer_sessions s
         JOIN customer_users u ON u.id = s.user_id
         WHERE s.token_hash = ?1
@@ -260,7 +326,14 @@ export function createCustomerRepository(db: D1Database): CustomerRepository {
         LIMIT 1
       `).bind(tokenHash, now).first<CustomerSessionRow>();
 
-      return row ? { sessionId: row.session_id, id: row.id, email: row.email } : null;
+      return row ? {
+        sessionId: row.session_id,
+        id: row.id,
+        email: row.email,
+        nickname: row.nickname,
+        nicknamePromptDismissedAt: row.nickname_prompt_dismissed_at,
+        onboardingDismissedAt: row.onboarding_dismissed_at
+      } : null;
     },
 
     async revokeSession(tokenHash, revokedAt) {
@@ -368,9 +441,46 @@ export function createCustomerRepository(db: D1Database): CustomerRepository {
 
       return {
         email: user.email,
+        profile: {
+          nickname: user.nickname,
+          nicknamePromptDismissed: Boolean(user.nicknamePromptDismissedAt),
+          onboardingDismissed: Boolean(user.onboardingDismissedAt)
+        },
         monthTapCount: businesses.reduce((total, business) => total + business.monthTapCount, 0),
         businesses
       };
+    },
+
+    async updateCustomerProfile(userId, update, updatedAt) {
+      let statement: D1PreparedStatement;
+      if (update.action === "save_nickname") {
+        statement = db.prepare(`
+          UPDATE customer_users
+          SET nickname = ?1,
+              nickname_prompt_dismissed_at = ?2,
+              updated_at = ?2
+          WHERE id = ?3 AND active = 1
+          RETURNING nickname, nickname_prompt_dismissed_at, onboarding_dismissed_at
+        `).bind(update.nickname, updatedAt, userId);
+      } else if (update.action === "skip_nickname") {
+        statement = db.prepare(`
+          UPDATE customer_users
+          SET nickname_prompt_dismissed_at = ?1,
+              updated_at = ?1
+          WHERE id = ?2 AND active = 1
+          RETURNING nickname, nickname_prompt_dismissed_at, onboarding_dismissed_at
+        `).bind(updatedAt, userId);
+      } else {
+        statement = db.prepare(`
+          UPDATE customer_users
+          SET onboarding_dismissed_at = ?1,
+              updated_at = ?1
+          WHERE id = ?2 AND active = 1
+          RETURNING nickname, nickname_prompt_dismissed_at, onboarding_dismissed_at
+        `).bind(updatedAt, userId);
+      }
+      const row = await statement.first<CustomerProfileRow>();
+      return row ? mapProfile(row) : null;
     },
 
     async updateOwnedCard(userId, cardId, update, updatedAt) {

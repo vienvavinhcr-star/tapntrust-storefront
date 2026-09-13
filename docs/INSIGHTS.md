@@ -1,4 +1,4 @@
-# Tapntrust Insights — Phase 1 through Phase 3B
+# Tapntrust Insights — Phase 1 through Phase 3C
 
 ## Scope and product truth
 
@@ -204,11 +204,40 @@ Phase 3B is primarily a presentation and retention update. It adds one narrowly 
 
 The hero count uses responsive number typography so comma-formatted values through `100,000+` remain contained at a 390px viewport. A deterministic low-data threshold of five Review Opportunities avoids calling a card, day or time window a confident top performer too early. Zero activity receives a useful setup prompt; one through four opportunities are presented as an early signal; normal strongest-card/day/time recommendations begin at five. The underlying activity remains visible throughout.
 
-The recent-event table is deliberately not rendered in the customer experience because individual timestamps add noise without changing the action a small-business owner should take. Empty and low-data states encourage better card visibility without inventing activity, and the approved mascot appears once as the recommendation guide rather than as repeated decoration. Google failure cannot suppress Tapntrust-owned activity; the page tells the customer that tap insights remain available.
+Empty and low-data states encourage better card visibility without inventing activity. Google failure cannot suppress Tapntrust-owned activity; the page tells the customer that tap insights remain available.
 
 Recommendations are deterministic and derived only from the current response: active cards, period opportunities, placement, activity share, weekday totals and the strongest available time window. They do not claim review submissions, unique visitors or outcomes that Tapntrust does not measure.
 
 Customer card editing uses `PATCH /api/customer/cards/{cardId}` with exact same-origin enforcement, the existing 30-day session, `application/json`, a bounded body, the existing placement enum and a trimmed 40-character label without control characters. The server resolves ownership by joining the authenticated user through `customer_business_access`, an active location and an active Insights entitlement; it never accepts a client business or location ID. A successful update can change only `cards.label`, `cards.placement_type` and `cards.updated_at`. The immutable public token, card/location identity, Google destination, active state, provisioning records and tap history cannot be changed by this route. Presets map to the existing enum: Front Counter → `counter`, Table → `table`, Reception → `reception`, Payment Area → `register`, while Wall, Waiting Area, Entrance and a validated custom name use `other`. On Apply, a generic placeholder such as `Card 1` adopts the known placement preset already shown to the customer; a real custom label keeps its existing placement classification until the customer explicitly changes the dropdown. Passive 60-second analytics refreshes do not rebuild a dirty or focused editor. A successful Apply or a location change renders the canonical saved state again. Card Performance may rank cards for the selected period, but the settings area uses the immutable public token—not a changing list index—as the stable physical identifier.
+
+## Phase 3C retention experience
+
+Phase 3C keeps the established analytics and security model while making `/app` warmer and easier to return to. Migration `0004_customer_retention.sql` adds only three optional customer profile fields and one per-user, per-entitled-location visit marker. All lifecycle values use the repository's ISO UTC `TEXT` convention.
+
+- `PATCH /api/customer/profile` lets the authenticated customer save or change an optional 40-character nickname, skip the first-visit prompt or dismiss the low-data guide. It uses exact same-origin JSON requests and can update only the current session's customer row.
+- `POST /api/customer/locations/{locationId}/visit` records one dashboard visit marker after the server independently confirms that the authenticated user owns the business and that the location entitlement is active. It returns only the number of tap events and strongest card label since the previous marker. The browser calls it once per location per page session; the 60-second analytics poll does not move the marker.
+- `GET /api/customer/insights` now returns at most the five newest Tapntrust tap events for the selected entitled location, including card label, placement context and a server-built Google Maps business-listing URL for a manual cross-check. The listing URL is constructed locally from the location's existing validated `google_place_id`; it does not call the Places provider and never reuses or exposes the stored write-review destination for this action.
+
+Recent taps remain Tapntrust events only. They do not contain a visitor identity and must never be interpreted as a specific submitted review. A review opportunity is still one recorded open, not a unique person or guaranteed review. The Google Maps action opens the public business listing—not the write-review form—and does not claim a relationship between an event and any review Google displays. If the stored Place ID is missing or malformed, the action is shown as unavailable.
+
+The approved `insights-worker/assets/tapntrust-insights-mascot.png` is a four-pose source sheet supplied by the owner. CSS crops the exact quadrants for welcome, positive-performance, analytical-recommendation and low-activity guidance contexts. No character is regenerated or restyled, and the mascot is used only where it explains the state or next action.
+
+The Billing area is a support-request flow, not billing-provider integration or instant self-service cancellation. The customer selects a reason, confirms the request and opens a prepared email to `support@tapntrust.com`. No subscription, invoice, entitlement or card state changes in the dashboard. Tapntrust staff must process the request in the actual billing system and confirm the outcome. Until that confirmation, access remains active. Any later automated cancellation implementation must preserve the rule that subscription state never disables NFC redirect or tap recording.
+
+### Phase 3C manual rollout
+
+After review and merge, but before deploying:
+
+1. Review and back up the intended D1 database. Migration `0004_customer_retention.sql` contains no customer seed data and does not alter cards, tokens, destinations, taps, access mappings, entitlements or sessions.
+2. Apply the pending migration manually:
+
+   ```bash
+   pnpm exec wrangler d1 migrations apply DB --remote -c insights-worker/wrangler.jsonc
+   ```
+
+3. Run `pnpm run check:all` and the Wrangler deploy dry-run, then deploy the Worker manually.
+4. With controlled accounts, verify nickname save/skip/edit, low-data guide dismissal, location-scoped since-last-visit copy, the five-event limit, cancellation email preparation and cross-tenant rejection.
+5. Reconfirm an existing physical card still redirects and records a tap. No production migration or deployment is part of the Phase 3C development change itself.
 
 ### Phase 3A manual production setup
 

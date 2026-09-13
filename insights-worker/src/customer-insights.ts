@@ -1,6 +1,7 @@
 export type InsightsPeriod = "7d" | "30d" | "all";
 
 export const LOW_DATA_THRESHOLD = 5;
+const GOOGLE_PLACE_ID_PATTERN = /^[A-Za-z0-9_-]{3,300}$/;
 
 export interface EntitledLocation {
   id: string;
@@ -51,7 +52,23 @@ export interface CustomerLocationInsights {
   weekdayActivity: WeekdayActivity[];
   peakWindow: string | null;
   primaryInsight: { title: string; body: string };
-  recentActivity: Array<{ cardId: string; label: string; tappedAt: string }>;
+  recentActivity: Array<{
+    cardId: string;
+    label: string;
+    placementType: string;
+    locationName: string;
+    locationAddress: string;
+    googleMapsUrl: string | null;
+    tappedAt: string;
+  }>;
+}
+
+export interface CustomerVisitSummary {
+  firstVisit: boolean;
+  previousVisitedAt: string | null;
+  newReviewOpportunities: number;
+  strongestCardLabel: string | null;
+  strongestCardOpportunities: number;
 }
 
 interface EntitledLocationRow {
@@ -94,7 +111,17 @@ interface TimingRow {
 interface RecentRow {
   card_id: string;
   label: string;
+  placement_type: string;
   tapped_at: string;
+}
+
+interface VisitRow {
+  last_visited_at: string;
+}
+
+interface VisitActivityRow {
+  label: string;
+  tap_count: number;
 }
 
 interface PeriodBounds {
@@ -113,6 +140,11 @@ export interface CustomerInsightsRepository {
     timezoneOffsetMinutes: number,
     now: Date
   ): Promise<CustomerLocationInsights>;
+  recordDashboardVisit(
+    userId: string,
+    locationId: string,
+    now: Date
+  ): Promise<CustomerVisitSummary>;
 }
 
 export interface GoogleProviderRateLimit {
@@ -136,6 +168,18 @@ function mapLocation(row: EntitledLocationRow): EntitledLocation {
 function customerLocationView(location: EntitledLocation): CustomerLocationView {
   const { googlePlaceId: _googlePlaceId, ...view } = location;
   return view;
+}
+
+export function buildGoogleMapsListingUrl(
+  placeId: string,
+  businessName: string
+): string | null {
+  if (!GOOGLE_PLACE_ID_PATTERN.test(placeId)) return null;
+  const url = new URL("https://www.google.com/maps/search/");
+  url.searchParams.set("api", "1");
+  url.searchParams.set("query", businessName.trim() || placeId);
+  url.searchParams.set("query_place_id", placeId);
+  return url.toString();
 }
 
 function periodBounds(period: InsightsPeriod, now: Date): PeriodBounds {
@@ -356,13 +400,13 @@ export function createCustomerInsightsRepository(db: D1Database): CustomerInsigh
           ORDER BY weekday, hour
         `).bind(location.id, bounds.start, end, timezone.modifier),
         db.prepare(`
-          SELECT t.card_id, c.label, t.tapped_at
+          SELECT t.card_id, c.label, c.placement_type, t.tapped_at
           FROM tap_events t
           JOIN cards c ON c.id = t.card_id
-          WHERE c.location_id = ?1
+          WHERE c.location_id = ?1 AND t.tapped_at <= ?2
           ORDER BY t.tapped_at DESC
-          LIMIT 12
-        `).bind(location.id)
+          LIMIT 5
+        `).bind(location.id, end)
       ]);
       const totalsResult = batchResults[0]!;
       const trendResult = batchResults[1]!;
@@ -396,6 +440,10 @@ export function createCustomerInsightsRepository(db: D1Database): CustomerInsigh
           .reduce((sum, row) => sum + Number(row.tap_count || 0), 0)
       }));
       const window = peakWindow(timingRows);
+      const googleMapsUrl = buildGoogleMapsListingUrl(
+        location.googlePlaceId,
+        location.businessName
+      );
 
       return {
         availableLocations: availableLocations.map(customerLocationView),
@@ -419,8 +467,82 @@ export function createCustomerInsightsRepository(db: D1Database): CustomerInsigh
         recentActivity: (recentResult.results as unknown as RecentRow[]).map((row) => ({
           cardId: row.card_id,
           label: row.label,
+          placementType: row.placement_type,
+          locationName: location.businessName,
+          locationAddress: location.businessAddress,
+          googleMapsUrl,
           tappedAt: row.tapped_at
         }))
+      };
+    },
+
+    async recordDashboardVisit(userId, locationId, now) {
+      const visitedAt = now.toISOString();
+      const prior = await db.prepare(`
+        SELECT v.last_visited_at
+        FROM customer_dashboard_visits v
+        JOIN locations l ON l.id = v.location_id AND l.active = 1
+        JOIN customer_business_access a
+          ON a.user_id = v.user_id AND a.business_id = l.business_id
+        JOIN insights_entitlements e
+          ON e.location_id = l.id AND e.status = 'active'
+        WHERE v.user_id = ?1 AND v.location_id = ?2
+        LIMIT 1
+      `).bind(userId, locationId).first<VisitRow>();
+
+      let activity: VisitActivityRow[] = [];
+      if (prior) {
+        const result = await db.prepare(`
+          SELECT c.label, COUNT(*) AS tap_count
+          FROM customer_business_access a
+          JOIN locations l ON l.business_id = a.business_id AND l.id = ?2 AND l.active = 1
+          JOIN insights_entitlements e ON e.location_id = l.id AND e.status = 'active'
+          JOIN cards c ON c.location_id = l.id
+          JOIN tap_events t ON t.card_id = c.id
+          WHERE a.user_id = ?1
+            AND t.tapped_at > ?3
+            AND t.tapped_at <= ?4
+          GROUP BY c.id
+          ORDER BY tap_count DESC, c.created_at ASC, c.id ASC
+        `).bind(userId, locationId, prior.last_visited_at, visitedAt).all<VisitActivityRow>();
+        activity = result.results;
+      }
+
+      const accessCheck = await db.prepare(`
+        SELECT l.id
+        FROM customer_business_access a
+        JOIN locations l ON l.business_id = a.business_id AND l.id = ?2 AND l.active = 1
+        JOIN insights_entitlements e ON e.location_id = l.id AND e.status = 'active'
+        WHERE a.user_id = ?1
+        LIMIT 1
+      `).bind(userId, locationId).first<{ id: string }>();
+      if (!accessCheck) {
+        return {
+          firstVisit: true,
+          previousVisitedAt: null,
+          newReviewOpportunities: 0,
+          strongestCardLabel: null,
+          strongestCardOpportunities: 0
+        };
+      }
+
+      await db.prepare(`
+        INSERT INTO customer_dashboard_visits (user_id, location_id, last_visited_at)
+        VALUES (?1, ?2, ?3)
+        ON CONFLICT(user_id, location_id)
+        DO UPDATE SET last_visited_at = excluded.last_visited_at
+      `).bind(userId, locationId, visitedAt).run();
+
+      const strongest = activity[0] || null;
+      return {
+        firstVisit: !prior,
+        previousVisitedAt: prior?.last_visited_at || null,
+        newReviewOpportunities: activity.reduce(
+          (total, row) => total + Number(row.tap_count || 0),
+          0
+        ),
+        strongestCardLabel: strongest?.label || null,
+        strongestCardOpportunities: Number(strongest?.tap_count || 0)
       };
     }
   };
