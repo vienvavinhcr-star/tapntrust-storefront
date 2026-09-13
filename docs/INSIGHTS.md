@@ -454,3 +454,18 @@ pnpm run check:all
 ```
 
 The Worker integration tests cover valid redirects, separate tracking for shared destinations, unknown and inactive cards, destination allowlisting, database write failure with redirect continuity, admin protection, label/placement updates that preserve token and destination, scanner-safe magic-link confirmation, JSON/origin enforcement, enumeration-safe cooldown responses, magic-link sessions, unauthenticated rejection and cross-tenant isolation.
+
+
+## Phase 4B — subscription lifecycle
+
+Phase 4B adds a TapnTrust-internal paid access window on top of verified Shopify payments. `access_paid_through_at` is an entitlement-policy timestamp, not a claim about Shopify's next billing date. A successful monthly payment starts or extends one calendar month of access. If no later successful payment is observed by the paid-through boundary, TapnTrust enters a three-day grace period; a successful payment during grace restores active access. If grace expires, the Insights entitlement becomes inactive while NFC redirects, tap recording, cards, destinations and historical tap rows continue unchanged.
+
+Cancellation remains support-managed. The customer can create a persisted cancellation request from the collapsed Account & billing section. Support cancels the provider contract in Shopify Subscriptions Admin, then confirms the request through the protected TapnTrust admin operation. Confirmed cancellation is `cancel_at_period_end`: paid access remains available through the internal paid-through timestamp and then ends without grace. TapnTrust does not require protected Shopify SubscriptionContract scopes in this phase.
+
+The Worker runs an hourly bounded lifecycle processor. It handles `active`/`review` -> `grace`, `grace` -> `expired`, and `cancel_at_period_end` -> `cancelled` transitions idempotently. Shopify `refunds/create` is ingested as `refund_observed` for review only; it does not automatically remove already-paid access. Refund observation preserves cancellation, grace and terminal lifecycle states instead of reopening access.
+
+Customer billing UI is intentionally quiet: Account & billing is the final collapsed dashboard section, and billing status is requested only when the customer opens it. The customer-facing grace copy says TapnTrust has not received the next successful payment; it does not claim a card was declined.
+
+Shopify Subscriptions remains the provider contract owner. Support manages actual contract cancellation in Shopify Admin; TapnTrust does not depend on protected `read_own_subscription_contracts` / `write_own_subscription_contracts` scopes or `subscription_contracts/*` webhooks. Shopify retry settings remain provider-controlled.
+
+Production rollout remains gated: merge Phase 4B, apply migrations `0005` then `0006` if still pending, configure Shopify secrets/IDs, deploy the Worker, verify the hourly trigger, align Shopify Subscriptions retry settings, run controlled purchase/renewal/cancellation/refund tests, and only then enable real-customer `orders/paid` and `refunds/create` webhook deliveries.

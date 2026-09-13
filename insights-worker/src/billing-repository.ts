@@ -435,8 +435,10 @@ export async function upsertInsightsSubscription(
         ELSE insights_subscriptions.plan_code
       END,
       status = CASE
+        WHEN insights_subscriptions.status IN ('cancel_at_period_end','grace','past_due','cancelled','expired')
+          THEN insights_subscriptions.status
         WHEN insights_subscriptions.review_required = 1 OR excluded.review_required = 1 THEN 'review'
-        ELSE 'active'
+        ELSE insights_subscriptions.status
       END,
       currency = CASE
         WHEN excluded.last_paid_at >= insights_subscriptions.last_paid_at THEN excluded.currency

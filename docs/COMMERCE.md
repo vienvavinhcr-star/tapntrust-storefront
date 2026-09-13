@@ -100,3 +100,8 @@ Do not simulate an accepted Shopify discount in production if Shopify rejected i
 
 For copy/layout work inside the cart drawer, do not change cart mutation logic.
 For Extra Card dependency/cleanup or 5-card gift work, inspect `js/cart-integrity.js`, `js/bundle-gift.js`, `js/cart.js`, and `docs/FULFILMENT.md`, then run `npm run check`.
+
+
+## Insights subscription lifecycle
+
+Shopify remains authoritative for payment and the first-party Shopify Subscriptions app remains the provider contract owner. TapnTrust does not collect card details and Phase 4B does not call protected SubscriptionContract cancellation APIs. Verified `orders/paid` events establish TapnTrust internal paid-access windows. Support-managed cancellation is performed in Shopify Subscriptions Admin and then confirmed in TapnTrust so access ends at the already-paid period boundary. Shopify retry settings remain provider-controlled; TapnTrust independently provides a three-day Insights grace window when no successful renewal has been observed. `refunds/create` is recorded for support review and does not itself revoke paid access.
