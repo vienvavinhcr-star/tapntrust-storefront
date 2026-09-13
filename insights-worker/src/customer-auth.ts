@@ -13,6 +13,7 @@ import { CUSTOMER_PAGE } from "./customer-page";
 import {
   createCustomerRepository,
   type CustomerCardUpdate,
+  type CustomerProfileUpdate,
   type CustomerRepository
 } from "./customer-repository";
 import {
@@ -40,7 +41,9 @@ const SESSION_TTL_MS = SESSION_TTL_SECONDS * 1000;
 const GOOGLE_RATE_WINDOW_MS = 60 * 60 * 1000;
 const CUSTOMER_CARD_UPDATE_BODY_BYTES = 1024;
 const CUSTOMER_CARD_LABEL_MAX_LENGTH = 40;
+const CUSTOMER_NICKNAME_MAX_LENGTH = 40;
 const CUSTOMER_CARD_ID_PATTERN = /^[A-Za-z0-9_-]{1,128}$/;
+const CUSTOMER_LOCATION_ID_PATTERN = /^[A-Za-z0-9_-]{1,128}$/;
 const CUSTOMER_CARD_PLACEMENT_TYPES = new Set<PlacementType>([
   "counter", "table", "reception", "register", "other"
 ]);
@@ -228,6 +231,31 @@ function parseCustomerCardUpdate(value: unknown): CustomerCardUpdate | null {
   ) return null;
 
   return { label, placementType: placementType as PlacementType };
+}
+
+function parseCustomerProfileUpdate(value: unknown): CustomerProfileUpdate | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const record = value as Record<string, unknown>;
+  const action = record.action;
+  const keys = Object.keys(record);
+
+  if (action === "save_nickname") {
+    if (keys.length !== 2 || !keys.includes("nickname")) return null;
+    if (typeof record.nickname !== "string") return null;
+    const nickname = record.nickname.trim();
+    if (
+      nickname.length > CUSTOMER_NICKNAME_MAX_LENGTH
+      || CONTROL_CHARACTER_PATTERN.test(nickname)
+    ) return null;
+    return { action, nickname: nickname || null };
+  }
+  if (
+    (action === "skip_nickname" || action === "dismiss_onboarding")
+    && keys.length === 1
+  ) {
+    return { action };
+  }
+  return null;
 }
 
 function invalidLinkPage(): Response {
@@ -442,6 +470,30 @@ async function updateCustomerCard(
   return card ? json({ card }) : json({ error: "Not found" }, 404);
 }
 
+async function updateCustomerProfile(
+  request: Request,
+  env: CustomerEnv,
+  repository: CustomerRepository,
+  now: Date
+): Promise<Response> {
+  if (request.method !== "PATCH") return methodNotAllowed("PATCH");
+  const customer = await authenticateCustomer(request, repository, now);
+  if (!customer) return json({ error: "Unauthorized" }, 401);
+  if (!hasExpectedOrigin(request, env)) return json({ error: "Request not allowed" }, 403);
+  if (!hasContentType(request, "application/json")) {
+    return json({ error: "Content-Type must be application/json" }, 415);
+  }
+
+  const body = await readBoundedJson(request, 1024);
+  if (body.status === 413) return json({ error: "Request body too large" }, 413);
+  if (body.status === 400) return json({ error: "Invalid JSON" }, 400);
+  const update = parseCustomerProfileUpdate(body.value);
+  if (!update) return json({ error: "Invalid profile update" }, 400);
+
+  const profile = await repository.updateCustomerProfile(customer.id, update, now.toISOString());
+  return profile ? json({ profile }) : json({ error: "Not found" }, 404);
+}
+
 async function authenticatedInsights(
   request: Request,
   url: URL,
@@ -466,6 +518,38 @@ async function authenticatedInsights(
     parseTimezoneOffset(url.searchParams.get("timezoneOffsetMinutes")),
     now
   ));
+}
+
+async function recordCustomerDashboardVisit(
+  request: Request,
+  locationId: string,
+  env: CustomerEnv,
+  repository: CustomerRepository,
+  insightsRepository: CustomerInsightsRepository,
+  now: Date
+): Promise<Response> {
+  if (request.method !== "POST") return methodNotAllowed("POST");
+  const customer = await authenticateCustomer(request, repository, now);
+  if (!customer) return json({ error: "Unauthorized" }, 401);
+  if (!hasExpectedOrigin(request, env)) return json({ error: "Request not allowed" }, 403);
+  if (!hasContentType(request, "application/json")) {
+    return json({ error: "Content-Type must be application/json" }, 415);
+  }
+  if (!CUSTOMER_LOCATION_ID_PATTERN.test(locationId)) return json({ error: "Not found" }, 404);
+
+  const body = await readBoundedJson(request, 64);
+  if (body.status === 413) return json({ error: "Request body too large" }, 413);
+  if (body.status === 400 || !body.value || typeof body.value !== "object" || Array.isArray(body.value)) {
+    return json({ error: "Invalid request" }, 400);
+  }
+  if (Object.keys(body.value as Record<string, unknown>).length !== 0) {
+    return json({ error: "Invalid request" }, 400);
+  }
+
+  const locations = await insightsRepository.listEntitledLocations(customer.id);
+  const location = selectCustomerLocation(locations, locationId);
+  if (!location) return json({ error: "Not found" }, 404);
+  return json(await insightsRepository.recordDashboardVisit(customer.id, location.id, now));
 }
 
 async function authenticatedGooglePlace(
@@ -572,6 +656,9 @@ export async function handleCustomerRequest(
     return requestMagicLink(request, env, ctx, repository, mailer, now);
   }
   if (url.pathname === "/api/auth/logout") return logoutCustomer(request, repository, now);
+  if (url.pathname === "/api/customer/profile") {
+    return updateCustomerProfile(request, env, repository, now);
+  }
   const customerCardMatch = url.pathname.match(/^\/api\/customer\/cards\/([^/]+)$/);
   if (customerCardMatch) {
     let cardId = "";
@@ -583,6 +670,23 @@ export async function handleCustomerRequest(
     return updateCustomerCard(request, cardId, env, repository, now);
   }
   if (url.pathname === "/api/customer/summary") return customerSummary(request, repository, now);
+  const customerVisitMatch = url.pathname.match(/^\/api\/customer\/locations\/([^/]+)\/visit$/);
+  if (customerVisitMatch) {
+    let locationId = "";
+    try {
+      locationId = decodeURIComponent(customerVisitMatch[1] || "");
+    } catch {
+      return json({ error: "Not found" }, 404);
+    }
+    return recordCustomerDashboardVisit(
+      request,
+      locationId,
+      env,
+      repository,
+      insightsRepository,
+      now
+    );
+  }
   if (url.pathname === "/api/customer/insights") {
     return authenticatedInsights(request, url, repository, insightsRepository, now);
   }

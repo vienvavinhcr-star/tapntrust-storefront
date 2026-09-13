@@ -246,7 +246,11 @@ describe("customer magic-link authentication", () => {
     expect(page).toContain("window.addEventListener('focus'");
     expect(page).toContain("if(response.status===401){showLogin();return}");
     expect(page).toContain('src="/tapntrust-insights-mascot.png"');
-    expect(page.match(/src="\/tapntrust-insights-mascot\.png"/g)).toHaveLength(1);
+    expect(page.match(/src="\/tapntrust-insights-mascot\.png"/g)).toHaveLength(3);
+    expect(page).toContain("mascot-crop mascot-insights");
+    expect(page).toContain("mascot-crop mascot-guidance");
+    expect(page).toContain(".guide-art,.guide-art .mascot-crop{width:82px}");
+    expect(page).toContain("setRecommendationMascot(next.variant)");
     expect(page).toContain("const GOOGLE_REFRESH_COOLDOWN_MS=300000");
     expect(page).toContain("if(!currentLocationId||googleSummaryRequest)return googleSummaryRequest");
     expect(page).toContain("if(!currentLocationId||reviewsRequest)return reviewsRequest");
@@ -297,8 +301,18 @@ describe("customer magic-link authentication", () => {
     expect(page).toContain("Early signal");
     expect(page).toContain("data.reviewOpportunities<LOW_DATA_THRESHOLD");
     expect(page).toContain("Google data is temporarily unavailable. Tap activity insights are still available.");
-    expect(page).not.toContain("Recent activity");
-    expect(page).not.toContain('id="recent-body"');
+    expect(page).toContain("Your 5 most recent taps");
+    expect(page).toContain('id="recent-taps"');
+    expect(page).toContain("Google does not identify which visitor left which review.");
+    expect(page).toContain("View on Google Maps");
+    expect(page).toContain("Welcome to Tapntrust Insights");
+    expect(page).toContain("What can we call you?");
+    expect(page).toContain("Skip for now");
+    expect(page).toContain("No new activity since your last visit.");
+    expect(page).toContain("Request cancellation");
+    expect(page).toContain("mailto:support@tapntrust.com");
+    expect(page).toContain("It does not cancel access instantly.");
+    expect(page).toContain("@media(max-width:420px)");
     expect(page).toContain("data.trendDirection==='unavailable'?'—'");
     expect(page).toContain("data.period==='all'?'No comparison for all-time'");
     expect(page).toContain("review.author.photoUri");
@@ -312,6 +326,8 @@ describe("customer magic-link authentication", () => {
     const polling = page.match(/function startPolling\(\)\{[\s\S]*?\}\n    function chartMarkup/)?.[0] || "";
     expect(polling).not.toContain("google-place");
     expect(polling).not.toContain("loadGoogleSummary");
+    expect(polling).not.toContain("/visit");
+    expect(polling).not.toContain("loadVisitSummary");
     expect(polling).toContain("void load()");
     expect(polling).not.toContain("forceCardSettings");
     const cardEditor = page.match(/function cardSettingsMarkup\([\s\S]*?\}\n    function recommendation/)?.[0] || "";
@@ -366,6 +382,27 @@ describe("customer magic-link authentication", () => {
     const embeddedScript = page.match(/<script>([\s\S]*?)<\/script>/)?.[1];
     expect(embeddedScript).toBeTruthy();
     expect(() => new Function(embeddedScript || "")).not.toThrow();
+  });
+
+  it("uses the browser's local hour for deterministic morning, afternoon and evening greetings", async () => {
+    const { response } = await request("/app");
+    const page = await response.text();
+    const greetingSource = page.match(
+      /function greetingText\(summary,hour=new Date\(\)\.getHours\(\)\)\{[^\n]+\}/
+    )?.[0] || "";
+    const greeting = new Function(`${greetingSource};return greetingText;`)() as (
+      summary: { profile: { nickname: string | null } },
+      hour: number
+    ) => string;
+    const named = { profile: { nickname: "Justin" } };
+    const unnamed = { profile: { nickname: null } };
+
+    expect(greeting(named, 5)).toBe("Good morning, Justin 👋");
+    expect(greeting(named, 11)).toBe("Good morning, Justin 👋");
+    expect(greeting(named, 12)).toBe("Good afternoon, Justin 👋");
+    expect(greeting(unnamed, 17)).toBe("Good afternoon 👋");
+    expect(greeting(named, 18)).toBe("Good evening, Justin 👋");
+    expect(greeting(unnamed, 4)).toBe("Good evening 👋");
   });
 
   it("restores legacy GET confirmation safely without consuming a link or creating a session", async () => {
