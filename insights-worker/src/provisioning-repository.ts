@@ -29,6 +29,7 @@ interface BatchRecord {
   source: string;
   external_order_reference: string;
   external_setup_reference: string;
+  customer_email: string | null;
   request_fingerprint: string;
   business_id: string;
   location_id: string;
@@ -71,6 +72,7 @@ export interface ProvisioningBatchSummary {
   id: string;
   externalOrderReference: string;
   externalSetupReference: string;
+  customerEmail: string | null;
   businessName: string;
   businessAddress: string;
   physicalCardCount: number;
@@ -94,6 +96,7 @@ async function findBatchByKey(db: D1Database, intent: ProvisioningIntent): Promi
       p.source,
       p.external_order_reference,
       p.external_setup_reference,
+      p.customer_email,
       p.request_fingerprint,
       p.business_id,
       p.location_id,
@@ -123,6 +126,7 @@ async function findBatchById(db: D1Database, batchId: string): Promise<BatchReco
       p.source,
       p.external_order_reference,
       p.external_setup_reference,
+      p.customer_email,
       p.request_fingerprint,
       p.business_id,
       p.location_id,
@@ -153,6 +157,7 @@ async function loadManifest(db: D1Database, batch: BatchRecord): Promise<Provisi
     source: batch.source,
     externalOrderReference: batch.external_order_reference,
     externalSetupReference: batch.external_setup_reference,
+    customerEmail: batch.customer_email,
     businessId: batch.business_id,
     businessName: batch.business_name,
     locationId: batch.location_id,
@@ -267,13 +272,15 @@ export async function provisionPhysicalCards(
     statements.push(db.prepare(`
       INSERT INTO provisioning_batches (
         id, source, external_order_reference, external_setup_reference,
-        request_fingerprint, business_id, location_id, physical_card_count, created_at
-      ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
+        customer_email, request_fingerprint, business_id, location_id,
+        physical_card_count, created_at
+      ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
     `).bind(
       batchId,
       intent.source,
       intent.externalOrderReference,
       intent.externalSetupReference,
+      intent.customerEmail,
       fingerprint,
       business.id,
       location.id,
@@ -322,6 +329,7 @@ export async function listProvisioningBatches(db: D1Database): Promise<Provision
       p.id,
       p.external_order_reference,
       p.external_setup_reference,
+      p.customer_email,
       b.name AS business_name,
       l.business_address,
       p.physical_card_count,
@@ -335,6 +343,7 @@ export async function listProvisioningBatches(db: D1Database): Promise<Provision
     id: string;
     external_order_reference: string;
     external_setup_reference: string;
+    customer_email: string | null;
     business_name: string;
     business_address: string;
     physical_card_count: number;
@@ -344,6 +353,7 @@ export async function listProvisioningBatches(db: D1Database): Promise<Provision
     id: row.id,
     externalOrderReference: row.external_order_reference,
     externalSetupReference: row.external_setup_reference,
+    customerEmail: row.customer_email,
     businessName: row.business_name,
     businessAddress: row.business_address,
     physicalCardCount: Number(row.physical_card_count),

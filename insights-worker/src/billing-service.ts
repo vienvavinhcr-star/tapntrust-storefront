@@ -13,6 +13,10 @@ import {
   upsertInsightsSubscription,
   type StoredPaymentEvent
 } from "./billing-repository";
+import {
+  claimActivationCheckoutTarget,
+  completeActivationCheckout
+} from "./activation-checkout-repository";
 import { activateInsights } from "./provisioning-repository";
 import { applySuccessfulPaymentAccessWindow } from "./subscription-lifecycle-repository";
 import {
@@ -149,6 +153,22 @@ async function applyStoredPaymentEvent(
   );
   if (resolution.ambiguous) return "review";
   let target = resolution.target;
+  let activationCheckoutId: string | null = null;
+
+  if (!target) {
+    const activation = await claimActivationCheckoutTarget(
+      db,
+      event.externalSetupReference,
+      event.billingEmail,
+      event.providerOrderReference,
+      now
+    );
+    if (activation) {
+      target = { businessId: activation.businessId, locationId: activation.locationId };
+      activationCheckoutId = activation.checkoutId;
+    }
+  }
+
   if (!target && event.planCode === "standard" && event.providerCustomerReference) {
     const renewal = await findRenewalSubscriptionTarget(
       db,
@@ -208,6 +228,15 @@ async function applyStoredPaymentEvent(
     locationId: target.locationId
   }, now, "shopify_orders_paid");
   await appendAppliedPaymentEvent(db, event, subscription.id, result, now);
+  if (activationCheckoutId) {
+    await completeActivationCheckout(
+      db,
+      activationCheckoutId,
+      event.providerOrderReference,
+      event.occurredAt,
+      now
+    );
+  }
   return result;
 }
 

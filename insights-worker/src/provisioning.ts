@@ -1,3 +1,4 @@
+import { isValidEmail, normaliseEmail } from "./auth";
 import { isAllowedGoogleReviewUrl } from "./destinations";
 
 const PUBLIC_TOKEN_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -20,6 +21,7 @@ export interface ProvisioningIntent {
   source: "admin_shopify";
   externalOrderReference: string;
   externalSetupReference: string;
+  customerEmail: string | null;
   business: ProvisioningBusinessIntent;
   location: ProvisioningLocationIntent;
   physicalCardCount: number;
@@ -38,6 +40,7 @@ export interface ProvisioningManifest {
   source: string;
   externalOrderReference: string;
   externalSetupReference: string;
+  customerEmail: string | null;
   businessId: string;
   businessName: string;
   locationId: string;
@@ -76,6 +79,13 @@ function optionalText(value: unknown, maximumLength: number): string | null {
   return cleaned.length <= maximumLength ? cleaned : null;
 }
 
+function optionalEmail(value: unknown): string | null | undefined {
+  if (value === undefined || value === null || value === "") return null;
+  if (typeof value !== "string") return undefined;
+  const email = normaliseEmail(value);
+  return isValidEmail(email) ? email : undefined;
+}
+
 export function normaliseGoogleReviewUrl(value: unknown): string | null {
   if (typeof value !== "string" || value.length > 2048 || !isAllowedGoogleReviewUrl(value)) return null;
   return new URL(value).toString();
@@ -86,6 +96,7 @@ export function parseProvisioningIntent(value: unknown): ProvisioningIntent | nu
   const record = value as Record<string, unknown>;
   const externalOrderReference = cleanText(record.externalOrderReference, 160);
   const externalSetupReference = cleanText(record.externalSetupReference, 160);
+  const customerEmail = optionalEmail(record.customerEmail);
   const businessMode = record.businessMode;
   const locationMode = record.locationMode;
   const physicalCardCount = record.physicalCardCount;
@@ -94,6 +105,7 @@ export function parseProvisioningIntent(value: unknown): ProvisioningIntent | nu
   if (
     !externalOrderReference
     || !externalSetupReference
+    || customerEmail === undefined
     || !Number.isInteger(physicalCardCount)
     || Number(physicalCardCount) < 1
     || Number(physicalCardCount) > 100
@@ -131,6 +143,7 @@ export function parseProvisioningIntent(value: unknown): ProvisioningIntent | nu
     source: "admin_shopify",
     externalOrderReference,
     externalSetupReference,
+    customerEmail,
     business,
     location,
     physicalCardCount: Number(physicalCardCount)
@@ -143,6 +156,7 @@ export async function fingerprintProvisioningIntent(intent: ProvisioningIntent):
     source: intent.source,
     externalOrderReference: intent.externalOrderReference,
     externalSetupReference: intent.externalSetupReference,
+    ...(intent.customerEmail ? { customerEmail: intent.customerEmail } : {}),
     business: intent.business,
     location: intent.location,
     physicalCardCount: intent.physicalCardCount
