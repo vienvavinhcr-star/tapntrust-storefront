@@ -231,8 +231,8 @@ async function issueIntroReservation(
   const existing = await findOffer(db, eligibility.identityKey);
   const expiresAt = new Date(now.getTime() + OFFER_TTL_MS).toISOString();
 
-  if (isUnexpiredIssued(existing, now)) {
-    if (existing?.setup_id !== setupId || existing.business_id !== eligibility.businessId) {
+  if (existing && isUnexpiredIssued(existing, now)) {
+    if (existing.setup_id !== setupId || existing.business_id !== eligibility.businessId) {
       await db.prepare(`
         UPDATE insights_intro_offers
         SET business_id = ?, setup_id = ?, updated_at = ?
