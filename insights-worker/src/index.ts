@@ -2,6 +2,7 @@ import { ADMIN_PAGE } from "./admin-page";
 import { handleAdminProvisioningRequest } from "./admin-provisioning";
 import { handleAdminUsageRequest } from "./admin-usage";
 import { handleShopifyOrdersPaidWebhook, type BillingDependencies } from "./billing-service";
+import { capturePaidCardOrderContact } from "./card-order-contact";
 import { handleCustomerRequest, type CustomerAuthDependencies } from "./customer-auth";
 import { queueCustomerUsageTracking } from "./customer-usage";
 import { handleAdminInsightsInviteRequest } from "./insights-invite";
@@ -216,6 +217,13 @@ export async function handleRequest(
   try {
     if (url.pathname === "/health") return json({ ok: true });
     if (url.pathname === "/api/shopify/webhooks/orders-paid") {
+      const contactRequest = request.clone();
+      ctx.waitUntil(capturePaidCardOrderContact(contactRequest, env).catch((error) => {
+        console.error(JSON.stringify({
+          message: "paid card order contact capture failed",
+          error: error instanceof Error ? error.message : String(error)
+        }));
+      }));
       return handleShopifyOrdersPaidWebhook(request, env, () => new Date(), billingDependencies);
     }
     if (url.pathname === "/api/shopify/webhooks/refunds-create") {
