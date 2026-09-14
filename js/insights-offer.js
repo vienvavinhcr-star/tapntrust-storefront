@@ -1,13 +1,7 @@
 import config from "./config.js";
 import { FULFILMENT_KEYS, ITEM_ROLES } from "./fulfilment.js";
-import {
-  addCartLines,
-  fetchProductByHandle,
-  removeCartLines,
-  updateCartDiscountCodes
-} from "./shopify.js";
+import { addCartLines, fetchProductByHandle } from "./shopify.js";
 
-const OFFER_CODE_KEY = "_Insights Offer Code";
 const OFFER_ID_KEY = "_Insights Offer ID";
 const OFFER_KIND_KEY = "_Insights Offer";
 const money = new Intl.NumberFormat("en-AU", { style: "currency", currency: "AUD" });
@@ -56,11 +50,16 @@ async function insightsProduct() {
   return productPromise;
 }
 
-function monthlyPlan(product) {
+function shopifyIdPart(value) {
+  const text = String(value || "").trim();
+  return text.split("/").filter(Boolean).at(-1) || text;
+}
+
+function sellingPlanById(product, sellingPlanId) {
+  const target = shopifyIdPart(sellingPlanId);
+  if (!target) return null;
   const plans = (product?.sellingPlanGroups?.nodes || []).flatMap((group) => group.sellingPlans?.nodes || []);
-  return plans.find((plan) => plan.recurringDeliveries && (plan.options || []).some((option) => /month/i.test(String(option.value || ""))))
-    || plans.find((plan) => plan.recurringDeliveries)
-    || null;
+  return plans.find((plan) => plan.recurringDeliveries && shopifyIdPart(plan.id) === target) || null;
 }
 
 function setupIdForPrimary(primaryLine) {
@@ -157,7 +156,7 @@ export function initialiseInsightsOffer({ form, cartActions, toast } = {}) {
     if (payload.introEligible) {
       price.textContent = `${formatMinor(payload.firstMonthMinor)} for your first month`;
       status.textContent = `Then ${formatMinor(payload.recurringMinor)}/month. Renews monthly.`;
-      if (badge) badge.textContent = payload.discountCode ? "Intro ready" : "Intro eligible";
+      if (badge) badge.textContent = payload.offerId ? "Intro ready" : "Intro eligible";
       root.dataset.offerState = "intro";
       renderMarketingPrice(
         `${formatMinor(payload.firstMonthMinor)} for your first month`,
@@ -261,24 +260,19 @@ export function initialiseInsightsOffer({ form, cartActions, toast } = {}) {
     ]);
     if (!offer) throw new Error("TapnTrust Insights could not prepare this offer. Please try again.");
     const variant = product?.variants?.nodes?.[0];
-    const plan = monthlyPlan(product);
+    const plan = sellingPlanById(product, offer.sellingPlanId);
     if (!variant?.id || !variant.availableForSale || !plan?.id) {
       throw new Error("TapnTrust Insights is temporarily unavailable in Shopify.");
     }
-    if (offer.variantId && offer.variantId !== variant.id) {
+    if (offer.variantId && shopifyIdPart(offer.variantId) !== shopifyIdPart(variant.id)) {
       throw new Error("TapnTrust Insights product configuration does not match. Please contact support.");
     }
-    if (offer.sellingPlanId && offer.sellingPlanId !== plan.id) {
-      throw new Error("TapnTrust Insights subscription configuration does not match. Please contact support.");
-    }
 
-    const offerCode = String(offer.discountCode || "").trim();
     const attributes = [
       { key: FULFILMENT_KEYS.setupId, value: setupId },
       { key: FULFILMENT_KEYS.itemRole, value: ITEM_ROLES.insights },
       { key: OFFER_KIND_KEY, value: String(offer.offerKind || "standard") },
-      ...(offer.offerId ? [{ key: OFFER_ID_KEY, value: String(offer.offerId) }] : []),
-      ...(offerCode ? [{ key: OFFER_CODE_KEY, value: offerCode }] : [])
+      ...(offer.offerId ? [{ key: OFFER_ID_KEY, value: String(offer.offerId) }] : [])
     ];
 
     const cartId = stateBefore.cart?.id;
@@ -289,42 +283,9 @@ export function initialiseInsightsOffer({ form, cartActions, toast } = {}) {
       sellingPlanId: plan.id,
       attributes
     }]);
-    let current = await adoptCartSnapshot(addedCart);
+    const current = await adoptCartSnapshot(addedCart);
     const added = insightsForSetup(current, setupId);
     if (!added) throw new Error("TapnTrust Insights was not returned by Shopify after it was added.");
-
-    if (offer.offerKind === "intro") {
-      if (!offerCode) {
-        await cartActions.removeLine(added.id);
-        throw new Error("The A$1.99 first-month offer could not be attached. Please try again.");
-      }
-      const previousCodes = [...(current.cart?.discountCodes || [])];
-      const codes = [...new Set([...previousCodes, offerCode])];
-      const updated = await updateCartDiscountCodes(current.cart.id, codes);
-      const applicableCodes = (updated.discountCodes || [])
-        .filter((entry) => entry.applicable)
-        .map((entry) => String(entry.code).toLowerCase());
-      const applicable = applicableCodes.includes(offerCode.toLowerCase());
-      const lostExistingCode = previousCodes.find((code) => !applicableCodes.includes(String(code).toLowerCase()));
-      current = await adoptCartSnapshot(updated);
-      if (!applicable || lostExistingCode) {
-        const rollback = insightsForSetup(current, setupId);
-        if (rollback?.id) await cartActions.removeLine(rollback.id);
-        current = cartActions.getState();
-        if (current.cart?.id) {
-          try {
-            const restored = await updateCartDiscountCodes(current.cart.id, previousCodes);
-            current = await adoptCartSnapshot(restored);
-          } catch {
-            // Preserve the primary cart rollback even if restoring a previous code fails.
-          }
-        }
-        if (lostExistingCode) {
-          throw new Error("The A$1.99 Insights offer cannot be combined with the discount already in your cart. Your existing discount was kept and Insights was not added.");
-        }
-        throw new Error("Shopify could not apply the A$1.99 first-month offer. No Insights subscription was added. Please try again.");
-      }
-    }
     return current;
   }
 
