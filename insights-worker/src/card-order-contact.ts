@@ -61,7 +61,7 @@ function setupReferences(payload: Record<string, unknown>): string[] {
   return Array.from(found);
 }
 
-async function rawBody(request: Request): Promise<Uint8Array | null> {
+async function rawBody(request: Request<any, any>): Promise<Uint8Array | null> {
   const declared = Number(request.headers.get("Content-Length") || 0);
   if (declared > SHOPIFY_WEBHOOK_MAX_BODY_BYTES || !request.body) return null;
   const reader = request.body.getReader();
@@ -87,7 +87,7 @@ async function rawBody(request: Request): Promise<Uint8Array | null> {
 }
 
 export async function capturePaidCardOrderContact(
-  request: Request,
+  request: Request<any, any>,
   env: ContactEnv,
   now: Date = new Date()
 ): Promise<void> {
