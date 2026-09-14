@@ -27,6 +27,34 @@ function cleanShopDomain(value: string): string | null {
     : null;
 }
 
+function safeLogText(value: unknown, max = 180): string {
+  return typeof value === "string"
+    ? value.replace(/[\r\n\t]+/g, " ").trim().slice(0, max)
+    : "";
+}
+
+async function logRejectedTokenResponse(response: Response): Promise<void> {
+  let error = "";
+  let errorDescription = "";
+  try {
+    const payload = await response.clone().json<{
+      error?: unknown;
+      error_description?: unknown;
+    }>();
+    error = safeLogText(payload.error, 80);
+    errorDescription = safeLogText(payload.error_description, 180);
+  } catch {
+    // Keep diagnostics metadata-only if Shopify did not return JSON.
+  }
+
+  console.error(JSON.stringify({
+    message: "shopify admin token rejected",
+    status: response.status,
+    error: error || undefined,
+    errorDescription: errorDescription || undefined
+  }));
+}
+
 async function mintToken(
   config: TokenConfig,
   fetcher: typeof fetch = fetch
@@ -36,6 +64,12 @@ async function mintToken(
   const clientSecret = config.clientSecret.trim();
 
   if (!shopDomain || !clientId || !clientSecret) {
+    console.error(JSON.stringify({
+      message: "shopify admin token configuration invalid",
+      hasShopDomain: Boolean(shopDomain),
+      hasClientId: Boolean(clientId),
+      hasClientSecret: Boolean(clientSecret)
+    }));
     throw new ShopifyAdminProviderError("configuration_error");
   }
 
@@ -62,6 +96,7 @@ async function mintToken(
     );
 
     if (!response.ok) {
+      await logRejectedTokenResponse(response);
       throw new ShopifyAdminProviderError(
         "request_failed",
         response.status
@@ -85,6 +120,12 @@ async function mintToken(
       !Number.isFinite(expiresIn) ||
       expiresIn <= 0
     ) {
+      console.error(JSON.stringify({
+        message: "shopify admin token response invalid",
+        status: response.status,
+        hasAccessToken: Boolean(accessToken),
+        hasValidExpiry: Number.isFinite(expiresIn) && expiresIn > 0
+      }));
       throw new ShopifyAdminProviderError(
         "invalid_response",
         response.status
@@ -97,6 +138,14 @@ async function mintToken(
     };
   } catch (error) {
     if (error instanceof ShopifyAdminProviderError) throw error;
+    const category = error instanceof DOMException && error.name === "AbortError"
+      ? "timeout"
+      : "network_error";
+    console.error(JSON.stringify({
+      message: "shopify admin token request failed",
+      category,
+      errorName: error instanceof Error ? error.name : "unknown"
+    }));
     throw new ShopifyAdminProviderError("request_failed");
   } finally {
     clearTimeout(timeout);
@@ -112,6 +161,11 @@ export async function getShopifyAdminAccessToken(
   const clientId = config.clientId.trim();
 
   if (!shopDomain || !clientId) {
+    console.error(JSON.stringify({
+      message: "shopify admin token cache key invalid",
+      hasShopDomain: Boolean(shopDomain),
+      hasClientId: Boolean(clientId)
+    }));
     throw new ShopifyAdminProviderError("configuration_error");
   }
 
