@@ -55,7 +55,7 @@ Rules:
 
 ## Insights billing boundary
 
-Phase 4A does not alter this storefront or its checkout transport. A future Insights purchase flow will remain inside Shopify and must clearly state **A$1.99 for the first month, then A$9.99 monthly until cancelled**. The storefront must not collect payment-card data or treat a checkout click as payment.
+Phase 4A does not alter this storefront or its checkout transport. A future Insights purchase flow will remain inside Shopify and must clearly state **A$1.99 for the first month, then A$6.99 monthly until cancelled**. The storefront must not collect payment-card data or treat a checkout click as payment.
 
 The Insights Worker mirrors verified `orders/paid` events only. Its webhook secret and Shopify Admin API token are private server credentials and must never reuse or expose the public Storefront API token. Product identity starts with the configured Insights variant in the HMAC-verified webhook, then the Worker confirms selling-plan identity from the corresponding order line through server-side Shopify Admin GraphQL. Price alone cannot grant access.
 
@@ -105,3 +105,18 @@ For Extra Card dependency/cleanup or 5-card gift work, inspect `js/cart-integrit
 ## Insights subscription lifecycle
 
 Shopify remains authoritative for payment and the first-party Shopify Subscriptions app remains the provider contract owner. TapnTrust does not collect card details and Phase 4B does not call protected SubscriptionContract cancellation APIs. Verified `orders/paid` events establish TapnTrust internal paid-access windows. Support-managed cancellation is performed in Shopify Subscriptions Admin and then confirmed in TapnTrust so access ends at the already-paid period boundary. Shopify retry settings remain provider-controlled; TapnTrust independently provides a three-day Insights grace window when no successful renewal has been observed. `refunds/create` is recorded for support review and does not itself revoke paid access.
+
+## Phase 4C purchase flow
+
+The storefront presents TapnTrust Insights as an optional add-on beside the physical card setup. Ticking the option does **not** activate Insights. It adds a Shopify subscription line using the confirmed TapnTrust Insights variant and monthly selling plan. Activation remains payment-authoritative through the existing verified 'orders/paid' pipeline.
+
+Confirmed Shopify identities:
+- variant: 'gid://shopify/ProductVariant/48192855376003'
+- monthly selling plan: 'gid://shopify/SellingPlan/2791899267'
+- base recurring price: A$6.99 AUD/month
+
+The same monthly selling plan is used for the first payment and renewals. Eligible businesses receive a short-lived, single-use A$5 Shopify discount code restricted to the Insights subscription variant with 'recurringCycleLimit: 1'. That makes the first successful charge A$1.99 while later billing cycles remain A$6.99. The Worker requires the Shopify Admin app token to have 'write_discounts' before production rollout.
+
+Intro eligibility is keyed to a Google Place ID that the Worker verifies server-side with Google Places before any A$5 discount can be created. The authoritative once-per-business redemption remains 'business_insights_intro_redemptions' after payment; pre-checkout offer issuance is an eligibility gate, not proof of payment. Manual businesses are intentionally treated as unverified in Phase 4C: they can still buy the physical NFC card and add Insights at the standard A$6.99/month price, but they do not receive the A$1.99 intro discount until a verifiable Google business identity is available.
+
+A cart may contain only one Insights location during Phase 4C to avoid ambiguous stacking of multiple first-cycle product discounts. Physical card purchases remain available without Insights.

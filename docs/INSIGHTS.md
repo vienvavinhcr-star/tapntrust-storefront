@@ -242,7 +242,7 @@ An order line is eligible for billing processing only when all of these checks p
 
 - the Shopify variant ID matches `SHOPIFY_INSIGHTS_VARIANT_ID`;
 - a server-side Shopify Admin GraphQL order lookup confirms that exact line belongs to the configured variant and provides its authoritative `sellingPlan.sellingPlanId`;
-- the authoritative selling-plan ID and exact paid amount form an allowed pair: intro plan + AUD 1.99 is the intro cycle; intro plan + AUD 9.99 is a normal renewal; standard plan + AUD 9.99 is standard billing;
+- the authoritative selling-plan ID and exact paid amount form an allowed pair: intro plan + AUD 1.99 is the intro cycle; intro plan + AUD 6.99 is a normal renewal; standard plan + AUD 6.99 is standard billing;
 - the order contains a normalized billing/contact email and the existing `_Business Setup ID` fulfilment property;
 - server-side provisioning proves exactly one location/business target for that order/setup. A standard renewal may instead reuse an existing subscription only when both its setup reference and Shopify customer reference match.
 
@@ -263,7 +263,7 @@ Payment may arrive before staff provisioning. A valid recognized payment is then
 
 All writes are retry-safe. A mid-operation retry repeats deterministic upserts and the unique application event closes the work exactly once. Phase 4A stores the observed paid/current-period-start timestamp, but leaves `expected_next_billing_at` and `current_period_ends_at` `NULL`: it does not pretend a calendar-month estimate is Shopify's authoritative billing anchor. Phase 4B may populate authoritative lifecycle dates when provider data supports them.
 
-The first legitimate A$1.99 intro payment inserts the business-scoped redemption. The same intro selling plan may then charge A$9.99 on cycle two and later; those payments are normalized as standard renewals and do not create another intro redemption. A later A$1.99 intro payment for another location in the same business still preserves the paid access period but cannot create a second redemption and marks the affected subscription/event for owner review. Each separate business may redeem its own intro once.
+The first legitimate A$1.99 intro payment inserts the business-scoped redemption. The same intro selling plan may then charge A$6.99 on cycle two and later; those payments are normalized as standard renewals and do not create another intro redemption. A later A$1.99 intro payment for another location in the same business still preserves the paid access period but cannot create a second redemption and marks the affected subscription/event for owner review. Each separate business may redeem its own intro once.
 
 Billing never updates or deletes cards, public tokens, Google destinations or `tap_events`. Entitlement remains the customer dashboard authorization gate. Subscription state is not consulted by `/t/{publicToken}`, so redirects and privacy-minimised tap recording remain independent.
 
@@ -271,7 +271,7 @@ Billing never updates or deletes cards, public tokens, Google destinations or `t
 
 After approval and merge, an operator must complete these steps manually and in this order:
 
-1. Configure a Shopify app/integration with the required `read_orders`/webhook access and a subscription provider capable of charging A$1.99 for the first month and A$9.99 for following monthly orders. Shopify checkout must clearly disclose the future recurring A$9.99 monthly price.
+1. Configure a Shopify app/integration with the required `read_orders`/webhook access and a subscription provider capable of charging A$1.99 for the first month and A$6.99 for following monthly orders. Shopify checkout must clearly disclose the future recurring A$6.99 monthly price.
 2. Confirm the provider's real `orders/paid` line contains the exact Insights variant, `_Business Setup ID`, line amount/currency and billing email needed by the normalizer. Confirm the Admin GraphQL token can read the order line's `sellingPlan` with ordinary `read_orders` access.
 3. Replace the safe placeholder values in `insights-worker/wrangler.jsonc` with the real non-secret Insights variant, intro selling-plan and standard selling-plan IDs. Confirm `SHOPIFY_SHOP_DOMAIN` exactly matches the intended `myshopify.com` domain.
 4. Add both private credentials interactively; never put them in Git, generated artifacts, test fixtures or shell history:

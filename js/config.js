@@ -13,6 +13,8 @@ export const config = Object.freeze({
   MAIN_PRODUCT_HANDLE: "tapntrust-nfc-review-card",
   STAND_PRODUCT_HANDLE: "tapntrust-counter-stand",
   EXTRA_CARD_PRODUCT_HANDLE: "tapntrust-extra-nfc-card",
+  INSIGHTS_PRODUCT_HANDLE: "tapntrust-insights",
+  INSIGHTS_OFFER_ENDPOINT: "https://go.tapntrust.com/api/storefront/insights/offer",
   WELCOME_DISCOUNT_CODE: "WELCOMETNT",
   WELCOME_DISCOUNT_PERCENT: 10,
   WELCOME_POPUP_COOLDOWN_DAYS: 14,

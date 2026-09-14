@@ -122,6 +122,19 @@ export async function fetchProductByHandle(handle) {
             image { url altText width height }
           }
         }
+        sellingPlanGroups(first: 10) {
+          nodes {
+            name
+            sellingPlans(first: 20) {
+              nodes {
+                id
+                name
+                recurringDeliveries
+                options { name value }
+              }
+            }
+          }
+        }
       }
     }
   `;

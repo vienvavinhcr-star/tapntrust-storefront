@@ -79,6 +79,8 @@
   <link rel="apple-touch-icon" href="/assets/brand/tapntrust-apple-touch-icon.png" sizes="180x180">
   <link rel="stylesheet" href="css/styles.min.css?v=20260908-1">
   <link rel="stylesheet" href="css/setup-builder.css?v=20260910-10">
+  <link rel="stylesheet" href="css/insights-offer.css?v=20260914-2">
+  <link rel="stylesheet" href="css/insights-experience.css?v=20260914-7">
   <link rel="stylesheet" href="css/review-proof-animation.css?v=20260903-1">
   <link rel="stylesheet" href="css/hero-showcase.css?v=20260907-1">
   <link rel="stylesheet" href="css/seasonal-theme.css?v=20260905-1">
@@ -671,6 +673,32 @@
               <p class="field__error business-finder__error" data-error-for="businessDetails" aria-live="polite"></p>
               <button class="business-finder__manual-toggle" type="button" data-manual-toggle>Can't find your business? Enter the review link manually</button>
             </div>
+            <aside class="insights-offer" id="insights-offer" data-insights-offer data-offer-state="unknown">
+              <label class="insights-offer__label">
+                <span class="insights-offer__content">
+                  <span class="insights-offer__eyebrow">Optional monthly add-on</span>
+                  <span class="insights-offer__top"><strong class="insights-offer__title">Add Tapntrust Insights</strong><span class="insights-offer__badge">First month offer</span></span>
+                  <strong class="insights-offer__price" data-insights-price>A$1.99 for your first month</strong>
+                  <small class="insights-offer__status" data-insights-status>Then just A$6.99/month.</small>
+                  <span class="insights-offer__copy">See which cards perform best, when customers engage, and where your review opportunities come from.</span>
+                </span>
+                <span class="insights-offer__toggle">
+                  <input type="checkbox" data-insights-toggle>
+                  <span class="insights-offer__switch" aria-hidden="true"></span>
+                </span>
+              </label>
+              <div class="insights-offer__footer">
+                <a href="#insights" data-insights-offer-details>See how Insights works <span aria-hidden="true">→</span></a>
+                <p class="insights-offer__fineprint">Cancel anytime</p>
+              </div>
+              <div class="insights-offer__mascot-stage" data-insights-offer-mascot aria-hidden="true">
+                <div class="insights-offer__mascot" aria-hidden="true">
+                  <img src="insights-worker/assets/tapntrust-insights-mascot-transparent.png" alt="" width="483" height="649" loading="eager" decoding="async">
+                </div>
+                <p class="insights-offer__mascot-message" data-insights-offer-mascot-message>Hi! I’ll help turn your card activity into useful next steps.</p>
+              </div>
+              <p class="sr-only" aria-live="polite" data-insights-offer-announcement></p>
+            </aside>
             <button class="button button--primary button--wide add-to-cart" type="submit" data-add-to-cart>
               <span>Add 2-card package</span><strong>A$59.95</strong>
             </button>
@@ -725,6 +753,161 @@
               </div>
             </div>
           </details>
+        </div>
+      </div>
+    </section>
+
+    <section class="section insights-experience" id="insights" aria-labelledby="insights-title" data-insights-experience>
+      <div class="container">
+        <div class="insights-sales-hero">
+          <div class="insights-sales-hero__copy">
+            <p class="eyebrow eyebrow--light">Tapntrust Insights</p>
+            <h2 id="insights-title">Know what happens after the tap.</h2>
+            <p class="insights-sales-hero__lede">See which card gets attention, when customers engage and the next simple move worth trying.</p>
+            <div class="insights-sales-hero__actions">
+              <a class="button button--gold" href="#insights-offer" data-insights-sales-cta>Try Tapntrust Insights</a>
+              <a class="button insights-button--glass" href="#insights-carousel">Explore the dashboard <span aria-hidden="true">↓</span></a>
+            </div>
+            <div class="insights-sales-price" aria-live="polite">
+              <strong data-insights-marketing-price>A$1.99 for your first month</strong>
+              <span data-insights-marketing-status>Then just A$6.99/month · Renews monthly.</span>
+            </div>
+          </div>
+
+          <div class="insights-sales-hero__visual" aria-label="Example Tapntrust Insights dashboard">
+            <div class="insights-preview" data-insights-preview>
+              <div class="insights-preview__bar"><span><i></i><i></i><i></i></span><strong>Tapntrust Insights</strong><small>Example dashboard</small></div>
+              <div class="insights-preview__hero">
+                <span>Last 30 days</span>
+                <strong><b data-insights-count data-count-to="139">0</b><small>Review Opportunities</small></strong>
+                <p>Recorded card activity toward your Google review page.</p>
+              </div>
+              <div class="insights-preview__grid">
+                <article class="insights-preview__momentum"><span>Momentum</span><strong data-insights-momentum>+22%</strong><small>vs previous 30 days</small><i class="insights-preview__trend" aria-hidden="true"><b></b></i></article>
+                <article class="is-highlighted insights-preview__card-result"><span>Strongest card</span><strong>Front Counter</strong><small>57% of activity</small><i class="insights-preview__progress" aria-hidden="true"><b></b></i></article>
+                <article class="insights-preview__time-result"><span>Best time</span><strong>Sat · 10–12</strong><small>Strongest activity window</small><i class="insights-preview__time-bars" aria-hidden="true"><b></b><b></b><b></b><b></b><b></b><b></b><b></b></i></article>
+              </div>
+              <div class="insights-preview__recommendation" data-insights-recommendation>
+                <div class="insights-mascot insights-mascot--hero" aria-hidden="true">
+                  <img src="insights-worker/assets/tapntrust-insights-mascot-transparent.png" alt="" width="483" height="649" loading="lazy" decoding="async">
+                </div>
+                <div><span>Next move</span><p><strong>Keep Front Counter visible.</strong> Test your Table card during Saturday’s strongest window.</p></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="insights-carousel" id="insights-carousel" role="region" aria-roledescription="carousel" aria-labelledby="insights-carousel-title" data-insights-carousel>
+          <header class="insights-carousel__heading">
+            <div><p class="eyebrow">Five practical benefits</p><h3 id="insights-carousel-title">Everything useful. Nothing overwhelming.</h3></div>
+            <p>Swipe through five ways Tapntrust Insights helps your business learn from every review opportunity.</p>
+          </header>
+
+          <div class="insights-carousel__viewport" tabindex="0" data-insights-carousel-viewport>
+            <div class="insights-carousel__track" data-insights-carousel-track>
+              <article class="insights-carousel__slide" role="group" aria-roledescription="slide" aria-label="1 of 5" data-insights-slide>
+                <div class="insights-carousel__copy">
+                  <span>01 · Your private dashboard</span>
+                  <h4>Open Insights from a secure email link.</h4>
+                  <p>Receive your own passwordless sign-in link and see only the Tapntrust locations connected to your business.</p>
+                </div>
+                <div class="insights-carousel-visual insights-carousel-visual--access" aria-label="Example secure Tapntrust Insights sign-in">
+                  <header><strong>Tapntrust Insights</strong><small>Secure access</small></header>
+                  <div class="insights-access-card">
+                    <span aria-hidden="true">✦</span>
+                    <small>Your private dashboard</small>
+                    <strong>Sign in without a password</strong>
+                    <p>We’ll email a secure sign-in link to your approved business email.</p>
+                    <b>Send secure link <i aria-hidden="true">→</i></b>
+                  </div>
+                  <div class="insights-access-trust"><span>✓ Business-scoped access</span><span>✓ 30-day secure session</span></div>
+                </div>
+              </article>
+
+              <article class="insights-carousel__slide" role="group" aria-roledescription="slide" aria-label="2 of 5" data-insights-slide>
+                <div class="insights-carousel__copy">
+                  <span>02 · Google Presence</span>
+                  <h4>Keep your current Google presence in view.</h4>
+                  <p>Refresh your rating, total rating count and selected review highlights when you want the latest Google context.</p>
+                </div>
+                <div class="insights-carousel-visual insights-carousel-visual--google" aria-label="Example Google Presence view">
+                  <header><strong>Google Presence</strong><small translate="no">Google Maps</small></header>
+                  <div class="insights-google-grid">
+                    <article><small>Current rating</small><strong>4.8 <span>★</span></strong><p>Live Google presence</p></article>
+                    <article><small>Total ratings</small><strong>247</strong><p>Current rating count</p></article>
+                  </div>
+                  <div class="insights-google-refresh"><span>Current data from Google Maps</span><b>Refresh Google data</b></div>
+                  <small class="insights-google-attribution" translate="no">Google Maps</small>
+                </div>
+              </article>
+
+              <article class="insights-carousel__slide" role="group" aria-roledescription="slide" aria-label="3 of 5" data-insights-slide>
+                <div class="insights-carousel__copy">
+                  <span>03 · Timing</span>
+                  <h4>Know when customers engage.</h4>
+                  <p>Spot the days and time windows when your cards receive the most attention.</p>
+                </div>
+                <div class="insights-carousel-visual insights-carousel-visual--timing" aria-label="Example activity timing view">
+                  <header><strong>Activity by time</strong><small>Last 30 days</small></header>
+                  <div class="insights-heatmap" aria-hidden="true">
+                    <span><b>Mon</b><i></i><i></i><i></i><i class="is-medium"></i><i></i><i></i></span>
+                    <span><b>Tue</b><i></i><i class="is-medium"></i><i></i><i class="is-strong"></i><i class="is-medium"></i><i></i></span>
+                    <span><b>Wed</b><i></i><i></i><i class="is-medium"></i><i></i><i class="is-medium"></i><i></i></span>
+                    <span><b>Thu</b><i></i><i class="is-medium"></i><i></i><i class="is-medium"></i><i class="is-strong"></i><i></i></span>
+                    <span><b>Fri</b><i class="is-medium"></i><i></i><i class="is-medium"></i><i class="is-strong"></i><i class="is-strong"></i><i class="is-medium"></i></span>
+                    <span><b>Sat</b><i></i><i class="is-medium"></i><i class="is-strong"></i><i class="is-strong"></i><i class="is-medium"></i><i></i></span>
+                  </div>
+                  <div class="insights-carousel-visual__callout"><small>Strongest window</small><strong>Saturday · 10 am–12 pm</strong></div>
+                </div>
+              </article>
+
+              <article class="insights-carousel__slide" role="group" aria-roledescription="slide" aria-label="4 of 5" data-insights-slide>
+                <div class="insights-carousel__copy">
+                  <span>04 · Card performance</span>
+                  <h4>See which card works hardest.</h4>
+                  <p>Compare the physical cards at your counter, tables, reception or any placement you name.</p>
+                </div>
+                <div class="insights-carousel-visual insights-carousel-visual--cards" aria-label="Example card performance view">
+                  <header><strong>Your card performance</strong><small>139 opportunities</small></header>
+                  <div class="insights-card-row is-leading"><span><b>Front Counter</b><small>Strongest card</small></span><i><em style="--share:82%"></em></i><strong>80</strong></div>
+                  <div class="insights-card-row"><span><b>Table Area</b><small>27% of activity</small></span><i><em style="--share:48%"></em></i><strong>38</strong></div>
+                  <div class="insights-card-row"><span><b>Reception</b><small>15% of activity</small></span><i><em style="--share:28%"></em></i><strong>21</strong></div>
+                </div>
+              </article>
+
+              <article class="insights-carousel__slide" role="group" aria-roledescription="slide" aria-label="5 of 5" data-insights-slide>
+                <div class="insights-carousel__copy">
+                  <span>05 · Simple recommendations</span>
+                  <h4>Turn more review activity into real growth.</h4>
+                  <p>Get one practical recommendation from your card and timing activity, so your team knows what to try next.</p>
+                </div>
+                <div class="insights-carousel-visual insights-carousel-visual--action" aria-label="Example Tapntrust recommendation">
+                  <span class="insights-carousel-visual__label">Recommended next step</span>
+                  <strong>Make Saturday’s strongest window work harder.</strong>
+                  <p>Keep your Front Counter card visible and ask staff to point it out between 10 am and noon.</p>
+                  <div><span>Based on recorded card, day and time activity</span><b aria-hidden="true">→</b></div>
+                </div>
+              </article>
+            </div>
+          </div>
+
+          <div class="insights-carousel__controls">
+            <button type="button" aria-label="Previous Insights view" data-insights-carousel-prev><span aria-hidden="true">←</span></button>
+            <div class="insights-carousel__dots" aria-label="Choose an Insights view">
+              <button type="button" aria-label="Show view 1" aria-current="true" data-insights-carousel-dot="0"></button>
+              <button type="button" aria-label="Show view 2" data-insights-carousel-dot="1"></button>
+              <button type="button" aria-label="Show view 3" data-insights-carousel-dot="2"></button>
+              <button type="button" aria-label="Show view 4" data-insights-carousel-dot="3"></button>
+              <button type="button" aria-label="Show view 5" data-insights-carousel-dot="4"></button>
+            </div>
+            <button type="button" aria-label="Next Insights view" data-insights-carousel-next><span aria-hidden="true">→</span></button>
+          </div>
+
+          <div class="insights-carousel__offer">
+            <div><small>Tapntrust Insights</small><strong data-insights-marketing-price>A$1.99 for your first month</strong><span data-insights-marketing-status>Then just A$6.99/month · Renews monthly.</span></div>
+            <a class="button button--primary" href="#insights-offer" data-insights-sales-cta>Add Insights</a>
+          </div>
+          <p class="insights-truth-note">Review Opportunities are recorded Tapntrust card opens toward the location’s Google review page. Opens are counted individually and are not guaranteed submitted reviews.</p>
         </div>
       </div>
     </section>
@@ -1113,7 +1296,7 @@
 
   <div class="toast-region" aria-live="polite" aria-atomic="true" data-toast-region></div>
   <noscript><p class="noscript">JavaScript is required to add products to the Shopify cart. You can still read product and policy information.</p></noscript>
-  <script type="module" src="js/app.min.js?v=20260831-1"></script>
+  <script type="module" src="js/app.min.js?v=20260914-3"></script>
 
   <div id="soro-blog"></div>
   <script>

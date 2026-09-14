@@ -445,7 +445,7 @@ describe("Shopify billing classification and money", () => {
 
   it("normalizes AUD cents exactly without floating-point money arithmetic", () => {
     expect(decimalMoneyToMinor("1.99")).toBe(199);
-    expect(decimalMoneyToMinor("9.99")).toBe(999);
+    expect(decimalMoneyToMinor("6.99")).toBe(699);
     expect(decimalMoneyToMinor("1.999")).toBeNull();
     expect(decimalMoneyToMinor("not-money")).toBeNull();
   });
@@ -480,7 +480,7 @@ describe("Shopify billing classification and money", () => {
       orderReference: standardOrder,
       setupReference: standardSetup,
       sellingPlanId: STANDARD_PLAN_ID,
-      price: "9.99"
+      price: "6.99"
     }));
 
     expect(await intro.json()).toMatchObject({ result: "activated" });
@@ -491,7 +491,7 @@ describe("Shopify billing classification and money", () => {
     `).all<{ plan_code: string; amount_minor: number }>();
     expect(plans.results).toEqual([
       { plan_code: "intro", amount_minor: 199 },
-      { plan_code: "standard", amount_minor: 999 }
+      { plan_code: "standard", amount_minor: 699 }
     ]);
   });
 
@@ -603,7 +603,7 @@ describe("billing activation, tenant resolution and idempotency", () => {
       orderReference: unique("#renewal"),
       setupReference: sharedSetup,
       sellingPlanId: STANDARD_PLAN_ID,
-      price: "9.99"
+      price: "6.99"
     }));
     expect(await response.json()).toMatchObject({ result: "review" });
     expect(await count("insights_subscriptions")).toBe(0);
@@ -739,7 +739,7 @@ describe("billing activation, tenant resolution and idempotency", () => {
     expect(await count("shopify_webhook_receipts")).toBe(2);
   });
 
-  it("accepts A$9.99 renewal on the same intro selling plan without a second intro redemption", async () => {
+  it("accepts A$6.99 renewal on the same intro selling plan without a second intro redemption", async () => {
     const originalOrder = unique("#original-order");
     const setupReference = unique("renewal-setup");
     const customerId = unique("renewal-customer");
@@ -754,7 +754,7 @@ describe("billing activation, tenant resolution and idempotency", () => {
       orderId: renewalProviderId,
       customerId,
       sellingPlanId: INTRO_PLAN_ID,
-      price: "9.99",
+      price: "6.99",
       processedAt: "2026-02-28T10:00:00.000Z"
     }));
 
@@ -783,7 +783,7 @@ describe("billing activation, tenant resolution and idempotency", () => {
       expected_next_billing_at: null,
       most_recent_provider_order_reference: `gid://shopify/Order/${renewalProviderId}`,
       expected_intro_price_minor: 199,
-      expected_recurring_price_minor: 999
+      expected_recurring_price_minor: 699
     });
     expect(await count("insights_billing_events")).toBe(4);
     expect(await count("business_insights_intro_redemptions")).toBe(1);

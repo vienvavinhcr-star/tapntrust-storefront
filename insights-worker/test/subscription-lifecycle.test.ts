@@ -161,7 +161,7 @@ async function seedSubscription(options: {
         ?5, NULL, ?6,
         ?7, ?7,
         'standard', ?8, 'AUD',
-        199, 999,
+        199, 699,
         ?9, ?9, NULL,
         ?9, NULL,
         0, ?10, ?10,
@@ -231,7 +231,7 @@ async function ensureBillingSource(
       ?2, NULL, ?3,
       ?4, ?5, ?6,
       ?7, NULL,
-      ?8, 'orders_paid', 'standard', 999, 'AUD',
+      ?8, 'orders_paid', 'standard', 699, 'AUD',
       ?9, ?10, 'ready', ?9
     )
   `).bind(
@@ -387,9 +387,9 @@ describe("TapnTrust internal paid access calendar", () => {
         admin_graphql_api_id: lineGid,
         variant_id: INSIGHTS_VARIANT_ID,
         quantity: 1,
-        price: "9.99",
+        price: "6.99",
         total_discount: "0.00",
-        price_set: { shop_money: { amount: "9.99", currency_code: "AUD" } },
+        price_set: { shop_money: { amount: "6.99", currency_code: "AUD" } },
         properties: [{ name: "_Business Setup ID", value: "setup-reactivate4b" }]
       }]
     };
@@ -821,7 +821,7 @@ describe("billing status and refund observation", () => {
         billing_email, event_type, plan_code, amount_minor, currency, occurred_at,
         payload_hash, result, created_at
       ) VALUES (?1, NULL, NULL, 'shopify', ?2, NULL, ?3, ?4, ?5, ?6, ?7, NULL, ?8,
-        'orders_paid', 'standard', 999, 'AUD', ?9, ?10, 'ready', ?9)
+        'orders_paid', 'standard', 699, 'AUD', ?9, ?10, 'ready', ?9)
     `).bind(
       "billing-refund-source",
       "webhook-source",
@@ -840,7 +840,7 @@ describe("billing status and refund observation", () => {
       sourceBillingEventId: "billing-refund-source",
       refundReference: "refund-direct-test",
       providerLineReference: "gid://shopify/LineItem/refund-source",
-      amountMinor: 999,
+      amountMinor: 699,
       currency: "AUD",
       occurredAt: "2026-02-02T00:00:00.000Z",
       now: "2026-02-02T00:00:01.000Z"
@@ -866,7 +866,7 @@ describe("billing status and refund observation", () => {
       sourceBillingEventId: "billing-refund-cancelled",
       refundReference: "refund-cancel-state",
       providerLineReference: "gid://shopify/LineItem/billing-refund-cancelled",
-      amountMinor: 999,
+      amountMinor: 699,
       currency: "AUD",
       occurredAt: "2026-02-02T00:00:00.000Z",
       now: "2026-02-02T00:00:01.000Z"
@@ -900,7 +900,7 @@ describe("billing status and refund observation", () => {
           billing_email, event_type, plan_code, amount_minor, currency, occurred_at,
           payload_hash, result, created_at
         ) VALUES ('refund-payment', NULL, NULL, 'shopify', 'paid-hook', 'paid-event', ?1, ?2,
-          '#900001', ?3, 'customer-900001', NULL, ?4, 'orders_paid', 'standard', 999, 'AUD',
+          '#900001', ?3, 'customer-900001', NULL, ?4, 'orders_paid', 'standard', 699, 'AUD',
           '2026-02-01T00:00:00.000Z', ?5, 'ready', '2026-02-01T00:00:00.000Z')
       `).bind(orderRef, lineRef, `setup-${seeded.locationId}`, seeded.email, "b".repeat(64)),
       env.DB.prepare(`
@@ -911,7 +911,7 @@ describe("billing status and refund observation", () => {
           billing_email, event_type, plan_code, amount_minor, currency, occurred_at,
           payload_hash, result, created_at
         ) VALUES ('refund-applied', ?1, 'refund-payment', 'shopify', 'paid-hook', 'paid-event', ?2, ?3,
-          '#900001', ?4, 'customer-900001', NULL, ?5, 'payment_applied', 'standard', 999, 'AUD',
+          '#900001', ?4, 'customer-900001', NULL, ?5, 'payment_applied', 'standard', 699, 'AUD',
           '2026-02-01T00:00:00.000Z', ?6, 'activated', '2026-02-01T00:00:01.000Z')
       `).bind(seeded.subscriptionId, orderRef, lineRef, `setup-${seeded.locationId}`, seeded.email, "b".repeat(64))
     ]);
@@ -930,8 +930,8 @@ describe("billing status and refund observation", () => {
       created_at: "2026-02-02T00:00:00.000Z",
       refund_line_items: [{
         line_item_id: 910001,
-        subtotal: "9.99",
-        subtotal_set: { shop_money: { amount: "9.99", currency_code: "AUD" } }
+        subtotal: "6.99",
+        subtotal_set: { shop_money: { amount: "6.99", currency_code: "AUD" } }
       }]
     });
     const headers = {
@@ -969,8 +969,8 @@ describe("billing status and refund observation", () => {
       created_at: "2026-02-02T00:00:00.000Z",
       refund_line_items: [{
         line_item_id: 910099,
-        subtotal: "9.99",
-        subtotal_set: { shop_money: { amount: "9.99", currency_code: "AUD" } }
+        subtotal: "6.99",
+        subtotal_set: { shop_money: { amount: "6.99", currency_code: "AUD" } }
       }]
     });
     const response = await request("/api/shopify/webhooks/refunds-create", {
