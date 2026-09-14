@@ -14,6 +14,10 @@ import {
 } from "./subscription-lifecycle";
 import { isAllowedGoogleReviewUrl, isValidPublicToken, normalisePublicToken } from "./destinations";
 import { handleInsightsPurchaseRequest, type InsightsPurchaseDependencies } from "./insights-purchase";
+import {
+  handleInsightsActivationRequest,
+  type InsightsActivationDependencies
+} from "./insights-activation";
 import { createD1Repository, type CardUpdate, type InsightsRepository, type PlacementType } from "./repository";
 
 type WorkerEnv = Env & { ADMIN_API_TOKEN?: string };
@@ -210,7 +214,8 @@ export async function handleRequest(
   repository: InsightsRepository = createD1Repository(env.DB),
   customerDependencies: CustomerAuthDependencies = {},
   billingDependencies: BillingDependencies = {},
-  purchaseDependencies: InsightsPurchaseDependencies = {}
+  purchaseDependencies: InsightsPurchaseDependencies = {},
+  activationDependencies: InsightsActivationDependencies = {}
 ): Promise<Response> {
   const url = new URL(request.url);
 
@@ -241,6 +246,12 @@ export async function handleRequest(
       });
     }
     if (url.pathname.startsWith("/api/admin/")) return handleAdmin(request, url.pathname, env, repository);
+
+    const activationResponse = await handleInsightsActivationRequest(request, url, env, ctx, {
+      ...activationDependencies,
+      purchaseDependencies: activationDependencies.purchaseDependencies || purchaseDependencies
+    });
+    if (activationResponse) return activationResponse;
 
     const purchaseResponse = await handleInsightsPurchaseRequest(request, url, env, purchaseDependencies);
     if (purchaseResponse) return purchaseResponse;
