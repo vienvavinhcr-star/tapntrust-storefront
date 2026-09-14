@@ -60,6 +60,8 @@ const state = {
   error: null
 };
 
+let catalogPromise = null;
+
 function storageGet(key) {
   try { return localStorage.getItem(key); } catch { return null; }
 }
@@ -244,7 +246,7 @@ function normaliseProduct(product, fallbackImage) {
   };
 }
 
-async function loadCatalog() {
+async function fetchCatalog() {
   const [main, stand, extra] = await Promise.all([
     fetchProductByHandle(config.MAIN_PRODUCT_HANDLE),
     fetchProductByHandle(config.STAND_PRODUCT_HANDLE),
@@ -267,9 +269,28 @@ async function loadCatalog() {
   return catalog;
 }
 
+async function loadCatalog() {
+  if (!catalogPromise) {
+    catalogPromise = fetchCatalog().catch((error) => {
+      catalogPromise = null;
+      throw error;
+    });
+  }
+  return catalogPromise;
+}
+
 function saveShopifyCart(cart) {
   state.cart = normaliseShopifyCart(cart);
   storageSet(CART_ID_KEY, cart.id);
+}
+
+export function adoptShopifyCart(cart) {
+  if (state.mode !== "shopify") return getCartState();
+  if (!cart?.id) throw new ShopifyError("Shopify did not return an updated cart. Please try again.");
+  saveShopifyCart(cart);
+  state.error = null;
+  emit();
+  return getCartState();
 }
 
 function zeroQuantityLineIds(cart) {
@@ -633,6 +654,7 @@ export const cartActions = {
   initialise: initialiseCart,
   getState: getCartState,
   getMainVariant,
+  adoptShopifyCart,
   addMainPackage,
   addUpsell,
   changeLineQuantity,

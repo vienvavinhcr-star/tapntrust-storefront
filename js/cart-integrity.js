@@ -108,7 +108,10 @@ export function createIntegrityCartActions(baseCartActions) {
     return cleanupPromise;
   }
 
-  async function refreshShopifyCart() {
+  async function adoptCartSnapshot(cart) {
+    if (typeof baseCartActions.adoptShopifyCart === "function") {
+      return baseCartActions.adoptShopifyCart(cart);
+    }
     await baseCartActions.initialise();
     return baseCartActions.getState();
   }
@@ -122,12 +125,12 @@ export function createIntegrityCartActions(baseCartActions) {
     }
     if (!currentState.cart?.id) throw new ShopifyError("The Shopify cart is not ready for the free Counter Stand.");
 
-    await addCartLines(currentState.cart.id, [{
+    const updated = await addCartLines(currentState.cart.id, [{
       merchandiseId: standVariant.id,
       quantity: 1,
       attributes: Object.entries(bundleGiftStandAttributes(parentSetupId)).map(([key, value]) => ({ key, value: String(value) }))
     }]);
-    return refreshShopifyCart();
+    return adoptCartSnapshot(updated);
   }
 
   async function syncBundleGiftStands() {
