@@ -6,6 +6,22 @@ ALTER TABLE provisioning_batches
 CREATE INDEX provisioning_batches_customer_email_idx
   ON provisioning_batches (customer_email, created_at DESC);
 
+CREATE TABLE shopify_order_contacts (
+  external_order_reference TEXT NOT NULL,
+  external_setup_reference TEXT NOT NULL,
+  provider_order_reference TEXT NOT NULL,
+  customer_email TEXT NOT NULL COLLATE NOCASE,
+  observed_at TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY (external_order_reference, external_setup_reference)
+);
+
+CREATE INDEX shopify_order_contacts_email_idx
+  ON shopify_order_contacts (customer_email, updated_at DESC);
+CREATE INDEX shopify_order_contacts_setup_idx
+  ON shopify_order_contacts (external_setup_reference, updated_at DESC);
+
 CREATE TABLE insights_invite_deliveries (
   id TEXT PRIMARY KEY,
   email TEXT NOT NULL COLLATE NOCASE,
