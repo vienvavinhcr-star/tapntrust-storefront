@@ -4,6 +4,7 @@ import { handleAdminUsageRequest } from "./admin-usage";
 import { handleShopifyOrdersPaidWebhook, type BillingDependencies } from "./billing-service";
 import { handleCustomerRequest, type CustomerAuthDependencies } from "./customer-auth";
 import { queueCustomerUsageTracking } from "./customer-usage";
+import { handleAdminInsightsInviteRequest } from "./insights-invite";
 import {
   handleAdminSubscriptionLifecycleRequest,
   handleCustomerBillingRequest,
@@ -167,6 +168,9 @@ async function handleAdmin(
 
   const usageResponse = await handleAdminUsageRequest(request, new URL(request.url), env.DB);
   if (usageResponse) return usageResponse;
+
+  const inviteResponse = await handleAdminInsightsInviteRequest(request, pathname, env.DB);
+  if (inviteResponse) return inviteResponse;
 
   const lifecycleResponse = await handleAdminSubscriptionLifecycleRequest(request, pathname, env.DB);
   if (lifecycleResponse) return lifecycleResponse;
