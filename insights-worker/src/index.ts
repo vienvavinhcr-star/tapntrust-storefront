@@ -1,5 +1,6 @@
 import { ADMIN_PAGE } from "./admin-page";
 import { handleAdminProvisioningRequest } from "./admin-provisioning";
+import { handleAdminUsageRequest } from "./admin-usage";
 import { handleShopifyOrdersPaidWebhook, type BillingDependencies } from "./billing-service";
 import { handleCustomerRequest, type CustomerAuthDependencies } from "./customer-auth";
 import { queueCustomerUsageTracking } from "./customer-usage";
@@ -163,6 +164,9 @@ async function handleAdmin(
     if (request.method !== "GET") return methodNotAllowed("GET");
     return json(await repository.getSummary(monthStartUtc(new Date())));
   }
+
+  const usageResponse = await handleAdminUsageRequest(request, new URL(request.url), env.DB);
+  if (usageResponse) return usageResponse;
 
   const lifecycleResponse = await handleAdminSubscriptionLifecycleRequest(request, pathname, env.DB);
   if (lifecycleResponse) return lifecycleResponse;
