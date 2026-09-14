@@ -6,6 +6,7 @@ import { handleRequest } from "../src/index";
 const ORIGIN = "https://go.tapntrust.com";
 const ADMIN_TOKEN = "test-admin-token-that-is-not-a-production-secret";
 const REVIEW_URL = "https://search.google.com/local/writereview?placeid=contact-flow";
+const NO_INSIGHTS_LINES_PROVIDER = { getOrderBillingLines: async () => [] };
 
 async function clearDatabase(): Promise<void> {
   await env.DB.batch([
@@ -50,7 +51,14 @@ async function sign(body: string): Promise<string> {
 
 async function dispatch(request: Request) {
   const context = createExecutionContext();
-  const response = await handleRequest(request, env, context);
+  const response = await handleRequest(
+    request,
+    env,
+    context,
+    undefined,
+    {},
+    { shopifyAdminProvider: NO_INSIGHTS_LINES_PROVIDER }
+  );
   return { response, context };
 }
 
