@@ -253,7 +253,6 @@ export async function readShopifyOrdersPaidWebhook(
     || !isConfiguredShopifyId(configuration.insightsVariantId)
     || !isConfiguredShopifyId(configuration.introSellingPlanId)
     || !isConfiguredShopifyId(configuration.standardSellingPlanId)
-    || shopifyIdentifiersMatch(configuration.introSellingPlanId, configuration.standardSellingPlanId)
   ) {
     throw new ShopifyWebhookError("configuration_error", 503);
   }

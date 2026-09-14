@@ -152,7 +152,7 @@ export function initialiseInsightsOffer({ form, cartActions, toast } = {}) {
     if (payload.introEligible) {
       price.textContent = `${formatMinor(payload.firstMonthMinor)} for your first month`;
       status.textContent = `Then ${formatMinor(payload.recurringMinor)}/month. Renews monthly.`;
-      if (badge) badge.textContent = "Intro confirmed";
+      if (badge) badge.textContent = payload.discountCode ? "Intro ready" : "Intro eligible";
       root.dataset.offerState = "intro";
       renderMarketingPrice(
         `${formatMinor(payload.firstMonthMinor)} for your first month`,
