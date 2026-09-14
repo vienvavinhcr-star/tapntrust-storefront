@@ -68,7 +68,7 @@ export function orphanExtraIds(lines = []) {
       if (extraSetupId) {
         return !primaries.some((primary) => setupId(primary) === extraSetupId);
       }
-      return !setupId(extra) && !primaries.some((primary) => !setupId(primary) && sameBusinessSetup(primary, extra));
+      return !primaries.some((primary) => !setupId(primary) && sameBusinessSetup(primary, extra));
     })
     .map((line) => line.id)
     .filter(Boolean);
