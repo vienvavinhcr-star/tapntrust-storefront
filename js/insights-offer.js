@@ -47,7 +47,12 @@ async function requestOffer(action, details, setupId = "") {
 }
 
 async function insightsProduct() {
-  if (!productPromise) productPromise = fetchProductByHandle(config.INSIGHTS_PRODUCT_HANDLE);
+  if (!productPromise) {
+    productPromise = fetchProductByHandle(config.INSIGHTS_PRODUCT_HANDLE).catch((error) => {
+      productPromise = null;
+      throw error;
+    });
+  }
   return productPromise;
 }
 
@@ -174,12 +179,21 @@ export function initialiseInsightsOffer({ form, cartActions, toast } = {}) {
     }
   }
 
+  async function adoptCartSnapshot(cart) {
+    if (typeof cartActions.adoptShopifyCart === "function") {
+      return cartActions.adoptShopifyCart(cart);
+    }
+    await cartActions.initialise();
+    return cartActions.getState();
+  }
+
   async function previewEligibility(details = {}) {
     latestDetails = detailsUsable(details) ? details : null;
     if (!latestDetails) {
       renderQuote();
       return null;
     }
+    void insightsProduct().catch(() => {});
     const sequence = ++quoteSequence;
     status.textContent = "Checking first-month offer…";
     try {
@@ -262,14 +276,13 @@ export function initialiseInsightsOffer({ form, cartActions, toast } = {}) {
 
     const cartId = stateBefore.cart?.id;
     if (!cartId) throw new Error("Your Shopify cart is not ready. Please try again.");
-    await addCartLines(cartId, [{
+    const addedCart = await addCartLines(cartId, [{
       merchandiseId: variant.id,
       quantity: 1,
       sellingPlanId: plan.id,
       attributes
     }]);
-    await cartActions.initialise();
-    let current = cartActions.getState();
+    let current = await adoptCartSnapshot(addedCart);
     const added = insightsForSetup(current, setupId);
     if (!added) throw new Error("TapnTrust Insights was not returned by Shopify after it was added.");
 
@@ -286,13 +299,19 @@ export function initialiseInsightsOffer({ form, cartActions, toast } = {}) {
         .map((entry) => String(entry.code).toLowerCase());
       const applicable = applicableCodes.includes(offerCode.toLowerCase());
       const lostExistingCode = previousCodes.find((code) => !applicableCodes.includes(String(code).toLowerCase()));
-      await cartActions.initialise();
-      current = cartActions.getState();
+      current = await adoptCartSnapshot(updated);
       if (!applicable || lostExistingCode) {
         const rollback = insightsForSetup(current, setupId);
         if (rollback?.id) await cartActions.removeLine(rollback.id);
-        if (current.cart?.id) await updateCartDiscountCodes(current.cart.id, previousCodes).catch(() => {});
-        await cartActions.initialise().catch(() => {});
+        current = cartActions.getState();
+        if (current.cart?.id) {
+          try {
+            const restored = await updateCartDiscountCodes(current.cart.id, previousCodes);
+            current = await adoptCartSnapshot(restored);
+          } catch {
+            // Preserve the primary cart rollback even if restoring a previous code fails.
+          }
+        }
         if (lostExistingCode) {
           throw new Error("The A$1.99 Insights offer cannot be combined with the discount already in your cart. Your existing discount was kept and Insights was not added.");
         }
