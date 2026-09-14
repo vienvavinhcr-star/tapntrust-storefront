@@ -47,7 +47,12 @@ async function requestOffer(action, details, setupId = "") {
 }
 
 async function insightsProduct() {
-  if (!productPromise) productPromise = fetchProductByHandle(config.INSIGHTS_PRODUCT_HANDLE);
+  if (!productPromise) {
+    productPromise = fetchProductByHandle(config.INSIGHTS_PRODUCT_HANDLE).catch((error) => {
+      productPromise = null;
+      throw error;
+    });
+  }
   return productPromise;
 }
 
@@ -174,12 +179,21 @@ export function initialiseInsightsOffer({ form, cartActions, toast } = {}) {
     }
   }
 
+  async function adoptCartSnapshot(cart) {
+    if (typeof cartActions.adoptShopifyCart === "function") {
+      return cartActions.adoptShopifyCart(cart);
+    }
+    await cartActions.initialise();
+    return cartActions.getState();
+  }
+
   async function previewEligibility(details = {}) {
     latestDetails = detailsUsable(details) ? details : null;
     if (!latestDetails) {
       renderQuote();
       return null;
     }
+    void insightsProduct().catch(() => {});
     const sequence = ++quoteSequence;
     status.textContent = "Checking first-month offer…";
     try {
@@ -225,9 +239,12 @@ export function initialiseInsightsOffer({ form, cartActions, toast } = {}) {
       throw new Error("TapnTrust Insights can currently be added to one business location per checkout. Complete this order first, then subscribe another location separately.");
     }
     const setupId = globalThis.crypto?.randomUUID?.() || `setup-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-    const offer = await requestOffer("issue", details, setupId);
-    renderQuote(offer);
-    return { enabled: true, setupId, offer };
+    const offerPromise = requestOffer("issue", details, setupId).then((offer) => {
+      renderQuote(offer);
+      return offer;
+    });
+    void offerPromise.catch(() => {});
+    return { enabled: true, setupId, offerPromise };
   }
 
   async function attach(primaryLine, prepared) {
@@ -238,42 +255,45 @@ export function initialiseInsightsOffer({ form, cartActions, toast } = {}) {
     }
     const stateBefore = cartActions.getState();
     if (insightsForSetup(stateBefore, setupId)) return stateBefore;
-    const product = await insightsProduct();
+    const [offer, product] = await Promise.all([
+      prepared.offer ? Promise.resolve(prepared.offer) : prepared.offerPromise,
+      insightsProduct()
+    ]);
+    if (!offer) throw new Error("TapnTrust Insights could not prepare this offer. Please try again.");
     const variant = product?.variants?.nodes?.[0];
     const plan = monthlyPlan(product);
     if (!variant?.id || !variant.availableForSale || !plan?.id) {
       throw new Error("TapnTrust Insights is temporarily unavailable in Shopify.");
     }
-    if (prepared.offer.variantId && prepared.offer.variantId !== variant.id) {
+    if (offer.variantId && offer.variantId !== variant.id) {
       throw new Error("TapnTrust Insights product configuration does not match. Please contact support.");
     }
-    if (prepared.offer.sellingPlanId && prepared.offer.sellingPlanId !== plan.id) {
+    if (offer.sellingPlanId && offer.sellingPlanId !== plan.id) {
       throw new Error("TapnTrust Insights subscription configuration does not match. Please contact support.");
     }
 
-    const offerCode = String(prepared.offer.discountCode || "").trim();
+    const offerCode = String(offer.discountCode || "").trim();
     const attributes = [
       { key: FULFILMENT_KEYS.setupId, value: setupId },
       { key: FULFILMENT_KEYS.itemRole, value: ITEM_ROLES.insights },
-      { key: OFFER_KIND_KEY, value: String(prepared.offer.offerKind || "standard") },
-      ...(prepared.offer.offerId ? [{ key: OFFER_ID_KEY, value: String(prepared.offer.offerId) }] : []),
+      { key: OFFER_KIND_KEY, value: String(offer.offerKind || "standard") },
+      ...(offer.offerId ? [{ key: OFFER_ID_KEY, value: String(offer.offerId) }] : []),
       ...(offerCode ? [{ key: OFFER_CODE_KEY, value: offerCode }] : [])
     ];
 
     const cartId = stateBefore.cart?.id;
     if (!cartId) throw new Error("Your Shopify cart is not ready. Please try again.");
-    await addCartLines(cartId, [{
+    const addedCart = await addCartLines(cartId, [{
       merchandiseId: variant.id,
       quantity: 1,
       sellingPlanId: plan.id,
       attributes
     }]);
-    await cartActions.initialise();
-    let current = cartActions.getState();
+    let current = await adoptCartSnapshot(addedCart);
     const added = insightsForSetup(current, setupId);
     if (!added) throw new Error("TapnTrust Insights was not returned by Shopify after it was added.");
 
-    if (prepared.offer.offerKind === "intro") {
+    if (offer.offerKind === "intro") {
       if (!offerCode) {
         await cartActions.removeLine(added.id);
         throw new Error("The A$1.99 first-month offer could not be attached. Please try again.");
@@ -286,13 +306,19 @@ export function initialiseInsightsOffer({ form, cartActions, toast } = {}) {
         .map((entry) => String(entry.code).toLowerCase());
       const applicable = applicableCodes.includes(offerCode.toLowerCase());
       const lostExistingCode = previousCodes.find((code) => !applicableCodes.includes(String(code).toLowerCase()));
-      await cartActions.initialise();
-      current = cartActions.getState();
+      current = await adoptCartSnapshot(updated);
       if (!applicable || lostExistingCode) {
         const rollback = insightsForSetup(current, setupId);
         if (rollback?.id) await cartActions.removeLine(rollback.id);
-        if (current.cart?.id) await updateCartDiscountCodes(current.cart.id, previousCodes).catch(() => {});
-        await cartActions.initialise().catch(() => {});
+        current = cartActions.getState();
+        if (current.cart?.id) {
+          try {
+            const restored = await updateCartDiscountCodes(current.cart.id, previousCodes);
+            current = await adoptCartSnapshot(restored);
+          } catch {
+            // Preserve the primary cart rollback even if restoring a previous code fails.
+          }
+        }
         if (lostExistingCode) {
           throw new Error("The A$1.99 Insights offer cannot be combined with the discount already in your cart. Your existing discount was kept and Insights was not added.");
         }
