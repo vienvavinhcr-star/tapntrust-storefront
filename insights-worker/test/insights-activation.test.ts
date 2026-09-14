@@ -76,6 +76,7 @@ async function clearDatabase(): Promise<void> {
     env.DB.prepare("DELETE FROM provisioning_batch_cards"),
     env.DB.prepare("DELETE FROM provisioning_batches"),
     env.DB.prepare("DELETE FROM insights_entitlements"),
+    env.DB.prepare("DELETE FROM insights_intro_offers"),
     env.DB.prepare("DELETE FROM tap_events"),
     env.DB.prepare("DELETE FROM cards"),
     env.DB.prepare("DELETE FROM locations"),
