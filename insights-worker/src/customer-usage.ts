@@ -2,9 +2,7 @@ import { hashToken, readSessionToken } from "./auth";
 
 export type CustomerUsageEventType = "dashboard_open" | "google_summary" | "google_reviews";
 
-interface UsageEnv extends Env {
-  GOOGLE_PLACES_API_KEY?: string;
-}
+type UsageEnv = Env;
 
 interface UsageActorRow {
   user_id: string;
