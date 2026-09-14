@@ -13,7 +13,7 @@ import {
   trackMetaEvent
 } from "./analytics/meta.js";
 import { setText, toast } from "./ui/common.js";
-import { createCartUi } from "./ui/cart-drawer.js?v=20260915-1";
+import { createCartUi } from "./ui/cart-drawer.js?v=20260915-2";
 import { createGuideUi } from "./ui/guide.js";
 import {
   initialiseBrandAssets,

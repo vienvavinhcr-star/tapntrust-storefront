@@ -158,7 +158,7 @@ export function createCartUi({ cartActions, formatMoney, updatePackagesFromCatal
         noteText.textContent = "Keeps your Tapntrust card upright, stable and easy to notice on the counter.";
       } else if (line.kind === "insights") {
         noteTitle.textContent = "TapnTrust Insights";
-        noteText.textContent = "The first-month intro discount is shown in the cart total when eligible. Renewal is A$6.99/month.";
+        noteText.textContent = "Renews at A$6.99/month. Cancel anytime. After purchase, we'll email you a secure sign-in link to your private Insights dashboard, where you can view activity and manage your Insights setup.";
       } else {
         noteTitle.textContent = "Extra card for your selected location";
         noteText.textContent = "Programmed with the same business and Google review link as your card package.";
