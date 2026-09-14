@@ -81,7 +81,7 @@ async function mintToken(
       `https://${shopDomain}/admin/oauth/access_token`,
       {
         method: "POST",
-        redirect: "error",
+        redirect: "manual",
         signal: controller.signal,
         headers: {
           Accept: "application/json",
