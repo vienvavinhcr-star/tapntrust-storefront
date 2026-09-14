@@ -22,6 +22,27 @@ CREATE INDEX shopify_order_contacts_email_idx
 CREATE INDEX shopify_order_contacts_setup_idx
   ON shopify_order_contacts (external_setup_reference, updated_at DESC);
 
+CREATE TRIGGER provisioning_batches_apply_shopify_contact_after_insert
+AFTER INSERT ON provisioning_batches
+WHEN NEW.customer_email IS NULL
+BEGIN
+  UPDATE provisioning_batches
+  SET customer_email = (
+    SELECT customer_email
+    FROM shopify_order_contacts
+    WHERE external_order_reference = NEW.external_order_reference
+      AND external_setup_reference = NEW.external_setup_reference
+    LIMIT 1
+  )
+  WHERE id = NEW.id
+    AND EXISTS (
+      SELECT 1
+      FROM shopify_order_contacts
+      WHERE external_order_reference = NEW.external_order_reference
+        AND external_setup_reference = NEW.external_setup_reference
+    );
+END;
+
 CREATE TABLE insights_invite_deliveries (
   id TEXT PRIMARY KEY,
   email TEXT NOT NULL COLLATE NOCASE,
