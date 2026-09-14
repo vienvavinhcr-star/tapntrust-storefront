@@ -1,3 +1,8 @@
+import { trapFocus } from "./common.js";
+
+const INSIGHTS_PROMO_DELAY_MS = 9000;
+const INSIGHTS_PROMO_SESSION_KEY = "tapntrust.insightsPromoSeen.v1";
+
 function animateOpportunityCount(element, reducedMotion) {
   if (!element || element.dataset.counted === "true") return;
   const finalTarget = Number(element.dataset.countTo || 139);
@@ -72,6 +77,120 @@ function emphasiseOffer() {
   }, 420);
 }
 
+function buildInsightsPromo() {
+  const root = document.createElement("div");
+  root.className = "insights-promo";
+  root.dataset.insightsPromo = "";
+  root.hidden = true;
+  root.innerHTML = `
+    <div class="insights-promo__backdrop" data-insights-promo-close></div>
+    <section class="insights-promo__dialog" role="dialog" aria-modal="true" aria-labelledby="insights-promo-title" tabindex="-1" data-insights-promo-dialog>
+      <button class="insights-promo__close" type="button" aria-label="Close Tapntrust Insights offer" data-insights-promo-close>×</button>
+      <div class="insights-promo__visual" aria-hidden="true">
+        <p class="insights-promo__brand insights-promo__brand--mobile"><span class="insights-promo__brand-mark"><i></i><i></i><i></i></span>Tapntrust Insights</p>
+        <div class="insights-promo__mascot"><img src="insights-worker/assets/tapntrust-insights-mascot-transparent.png" alt="" width="483" height="649" loading="eager" decoding="async"></div>
+      </div>
+      <div class="insights-promo__content">
+        <p class="insights-promo__brand insights-promo__brand--desktop"><span class="insights-promo__brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>Tapntrust Insights</p>
+        <h2 id="insights-promo-title">Try Tapntrust <span>Insights</span></h2>
+        <div class="insights-promo__price"><small><span class="insights-promo__desktop-only">First month offer</span><span class="insights-promo__mobile-only">Only</span></small><strong>A$1.99</strong><span>for your first month</span></div>
+        <p class="insights-promo__copy"><span class="insights-promo__desktop-only">See which cards perform best, when customers engage, and where your review opportunities come from.</span><span class="insights-promo__mobile-only">Track taps, top locations, and smart insights.</span></p>
+        <button class="insights-promo__cta" type="button" data-insights-promo-cta><span class="insights-promo__desktop-only">See the A$1.99 offer</span><span class="insights-promo__mobile-only">Try it now</span> <span aria-hidden="true">→</span></button>
+        <p class="insights-promo__fineprint">Then A$6.99/month · <strong>Cancel anytime</strong></p>
+      </div>
+    </section>`;
+  document.body.append(root);
+  return root;
+}
+
+function initialiseInsightsPromo() {
+  if (document.querySelector("[data-insights-promo]")) return;
+  const root = buildInsightsPromo();
+  const dialog = root.querySelector("[data-insights-promo-dialog]");
+  const offer = document.querySelector("[data-insights-offer]");
+  const toggle = offer?.querySelector("[data-insights-toggle]");
+  let timer = 0;
+  let lastFocused = null;
+  let seenThisPage = false;
+
+  const wasSeen = () => {
+    if (seenThisPage) return true;
+    try { return sessionStorage.getItem(INSIGHTS_PROMO_SESSION_KEY) === "1"; }
+    catch { return false; }
+  };
+  const markSeen = () => {
+    seenThisPage = true;
+    try { sessionStorage.setItem(INSIGHTS_PROMO_SESSION_KEY, "1"); }
+    catch { /* session storage can be unavailable in private browsing */ }
+  };
+  const syncBodyLock = () => {
+    const anyOpen = document.querySelector(".cart-drawer.is-open, .guide-modal.is-open, .welcome-offer.is-open, .insights-promo.is-open");
+    document.body.classList.toggle("is-locked", Boolean(anyOpen));
+  };
+  const close = ({ restoreFocus = true } = {}) => {
+    if (root.hidden) return;
+    root.classList.remove("is-open");
+    window.setTimeout(() => {
+      root.hidden = true;
+      syncBodyLock();
+      if (restoreFocus) lastFocused?.focus?.();
+    }, 340);
+  };
+  const open = () => {
+    if (wasSeen() || toggle?.checked) {
+      markSeen();
+      return;
+    }
+    const anotherOverlayOpen = document.body.classList.contains("is-locked")
+      || document.querySelector(".cart-drawer.is-open, .guide-modal.is-open, .welcome-offer.is-open");
+    if (anotherOverlayOpen) {
+      timer = window.setTimeout(open, 2500);
+      return;
+    }
+    markSeen();
+    lastFocused = document.activeElement;
+    root.hidden = false;
+    requestAnimationFrame(() => {
+      root.classList.add("is-open");
+      syncBodyLock();
+      dialog?.focus();
+    });
+  };
+
+  root.querySelectorAll("[data-insights-promo-close]").forEach((element) => {
+    element.addEventListener("click", () => close());
+  });
+  root.querySelector("[data-insights-promo-cta]")?.addEventListener("click", () => {
+    close({ restoreFocus: false });
+    window.setTimeout(() => {
+      offer?.scrollIntoView({ behavior: "smooth", block: "center" });
+      emphasiseOffer();
+      toggle?.focus({ preventScroll: true });
+    }, 380);
+  });
+  dialog?.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      close();
+      return;
+    }
+    trapFocus(event, dialog);
+  });
+  document.querySelectorAll("[data-insights-sales-cta]").forEach((element) => {
+    element.addEventListener("click", () => {
+      window.clearTimeout(timer);
+      markSeen();
+    });
+  });
+  toggle?.addEventListener("change", () => {
+    if (!toggle.checked) return;
+    window.clearTimeout(timer);
+    markSeen();
+  });
+
+  if (!wasSeen()) timer = window.setTimeout(open, INSIGHTS_PROMO_DELAY_MS);
+}
+
 function initialiseCarousel(root, reducedMotion) {
   const carousel = root.querySelector("[data-insights-carousel]");
   const viewport = carousel?.querySelector("[data-insights-carousel-viewport]");
@@ -132,6 +251,8 @@ export function initialiseInsightsExperience() {
 
   const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   const count = root.querySelector("[data-insights-count]");
+
+  initialiseInsightsPromo();
 
   document.querySelectorAll("[data-insights-sales-cta]").forEach((link) => {
     link.addEventListener("click", emphasiseOffer);
