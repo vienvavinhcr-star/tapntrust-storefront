@@ -376,8 +376,10 @@ describe("customer magic-link authentication", () => {
     expect(visibilityHandler).not.toContain("Google");
     expect(focusHandler).not.toContain("Google");
     const initialRender = page.match(/function renderDashboard\([\s\S]*?\}\n    function load\(/)?.[0] || "";
-    expect(initialRender).toContain("loadGoogleSummary");
+    expect(initialRender).not.toContain("loadGoogleSummary");
     expect(initialRender).not.toContain("loadReviews");
+    expect(page).toContain("refreshGoogleButton.addEventListener('click',()=>void loadGoogleSummary({force:true}))");
+    expect(page).toContain("toggleReviewsButton.addEventListener('click',()=>void loadReviews())");
 
     const embeddedScript = page.match(/<script>([\s\S]*?)<\/script>/)?.[1];
     expect(embeddedScript).toBeTruthy();

@@ -31,7 +31,7 @@ import {
 } from "./shopify-webhook";
 
 const INTRO_PRICE_MINOR = 199;
-const STANDARD_PRICE_MINOR = 999;
+const STANDARD_PRICE_MINOR = 699;
 
 export interface BillingWorkerEnv {
   DB: D1Database;

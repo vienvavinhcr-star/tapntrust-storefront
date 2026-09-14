@@ -88,30 +88,89 @@ export function initialiseInsightsOffer({ form, cartActions, toast } = {}) {
   const checkbox = selected(root, "[data-insights-toggle]");
   const price = selected(root, "[data-insights-price]");
   const status = selected(root, "[data-insights-status]");
+  const badge = selected(root, ".insights-offer__badge");
+  const mascotStage = selected(root, "[data-insights-offer-mascot]");
+  const mascotMessage = selected(root, "[data-insights-offer-mascot-message]");
+  const mascotAnnouncement = selected(root, "[data-insights-offer-announcement]");
   const manualName = selected(form, "[data-manual-business-name]");
   const manualUrl = selected(form, "[data-manual-review-url]");
   let quoteSequence = 0;
+  let mascotTimer = 0;
   let latestDetails = null;
   let editing = false;
+
+  function announceMascot(message) {
+    if (mascotMessage) mascotMessage.textContent = message;
+    if (mascotAnnouncement) mascotAnnouncement.textContent = message;
+  }
+
+  function showMascotGreeting(isSelected) {
+    if (!root || !mascotStage) return;
+    window.clearTimeout(mascotTimer);
+    root.classList.remove("is-mascot-leaving", "is-mascot-goodbye");
+    root.classList.add("is-mascot-visible");
+    mascotStage.setAttribute("aria-hidden", "false");
+
+    if (isSelected) {
+      announceMascot("Hi! I’ll help turn your card activity into useful next steps.");
+      return;
+    }
+
+    announceMascot("Bye for now — you can add me again anytime.");
+    root.classList.add("is-mascot-goodbye");
+    mascotTimer = window.setTimeout(() => {
+      root.classList.add("is-mascot-leaving");
+      mascotTimer = window.setTimeout(() => {
+        root.classList.remove("is-mascot-visible", "is-mascot-leaving", "is-mascot-goodbye");
+        mascotStage.setAttribute("aria-hidden", "true");
+      }, 650);
+    }, 650);
+  }
+
+  function renderMarketingPrice(priceText, statusText) {
+    document.querySelectorAll("[data-insights-marketing-price]").forEach((element) => {
+      element.textContent = priceText;
+    });
+    document.querySelectorAll("[data-insights-marketing-status]").forEach((element) => {
+      element.textContent = statusText;
+    });
+  }
 
   function renderQuote(payload = null) {
     if (!root || !price || !status) return;
     if (!payload) {
-      price.textContent = "A$1.99 first month for eligible businesses · then A$9.99/month";
-      status.textContent = "Select your business to confirm your first-month price.";
+      price.textContent = "A$1.99 for your first month";
+      status.textContent = "Then just A$6.99/month.";
+      if (badge) badge.textContent = "First month offer";
       root.dataset.offerState = "unknown";
+      renderMarketingPrice(
+        "A$1.99 for your first month",
+        "Then just A$6.99/month · Renews monthly."
+      );
       return;
     }
     if (payload.introEligible) {
-      price.textContent = `${formatMinor(payload.firstMonthMinor)} first month · then ${formatMinor(payload.recurringMinor)}/month`;
-      status.textContent = "Your selected business qualifies for the first-month intro offer.";
+      price.textContent = `${formatMinor(payload.firstMonthMinor)} for your first month`;
+      status.textContent = `Then ${formatMinor(payload.recurringMinor)}/month. Renews monthly.`;
+      if (badge) badge.textContent = "Intro confirmed";
       root.dataset.offerState = "intro";
+      renderMarketingPrice(
+        `${formatMinor(payload.firstMonthMinor)} for your first month`,
+        `Then just ${formatMinor(payload.recurringMinor)}/month · Renews monthly.`
+      );
     } else {
       price.textContent = `${formatMinor(payload.recurringMinor)}/month`;
       status.textContent = payload.reason === "intro_already_used"
         ? "This business has already used the first-month intro offer."
         : "Standard monthly pricing applies to this business.";
+      if (badge) badge.textContent = "Standard plan";
       root.dataset.offerState = "standard";
+      renderMarketingPrice(
+        `${formatMinor(payload.recurringMinor)}/month`,
+        payload.reason === "intro_already_used"
+          ? "The first-month offer has already been used · Renews monthly."
+          : "Standard monthly pricing for this business · Renews monthly."
+      );
     }
   }
 
@@ -155,6 +214,7 @@ export function initialiseInsightsOffer({ form, cartActions, toast } = {}) {
 
   checkbox?.addEventListener("change", () => {
     root?.classList.toggle("is-selected", Boolean(checkbox.checked));
+    showMascotGreeting(Boolean(checkbox.checked));
     if (checkbox.checked && latestDetails) void previewEligibility(latestDetails);
   });
 

@@ -28,6 +28,7 @@ import {
 } from "./ui/site.js";
 import { initialiseConsultationForm } from "./forms/consultation.js";
 import { initialiseInsightsOffer } from "./insights-offer.js";
+import { initialiseInsightsExperience } from "./ui/insights-experience.js";
 
 const cartActions = createIntegrityCartActions(baseCartActions);
 const money = new Intl.NumberFormat("en-AU", { style: "currency", currency: "AUD" });
@@ -319,6 +320,7 @@ initialiseConsultationForm({ config, toast });
 initialiseStepDemo();
 initialisePlacementCarousel();
 initialiseScrollReveal();
+initialiseInsightsExperience();
 updatePackageSelection(selectedPackage);
 
 const initialState = cartActions.getState();

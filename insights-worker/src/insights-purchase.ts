@@ -6,9 +6,9 @@ import {
 } from "./places-provider";
 import { getShopifyAdminAccessToken } from "./shopify-admin-token";
 
-const INTRO_DISCOUNT_AMOUNT = "8.00";
+const INTRO_DISCOUNT_AMOUNT = "5.00";
 const INTRO_FIRST_MONTH_MINOR = 199;
-const STANDARD_MONTH_MINOR = 999;
+const STANDARD_MONTH_MINOR = 699;
 const OFFER_TTL_MS = 24 * 60 * 60 * 1000;
 const MAX_BODY_BYTES = 4096;
 

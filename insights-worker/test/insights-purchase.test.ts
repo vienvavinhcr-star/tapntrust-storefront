@@ -141,7 +141,7 @@ async function seedRedeemedBusiness(placeId: string) {
         first_provider_order_reference, most_recent_provider_order_reference, plan_code, status,
         currency, expected_intro_price_minor, expected_recurring_price_minor, started_at,
         last_paid_at, current_period_started_at, created_at, updated_at
-      ) VALUES (?, ?, ?, 'shopify', ?, ?, ?, ?, 'intro', 'active', 'AUD', 199, 999, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, 'shopify', ?, ?, ?, ?, 'intro', 'active', 'AUD', 199, 699, ?, ?, ?, ?, ?)
     `).bind(subscriptionId, data.manifest.businessId, data.manifest.locationId, "redeemed@example.invalid", setupReference, orderReference, orderReference, now, now, now, now, now),
     env.DB.prepare(`
       INSERT INTO insights_billing_events (
@@ -196,7 +196,7 @@ describe("Phase 4C storefront Insights offer", () => {
     const payload = await response.json<Record<string, unknown>>();
     expect(payload.offerKind).toBe("intro");
     expect(payload.firstMonthMinor).toBe(199);
-    expect(payload.recurringMinor).toBe(999);
+    expect(payload.recurringMinor).toBe(699);
     expect(placesProvider.summaryCalls).toEqual(["ChIJ-new-business"]);
     expect(discountProvider.calls).toHaveLength(0);
   });
@@ -229,7 +229,7 @@ describe("Phase 4C storefront Insights offer", () => {
     expect(discountProvider.calls).toHaveLength(0);
   });
 
-  it("creates one subscription-only A$8 discount for one billing cycle and reuses it", async () => {
+  it("creates one subscription-only A$5 discount for one billing cycle and reuses it", async () => {
     const body = {
       action: "issue",
       setupId: unique("setup"),
@@ -266,12 +266,12 @@ describe("Phase 4C storefront Insights offer", () => {
     const payload = await response.json<Record<string, unknown>>();
     expect(payload.offerKind).toBe("standard");
     expect(payload.introEligible).toBe(false);
-    expect(payload.firstMonthMinor).toBe(999);
+    expect(payload.firstMonthMinor).toBe(699);
     expect(payload.reason).toBe("intro_already_used");
     expect(discountProvider.calls).toHaveLength(0);
   });
 
-  it("quotes a manual business at standard A$9.99 without Google verification", async () => {
+  it("quotes a manual business at standard A$6.99 without Google verification", async () => {
     const response = await requestOffer({
       action: "quote",
       businessName: "Manual Business",
@@ -282,8 +282,8 @@ describe("Phase 4C storefront Insights offer", () => {
     expect(payload.offerKind).toBe("standard");
     expect(payload.introEligible).toBe(false);
     expect(payload.reason).toBe("manual_unverified");
-    expect(payload.firstMonthMinor).toBe(999);
-    expect(payload.recurringMinor).toBe(999);
+    expect(payload.firstMonthMinor).toBe(699);
+    expect(payload.recurringMinor).toBe(699);
     expect(placesProvider.summaryCalls).toHaveLength(0);
     expect(discountProvider.calls).toHaveLength(0);
   });
@@ -299,7 +299,7 @@ describe("Phase 4C storefront Insights offer", () => {
     const payload = await response.json<Record<string, unknown>>();
     expect(payload.offerKind).toBe("standard");
     expect(payload.reason).toBe("manual_unverified");
-    expect(payload.firstMonthMinor).toBe(999);
+    expect(payload.firstMonthMinor).toBe(699);
     expect(discountProvider.calls).toHaveLength(0);
     const row = await env.DB.prepare("SELECT id FROM insights_intro_offers LIMIT 1").first<{ id: string }>();
     expect(row).toBeNull();

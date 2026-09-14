@@ -402,7 +402,7 @@ export async function upsertInsightsSubscription(
       ?7,
       ?8, ?8,
       ?9, ?10, ?11,
-      199, 999,
+      199, 699,
       ?12, ?12, NULL,
       ?12, NULL,
       ?13, ?14, ?14
