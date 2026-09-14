@@ -2,6 +2,7 @@ import { ADMIN_PAGE } from "./admin-page";
 import { handleAdminProvisioningRequest } from "./admin-provisioning";
 import { handleShopifyOrdersPaidWebhook, type BillingDependencies } from "./billing-service";
 import { handleCustomerRequest, type CustomerAuthDependencies } from "./customer-auth";
+import { queueCustomerUsageTracking } from "./customer-usage";
 import {
   handleAdminSubscriptionLifecycleRequest,
   handleCustomerBillingRequest,
@@ -232,7 +233,10 @@ export async function handleRequest(
     if (billingCustomerResponse) return billingCustomerResponse;
 
     const customerResponse = await handleCustomerRequest(request, url, env, ctx, customerDependencies);
-    if (customerResponse) return customerResponse;
+    if (customerResponse) {
+      queueCustomerUsageTracking(request, url, customerResponse, env, ctx);
+      return customerResponse;
+    }
 
     const tapMatch = url.pathname.match(/^\/t\/([^/]+)\/?$/);
     if (tapMatch) return handleTap(request, decodeURIComponent(tapMatch[1] || ""), repository, ctx);
