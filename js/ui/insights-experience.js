@@ -88,7 +88,7 @@ function buildInsightsPromo() {
       <button class="insights-promo__close" type="button" aria-label="Close Tapntrust Insights offer" data-insights-promo-close>×</button>
       <div class="insights-promo__visual" aria-hidden="true">
         <p class="insights-promo__brand insights-promo__brand--mobile"><span class="insights-promo__brand-mark"><i></i><i></i><i></i></span>Tapntrust Insights</p>
-        <div class="insights-promo__mascot"><img src="insights-worker/assets/tapntrust-insights-mascot-transparent.png" alt="" width="483" height="649" loading="eager" decoding="async"></div>
+        <div class="insights-promo__mascot"><img src="assets/marketing/tapntrust-insights-popup-mascot.png" alt="" width="1222" height="1287" loading="eager" decoding="async"></div>
       </div>
       <div class="insights-promo__content">
         <p class="insights-promo__brand insights-promo__brand--desktop"><span class="insights-promo__brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>Tapntrust Insights</p>

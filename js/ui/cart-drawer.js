@@ -3,6 +3,8 @@ import { trackMetaEvent, upsellMetaParameters } from "../analytics/meta.js";
 import { FULFILMENT_KEYS } from "../fulfilment.js";
 import { trackClarityUpsellAdded } from "../clarity-events.js";
 
+const INSIGHTS_PRODUCT_ARTWORK = "assets/products/tapntrust-insights.png";
+
 export function createCartUi({ cartActions, formatMoney, updatePackagesFromCatalog, onEditBusiness }) {
   let lastFocusedElement = null;
 
@@ -89,8 +91,12 @@ export function createCartUi({ cartActions, formatMoney, updatePackagesFromCatal
     const imageWrap = document.createElement("div");
     imageWrap.className = "cart-line__image";
     const image = document.createElement("img");
-    image.src = line.image || "assets/products/tapntrust-nfc-card-transparent.webp";
-    image.alt = line.imageAlt || "Tapntrust product";
+    image.src = line.kind === "insights"
+      ? INSIGHTS_PRODUCT_ARTWORK
+      : line.image || "assets/products/tapntrust-nfc-card-transparent.webp";
+    image.alt = line.kind === "insights"
+      ? "Tapntrust Insights"
+      : line.imageAlt || "Tapntrust product";
     image.loading = "lazy";
     imageWrap.append(image);
 

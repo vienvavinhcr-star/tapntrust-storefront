@@ -13,7 +13,7 @@ import {
   trackMetaEvent
 } from "./analytics/meta.js";
 import { setText, toast } from "./ui/common.js";
-import { createCartUi } from "./ui/cart-drawer.js";
+import { createCartUi } from "./ui/cart-drawer.js?v=20260915-1";
 import { createGuideUi } from "./ui/guide.js";
 import {
   initialiseBrandAssets,
@@ -28,7 +28,7 @@ import {
 } from "./ui/site.js";
 import { initialiseConsultationForm } from "./forms/consultation.js";
 import { initialiseInsightsOffer } from "./insights-offer.js";
-import { initialiseInsightsExperience } from "./ui/insights-experience.js?v=20260914-3";
+import { initialiseInsightsExperience } from "./ui/insights-experience.js?v=20260915-1";
 
 const cartActions = createIntegrityCartActions(baseCartActions);
 const money = new Intl.NumberFormat("en-AU", { style: "currency", currency: "AUD" });
