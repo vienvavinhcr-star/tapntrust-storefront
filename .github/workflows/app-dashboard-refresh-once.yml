@@ -2,8 +2,10 @@ name: Tapntrust Insight app refresh
 
 on:
   push:
-    branches: [feature/app-dashboard-refresh]
-    paths: [.github/workflows/app-dashboard-refresh-once.yml]
+    branches:
+      - feature/app-dashboard-refresh
+    paths:
+      - .github/workflows/app-dashboard-refresh-once.yml
 
 permissions:
   contents: write
@@ -26,77 +28,7 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - name: Refresh customer dashboard UI
-        shell: bash
-        run: |
-          python3 <<'PY'
-          from pathlib import Path
-
-          path = Path('insights-worker/src/customer-page.ts')
-          text = path.read_text()
-
-          # Customer-facing product naming only in this page.
-          text = text.replace('Tapntrust Insights', 'Tapntrust Insight')
-          text = text.replace('Turn every tap into a clearer next move.', 'See what customers do. Know what to improve next.')
-          text = text.replace('<h2>Manage your subscription</h2>', '<h2>Tapntrust Insight</h2>')
-
-          roadmap = '''
-      <section class="panel roadmap-panel" aria-labelledby="roadmap-title">
-        <div class="roadmap-copy">
-          <div class="roadmap-kicker"><span aria-hidden="true">✦</span> What’s coming next</div>
-          <h2 id="roadmap-title">New improvements, every 2–4 weeks</h2>
-          <p class="roadmap-lead">Tapntrust Insight is built to keep getting better.</p>
-          <p>We’re continually developing new features designed to help you understand customer activity, improve your review strategy and make better decisions for your business.</p>
-          <div class="roadmap-highlight"><span class="roadmap-bolt" aria-hidden="true">↗</span><strong>Every 2–4 weeks, we aim to release meaningful improvements or new features directly into your Tapntrust Insight dashboard — automatically.</strong></div>
-          <p>There’s nothing extra for you to install or set up. When something new is ready, it will simply become part of your dashboard.</p>
-          <p class="roadmap-stay"><strong>Stay with us as Tapntrust Insight grows.</strong> We’re building the next features around one goal: making Insight more useful for your business over time.</p>
-          <div class="roadmap-features" aria-label="Future improvement areas">
-            <span><b aria-hidden="true">▥</b> New dashboard tools</span>
-            <span><b aria-hidden="true">◇</b> Smarter insights</span>
-            <span><b aria-hidden="true">⚙</b> Useful updates</span>
-          </div>
-          <div class="roadmap-contact">
-            <div class="roadmap-contact-icon" aria-hidden="true">✉</div>
-            <div><strong>Have a question or feature suggestion?</strong><p>Email us anytime at <a href="mailto:contact@tapntrust.com">contact@tapntrust.com</a><br><span>We aim to personally respond within 30 minutes to 6 hours after receiving your email.</span></p></div>
-          </div>
-        </div>
-        <aside class="roadmap-art" aria-label="Tapntrust Insight is continuously improving">
-          <div class="roadmap-orbit orbit-one"></div><div class="roadmap-orbit orbit-two"></div>
-          <div class="roadmap-mascot"><div class="mascot-crop mascot-positive"><img src="/tapntrust-insights-mascot.png" width="483" height="649" alt="Tapntrust Insight mascot"></div></div>
-          <div class="roadmap-art-card"><span class="roadmap-art-icon">▥</span><div><strong>A better Tapntrust Insight ahead</strong><small>More useful with every release</small></div></div>
-        </aside>
-      </section>
-'''
-          billing_marker = '      <details class="account-billing-panel" id="account-billing-panel">'
-          if 'id="roadmap-title"' not in text:
-              if billing_marker not in text:
-                  raise SystemExit('Billing marker not found')
-              text = text.replace(billing_marker, roadmap + billing_marker, 1)
-
-          # Give paid customers a permanent human support route in Billing without inventing a provider portal.
-          billing_actions = '''          <div class="account-billing-actions">
-            <button class="button ghost" id="request-cancellation" type="button">Request cancellation</button>
-          </div>'''
-          billing_actions_new = '''          <div class="account-billing-actions">
-            <a class="button ghost billing-support-button" href="mailto:support@tapntrust.com">Email support</a>
-            <button class="button ghost cancellation-button" id="request-cancellation" type="button">Request cancellation</button>
-          </div>'''
-          text = text.replace(billing_actions, billing_actions_new, 1)
-
-          css = r'''
-    /* 2026 customer dashboard visual refresh. Functional IDs and API behaviour remain unchanged. */
-    :root{--surface:#fff;--surface-soft:#f8fbff;--surface-blue:#eef6ff;--line-strong:#c9d9ee;--shadow-soft:0 12px 34px rgba(17,54,105,.075);--shadow-card:0 18px 46px rgba(17,54,105,.09)}
-    html{scroll-behavior:smooth}body{overflow-x:hidden;background:radial-gradient(circle at 86% 0,rgba(94,164,255,.20),transparent 34rem),linear-gradient(180deg,#f7faff 0,#eef4fb 52%,#f5f8fc 100%);letter-spacing:-.006em}.shell{width:min(1240px,calc(100% - 36px));margin:18px auto 72px}.top{position:sticky;top:10px;z-index:20;padding:14px 16px 14px 19px;margin-bottom:18px;border:1px solid rgba(205,221,242,.92);border-radius:18px;background:rgba(255,255,255,.91);box-shadow:0 12px 32px rgba(7,27,69,.07);backdrop-filter:blur(16px)}.top>div:first-child{display:flex;align-items:center;gap:14px}.top>div:first-child:before{content:'T';display:grid;place-items:center;width:38px;height:38px;border-radius:12px;background:linear-gradient(145deg,#1769ed,#6cb4ff);color:#fff;font-weight:950;box-shadow:0 9px 22px rgba(23,105,237,.22)}.brand{font-size:1.25rem}.brand span{color:var(--blue)}.top>div:first-child>.muted{font-size:.78rem}.button,.input,.select,.period{transition:transform .16s ease,box-shadow .16s ease,border-color .16s ease,background .16s ease}.button:hover{transform:translateY(-1px);box-shadow:0 8px 20px rgba(23,105,237,.14)}.input:focus,.select:focus{outline:3px solid rgba(23,105,237,.14);border-color:#7faef2}.panel{border-color:#d6e3f3;border-radius:22px;background:rgba(255,255,255,.97);box-shadow:var(--shadow-soft);padding:28px;margin-bottom:16px}.dashboard-tools{position:relative;display:grid;grid-template-columns:minmax(250px,1fr) auto;gap:12px;padding:0;margin-bottom:14px}.dashboard-tools .select{min-height:46px;border-color:#cfdef1;box-shadow:0 6px 20px rgba(7,27,69,.035)}.periods{padding:4px;border-color:#cfdef1;border-radius:13px;box-shadow:0 6px 20px rgba(7,27,69,.035)}.period{min-width:86px}.period.active{background:linear-gradient(135deg,#1769ed,#3d8cf7);box-shadow:0 7px 18px rgba(23,105,237,.25)}.welcome-strip{padding:14px 18px;border-color:#cfe0f6;border-radius:16px;background:linear-gradient(110deg,#fff 0,#f1f7ff 100%);box-shadow:0 8px 24px rgba(7,27,69,.04)}.since-badge{background:#e6f2ff;color:#125ac9}.hero{border:1px solid #cfe0f6!important;border-radius:24px;background:radial-gradient(circle at 84% 5%,rgba(105,174,255,.28),transparent 20rem),linear-gradient(135deg,#fff 0,#f2f7ff 58%,#e7f2ff 100%)!important;color:var(--ink)!important;box-shadow:var(--shadow-card)}.hero:before{width:420px;height:420px;border-color:rgba(23,105,237,.10);right:-150px;top:-250px}.hero:after{border-color:rgba(23,105,237,.08)!important;background:rgba(23,105,237,.025)}.hero .eyebrow{color:var(--blue)!important}.hero-period{color:#6280a9!important}.hero h1 .hero-count{color:#0d57cf;text-shadow:0 4px 24px rgba(23,105,237,.13)}.hero-copy{color:#526a8f!important}.hero-overview{border-left:1px solid #d8e5f4!important;background:rgba(217,232,250,.6)!important}.hero-fact{background:rgba(255,255,255,.75)!important}.hero-fact span{color:#5277a8!important}.hero-fact strong{color:var(--ink)}.hero-fact small{color:var(--muted)!important}.next-step{border-color:#cfe0f6;background:linear-gradient(118deg,#fff 0,#f7fbff 62%,#eaf4ff 100%);box-shadow:var(--shadow-soft)}.next-step-copy .eyebrow{display:inline-flex;padding:5px 9px;border-radius:999px;background:#e8f2ff}.recommendation-proof{background:#edf5ff}.onboarding,.card-setting,.story-card,.google-metric,.reviews-preview,.recent-item{border-color:#d8e4f3;background:linear-gradient(145deg,#fff,#f9fbfe)}.card-settings-section,.performance-panel,.card-section,.retention-panel,.google-panel{box-shadow:var(--shadow-soft)}.section-head{margin-bottom:20px}.panel-title{color:#0b2454}.story-card{box-shadow:0 8px 22px rgba(7,27,69,.035)}.performance-grid{border-top-color:#e0e9f5}.timing-card{border:1px solid #dce7f3;background:linear-gradient(145deg,#f9fbfe,#f1f7ff)}.chart{border-bottom-color:#dce6f2;background:linear-gradient(180deg,rgba(241,247,255,.42),transparent);border-radius:14px 14px 0 0}.bar{box-shadow:0 5px 12px rgba(23,105,237,.12)}.card-row{border-color:#d9e5f3;border-radius:17px;box-shadow:0 7px 20px rgba(7,27,69,.035)}.card-row.is-top{border-color:#8ab8f6;background:linear-gradient(120deg,#fff,#eff6ff);box-shadow:0 10px 28px rgba(23,105,237,.08)}.google-panel{background:linear-gradient(145deg,#fff 0,#fbfdff 65%,#f2f7ff 100%)}.google-metric{box-shadow:0 7px 20px rgba(7,27,69,.035)}.reviews-preview{border-style:solid;background:linear-gradient(135deg,#fbfdff,#f1f7ff)}.review{box-shadow:0 8px 22px rgba(7,27,69,.045)}.account-billing-panel{margin-top:0;border-color:#cfddf0;border-radius:22px;background:rgba(255,255,255,.96);box-shadow:var(--shadow-soft)}.account-billing-summary{padding:20px 22px}.account-billing-title{font-size:1.08rem}.account-billing-note{font-size:.8rem}.account-billing-chevron{width:36px;height:36px;background:#edf5ff;color:#1769ed}.account-billing-content{padding:24px 22px;background:linear-gradient(145deg,#fff,#fbfdff)}.account-billing-copy h2{font-size:1.45rem}.account-billing-actions{gap:9px;flex-wrap:wrap;justify-content:flex-end}.billing-support-button{color:#0c4fad!important}.cancellation-button{border-color:#f2c7cd!important;background:#fff7f8!important;color:#b42334!important}.account-billing-content>.provider-note{padding:11px 13px;border-radius:12px;background:#f5f8fc}.roadmap-panel{position:relative;display:grid;grid-template-columns:minmax(0,1.28fr) minmax(280px,.72fr);gap:34px;overflow:hidden;padding:34px 36px;background:radial-gradient(circle at 86% 18%,rgba(89,165,255,.19),transparent 18rem),linear-gradient(125deg,#fff 0,#f8fbff 58%,#eef6ff 100%);border-color:#cbdff6;box-shadow:var(--shadow-card)}.roadmap-copy{position:relative;z-index:2}.roadmap-kicker{display:inline-flex;align-items:center;gap:8px;padding:7px 11px;border-radius:999px;background:#eaf3ff;color:#1769ed;font-size:.73rem;font-weight:950;letter-spacing:.11em;text-transform:uppercase}.roadmap-kicker span{font-size:.95rem}.roadmap-panel h2{max-width:720px;margin:13px 0 5px;font-size:clamp(1.8rem,3.2vw,2.7rem);line-height:1.04;letter-spacing:-.05em;color:#081f4d}.roadmap-lead{margin:0 0 17px;color:#6b7d99;font-size:1.08rem;font-weight:750}.roadmap-copy>p:not(.roadmap-lead):not(.roadmap-stay){max-width:760px;color:#536987}.roadmap-highlight{display:grid;grid-template-columns:34px minmax(0,1fr);gap:12px;align-items:center;max-width:800px;margin:19px 0;padding:15px 17px;border:1px solid #d5e5f8;border-radius:15px;background:linear-gradient(110deg,#eff6ff,#f8fbff);color:#173c74}.roadmap-bolt{display:grid;place-items:center;width:32px;height:32px;border-radius:10px;background:#fff;color:#1769ed;font-size:1.2rem;box-shadow:0 5px 16px rgba(23,105,237,.11)}.roadmap-stay{max-width:800px;color:#536987}.roadmap-stay strong{color:#132f60}.roadmap-features{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px;margin:22px 0}.roadmap-features span{display:flex;align-items:center;gap:9px;min-height:52px;padding:11px 13px;border:1px solid #d8e5f4;border-radius:14px;background:rgba(255,255,255,.88);color:#17345f;font-size:.84rem;font-weight:850;box-shadow:0 6px 18px rgba(7,27,69,.035)}.roadmap-features b{display:grid;place-items:center;width:30px;height:30px;border-radius:9px;background:#eaf3ff;color:#1769ed}.roadmap-contact{display:grid;grid-template-columns:48px minmax(0,1fr);gap:13px;align-items:center;margin-top:13px;padding:15px 17px;border:1px solid #d6e4f4;border-radius:16px;background:rgba(255,255,255,.9)}.roadmap-contact-icon{display:grid;place-items:center;width:46px;height:46px;border-radius:14px;background:#e9f3ff;color:#1769ed;font-size:1.25rem}.roadmap-contact strong{display:block;color:#102d5b}.roadmap-contact p{margin:2px 0 0;color:#60718f;font-size:.85rem}.roadmap-contact a{color:#1769ed;font-weight:900;text-decoration:none}.roadmap-contact a:hover{text-decoration:underline}.roadmap-art{position:relative;min-height:390px;display:grid;place-items:center;align-self:stretch}.roadmap-orbit{position:absolute;border:1px solid rgba(23,105,237,.11);border-radius:50%}.orbit-one{width:330px;height:330px}.orbit-two{width:245px;height:245px}.roadmap-mascot{position:relative;z-index:2;width:230px;filter:drop-shadow(0 22px 30px rgba(23,105,237,.16))}.roadmap-art-card{position:absolute;z-index:4;right:4px;bottom:38px;display:flex;align-items:center;gap:11px;width:min(265px,90%);padding:14px 15px;border:1px solid #d7e5f5;border-radius:17px;background:rgba(255,255,255,.94);box-shadow:0 16px 38px rgba(7,27,69,.10);backdrop-filter:blur(12px)}.roadmap-art-icon{display:grid;place-items:center;flex:0 0 auto;width:42px;height:42px;border-radius:12px;background:#e9f3ff;color:#1769ed;font-size:1.2rem}.roadmap-art-card strong{display:block;font-size:.9rem;line-height:1.25}.roadmap-art-card small{display:block;margin-top:2px;color:#6a7c98}.login{border-color:#cedff4;background:linear-gradient(145deg,#fff,#f5f9ff);box-shadow:var(--shadow-card)}
-    @media(max-width:960px){.roadmap-panel{grid-template-columns:minmax(0,1fr) 245px;gap:22px;padding:30px}.roadmap-art{min-height:330px}.roadmap-mascot{width:195px}.roadmap-features{grid-template-columns:1fr}.account-billing-content{grid-template-columns:1fr}.account-billing-actions{justify-content:flex-start}}
-    @media(max-width:760px){body{background:linear-gradient(180deg,#f8fbff,#eef4fb)}.shell{width:calc(100% - 16px);margin:8px auto 42px}.top{top:6px;padding:11px 12px;margin-bottom:12px;border-radius:15px}.top>div:first-child{gap:9px}.top>div:first-child:before{width:34px;height:34px;border-radius:10px}.brand{font-size:1.05rem}.top>div:first-child>.muted{display:none}.top .button{padding:9px 12px}.panel{padding:20px 17px;border-radius:19px;margin-bottom:12px}.dashboard-tools{grid-template-columns:1fr;gap:8px}.periods{width:100%;display:grid;grid-template-columns:repeat(3,1fr)}.period{min-width:0;padding:9px 5px}.welcome-strip{padding:12px 14px;margin-bottom:12px}.hero-grid{grid-template-columns:1fr!important}.hero-main{padding:25px 19px 22px!important}.hero h1 .hero-count{font-size:clamp(4rem,20vw,5.2rem)!important}.hero h1 small{font-size:1.55rem!important}.hero-overview{grid-template-columns:1fr 1fr!important;border-left:0!important;border-top:1px solid #d8e5f4!important}.hero-fact{padding:17px 14px!important}.next-step{grid-template-columns:82px minmax(0,1fr)!important;padding:20px 15px!important;gap:12px!important}.guide-art,.guide-art .mascot-crop{width:88px!important}.performance-panel,.card-settings-section,.card-section,.google-panel{padding:20px 17px!important}.story-grid{gap:9px}.google-metrics{grid-template-columns:1fr 1fr}.google-metric{min-height:126px;padding:14px}.roadmap-panel{grid-template-columns:1fr;padding:23px 18px;gap:10px}.roadmap-panel h2{font-size:1.9rem}.roadmap-lead{font-size:1rem}.roadmap-highlight{grid-template-columns:30px 1fr;padding:13px 12px}.roadmap-art{min-height:245px;order:-1;margin:-10px -5px 0}.roadmap-mascot{width:158px}.orbit-one{width:230px;height:230px}.orbit-two{width:175px;height:175px}.roadmap-art-card{right:5px;bottom:13px;width:220px;padding:11px}.roadmap-features{margin:16px 0;gap:7px}.roadmap-features span{min-height:46px}.roadmap-contact{grid-template-columns:40px 1fr;padding:13px 12px}.roadmap-contact-icon{width:40px;height:40px}.account-billing-summary{padding:16px}.account-billing-content{padding:18px 15px}.account-billing-actions{display:grid;grid-template-columns:1fr;gap:8px;width:100%}.account-billing-actions .button{width:100%;text-align:center}.modal-shell{padding:10px}.modal-card{max-height:calc(100vh - 20px)}}
-    @media(max-width:460px){.shell{width:calc(100% - 12px)}.top{border-radius:13px}.top>div:first-child:before{display:none}.brand{font-size:1rem}.top .button{font-size:.8rem}.welcome-strip{display:grid;gap:7px}.since-badge{width:max-content}.hero h1 .hero-count{font-size:18vw!important}.hero h1 .hero-count.is-compact{font-size:12.5vw!important}.hero-overview{grid-template-columns:1fr!important}.hero-fact{display:grid;grid-template-columns:1fr auto;gap:3px 12px;align-items:center}.hero-fact strong{grid-column:2;grid-row:1/3;text-align:right}.hero-fact small{grid-column:1}.next-step{grid-template-columns:1fr!important}.guide-art{display:none}.google-metrics{grid-template-columns:1fr}.roadmap-art{min-height:210px}.roadmap-mascot{width:138px}.roadmap-art-card{width:205px;right:0}.roadmap-panel h2{font-size:1.65rem}.roadmap-features{grid-template-columns:1fr}.roadmap-contact{grid-template-columns:1fr}.roadmap-contact-icon{display:none}.account-billing-title{font-size:1rem}.account-billing-note{font-size:.73rem}}
-'''
-          if '2026 customer dashboard visual refresh' not in text:
-              if '  </style>' not in text:
-                  raise SystemExit('Style closing tag not found')
-              text = text.replace('  </style>', css + '\n  </style>', 1)
-
-          path.write_text(text)
-          PY
+        run: python3 scripts/app-dashboard-refresh-once.py
       - run: pnpm run check:all
       - name: Commit refreshed dashboard
         shell: bash
