@@ -18,10 +18,15 @@ import {
 } from "./subscription-lifecycle";
 import { isAllowedGoogleReviewUrl, isValidPublicToken, normalisePublicToken } from "./destinations";
 import { handleInsightsPurchaseRequest, type InsightsPurchaseDependencies } from "./insights-purchase";
+import {
+  handleUpdatedOrderInsightsEmail,
+  processPaidOrderQuickGuide,
+  type OrderEmailAutomationEnv
+} from "./order-email-automation";
 import { createD1Repository, type CardUpdate, type InsightsRepository, type PlacementType } from "./repository";
 import { autoProvisionPaidShopifyOrder } from "./shopify-order-provisioning";
 
-type WorkerEnv = Env & { ADMIN_API_TOKEN?: string };
+type WorkerEnv = Env & OrderEmailAutomationEnv & { ADMIN_API_TOKEN?: string };
 
 const PLACEMENT_TYPES = new Set<PlacementType>(["counter", "table", "reception", "register", "other"]);
 const HTML_HEADERS = {
@@ -223,9 +228,22 @@ export async function handleRequest(
 
   try {
     if (url.pathname === "/health") return json({ ok: true });
+    if (url.pathname === "/api/shopify/webhooks/orders-updated") {
+      return handleUpdatedOrderInsightsEmail(request, env);
+    }
     if (url.pathname === "/api/shopify/webhooks/orders-paid") {
+      const emailAutomationRequest = request.clone();
       await autoProvisionPaidShopifyOrder(request.clone(), env, new Date());
-      return handleShopifyOrdersPaidWebhook(request, env, () => new Date(), billingDependencies);
+      const response = await handleShopifyOrdersPaidWebhook(request, env, () => new Date(), billingDependencies);
+      if (response.ok) {
+        ctx.waitUntil(processPaidOrderQuickGuide(emailAutomationRequest, env).catch((error) => {
+          console.error(JSON.stringify({
+            event: "order_quick_guide_failed",
+            reason: error instanceof Error ? error.message : "unknown_error"
+          }));
+        }));
+      }
+      return response;
     }
     if (url.pathname === "/api/shopify/webhooks/refunds-create") {
       return handleShopifyRefundCreatedWebhook(request, env, () => new Date(), {
