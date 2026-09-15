@@ -213,7 +213,7 @@ export async function autoProvisionPaidShopifyOrder(
   } catch {
     return [];
   }
-  if (!isRecord(payload) || payload.test === true) return [];
+  if (!isRecord(payload)) return [];
 
   const orderReference = cleanText(payload.name ?? payload.order_number ?? payload.id, 160);
   if (!orderReference) return [];
