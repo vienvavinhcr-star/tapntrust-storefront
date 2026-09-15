@@ -4,3 +4,4 @@ ZEPTOMAIL_API_KEY=replace-with-your-zeptomail-agent-send-api-key
 GOOGLE_PLACES_API_KEY=replace-with-your-restricted-google-places-api-key
 SHOPIFY_CLIENT_ID=replace-with-your-shopify-client-id
 SHOPIFY_CLIENT_SECRET=replace-with-your-shopify-client-secret
+RESEND_API_KEY=replace-with-your-resend-sending-api-key
