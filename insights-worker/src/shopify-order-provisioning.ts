@@ -164,7 +164,7 @@ function extractPhysicalSetups(payload: Record<string, unknown>): SetupAccumulat
   ));
 }
 
-async function readRawBody(request: Request): Promise<Uint8Array | null> {
+async function readRawBody(request: Request<any, any>): Promise<Uint8Array | null> {
   const declaredLength = Number(request.headers.get("Content-Length") || 0);
   if (declaredLength > SHOPIFY_WEBHOOK_MAX_BODY_BYTES || !request.body) return null;
   const reader = request.body.getReader();
@@ -190,7 +190,7 @@ async function readRawBody(request: Request): Promise<Uint8Array | null> {
 }
 
 export async function autoProvisionPaidShopifyOrder(
-  request: Request,
+  request: Request<any, any>,
   env: AutoProvisioningEnv,
   now: Date = new Date()
 ): Promise<AutoProvisionedShopifyBatch[]> {
