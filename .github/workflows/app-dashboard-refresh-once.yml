@@ -33,6 +33,7 @@ jobs:
       - name: Update dashboard presentation contract
         shell: bash
         run: |
+          sed -i 's/Tapntrust <span>Insights<\/span>/Tapntrust <span>Insight<\/span>/' insights-worker/src/customer-page.ts
           sed -i 's/toHaveLength(3);/toHaveLength(4);/' insights-worker/test/customer-auth.test.ts
           sed -i 's/Welcome to Tapntrust Insights/Welcome to Tapntrust Insight/' insights-worker/test/customer-auth.test.ts
       - run: pnpm run check:all
@@ -46,5 +47,5 @@ jobs:
           git config user.name "Tapntrust UI automation"
           git config user.email "actions@users.noreply.github.com"
           git add insights-worker/src/customer-page.ts insights-worker/test/customer-auth.test.ts
-          git commit -m "feat: refresh Tapntrust Insight customer dashboard"
+          git commit -m "fix: use singular Tapntrust Insight app branding"
           git push origin HEAD:feature/app-dashboard-refresh
