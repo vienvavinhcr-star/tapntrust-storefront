@@ -283,7 +283,8 @@ describe("Shopify order programming metadata", () => {
       }))
       .mockResolvedValueOnce(json({ data: { orderByIdentifier: null } }));
 
+    const expectedError: Partial<ShopifyOrderProgrammingError> = { code: "order_not_found" };
     await expect(syncProgrammingManifestToShopifyOrder(CONFIG, manifest(), fetcher))
-      .rejects.toMatchObject<Partial<ShopifyOrderProgrammingError>>({ code: "order_not_found" });
+      .rejects.toMatchObject(expectedError);
   });
 });
