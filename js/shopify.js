@@ -186,6 +186,34 @@ export async function addCartLines(cartId, lines) {
   return assertMutation(data, "cartLinesAdd");
 }
 
+export async function addCartLinesWithDiscountCodes(cartId, lines, discountCodes) {
+  const mutation = `
+    mutation CartLinesAddWithDiscounts($cartId: ID!, $lines: [CartLineInput!]!, $discountCodes: [String!]!) {
+      add: cartLinesAdd(cartId: $cartId, lines: $lines) {
+        cart { ...CartFields }
+        userErrors { field message code }
+        warnings { code message target }
+      }
+      discounts: cartDiscountCodesUpdate(cartId: $cartId, discountCodes: $discountCodes) {
+        cart { ...CartFields }
+        userErrors { field message code }
+        warnings { code message target }
+      }
+    }
+    ${CART_FRAGMENT}
+  `;
+  const data = await storefrontRequest(mutation, { cartId, lines, discountCodes });
+  const addedCart = assertMutation(data, "add");
+  const discountPayload = data?.discounts;
+  const discountErrors = discountPayload?.userErrors || [];
+  return {
+    cart: discountPayload?.cart || addedCart,
+    addedCart,
+    discountErrors,
+    discountWarnings: discountPayload?.warnings || []
+  };
+}
+
 export async function updateCartLines(cartId, lines) {
   const mutation = `
     mutation CartLinesUpdate($cartId: ID!, $lines: [CartLineUpdateInput!]!) {
