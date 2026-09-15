@@ -16,8 +16,10 @@ export type ProvisioningLocationIntent =
     }
   | { mode: "existing"; id: string; googleReviewUrl: string };
 
+export type ProvisioningSource = "admin_shopify" | "admin_manual";
+
 export interface ProvisioningIntent {
-  source: "admin_shopify";
+  source: ProvisioningSource;
   externalOrderReference: string;
   externalSetupReference: string;
   business: ProvisioningBusinessIntent;
@@ -84,17 +86,32 @@ export function normaliseGoogleReviewUrl(value: unknown): string | null {
 export function parseProvisioningIntent(value: unknown): ProvisioningIntent | null {
   if (!value || typeof value !== "object") return null;
   const record = value as Record<string, unknown>;
-  const externalOrderReference = cleanText(record.externalOrderReference, 160);
-  const externalSetupReference = cleanText(record.externalSetupReference, 160);
+  const provisioningSource = record.provisioningSource === "manual" ? "manual" : "shopify";
+  let source: ProvisioningSource;
+  let externalOrderReference: string;
+  let externalSetupReference: string;
+
+  if (provisioningSource === "manual") {
+    const reference = crypto.randomUUID();
+    source = "admin_manual";
+    externalOrderReference = `MANUAL-${reference}`;
+    externalSetupReference = `MANUAL-${reference}`;
+  } else {
+    const orderReference = cleanText(record.externalOrderReference, 160);
+    const setupReference = cleanText(record.externalSetupReference, 160);
+    if (!orderReference || !setupReference) return null;
+    source = "admin_shopify";
+    externalOrderReference = orderReference;
+    externalSetupReference = setupReference;
+  }
+
   const businessMode = record.businessMode;
   const locationMode = record.locationMode;
   const physicalCardCount = record.physicalCardCount;
   const googleReviewUrl = normaliseGoogleReviewUrl(record.googleReviewUrl);
 
   if (
-    !externalOrderReference
-    || !externalSetupReference
-    || !Number.isInteger(physicalCardCount)
+    !Number.isInteger(physicalCardCount)
     || Number(physicalCardCount) < 1
     || Number(physicalCardCount) > 100
     || !googleReviewUrl
@@ -128,7 +145,7 @@ export function parseProvisioningIntent(value: unknown): ProvisioningIntent | nu
   }
 
   return {
-    source: "admin_shopify",
+    source,
     externalOrderReference,
     externalSetupReference,
     business,
