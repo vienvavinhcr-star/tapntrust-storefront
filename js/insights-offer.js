@@ -1,4 +1,5 @@
 import config from "./config.js";
+import { trackClarityInsightsAdded } from "./clarity-events.js";
 import { FULFILMENT_KEYS, ITEM_ROLES } from "./fulfilment.js";
 import {
   addCartLines,
@@ -325,6 +326,8 @@ export function initialiseInsightsOffer({ form, cartActions, toast } = {}) {
         throw new Error("Shopify could not apply the A$1.99 first-month offer. No Insights subscription was added. Please try again.");
       }
     }
+
+    trackClarityInsightsAdded(current);
     return current;
   }
 
