@@ -18,6 +18,7 @@ export type ProvisioningLocationIntent =
 
 export interface ProvisioningIntent {
   source: "admin_shopify";
+  shopifyLinked: boolean;
   externalOrderReference: string;
   externalSetupReference: string;
   business: ProvisioningBusinessIntent;
@@ -84,17 +85,29 @@ export function normaliseGoogleReviewUrl(value: unknown): string | null {
 export function parseProvisioningIntent(value: unknown): ProvisioningIntent | null {
   if (!value || typeof value !== "object") return null;
   const record = value as Record<string, unknown>;
-  const externalOrderReference = cleanText(record.externalOrderReference, 160);
-  const externalSetupReference = cleanText(record.externalSetupReference, 160);
+  const shopifyLinked = record.provisioningSource !== "manual";
+  let externalOrderReference: string;
+  let externalSetupReference: string;
+
+  if (!shopifyLinked) {
+    const reference = crypto.randomUUID();
+    externalOrderReference = `MANUAL-${reference}`;
+    externalSetupReference = `MANUAL-${reference}`;
+  } else {
+    const orderReference = cleanText(record.externalOrderReference, 160);
+    const setupReference = cleanText(record.externalSetupReference, 160);
+    if (!orderReference || !setupReference) return null;
+    externalOrderReference = orderReference;
+    externalSetupReference = setupReference;
+  }
+
   const businessMode = record.businessMode;
   const locationMode = record.locationMode;
   const physicalCardCount = record.physicalCardCount;
   const googleReviewUrl = normaliseGoogleReviewUrl(record.googleReviewUrl);
 
   if (
-    !externalOrderReference
-    || !externalSetupReference
-    || !Number.isInteger(physicalCardCount)
+    !Number.isInteger(physicalCardCount)
     || Number(physicalCardCount) < 1
     || Number(physicalCardCount) > 100
     || !googleReviewUrl
@@ -129,6 +142,7 @@ export function parseProvisioningIntent(value: unknown): ProvisioningIntent | nu
 
   return {
     source: "admin_shopify",
+    shopifyLinked,
     externalOrderReference,
     externalSetupReference,
     business,
@@ -141,6 +155,7 @@ export async function fingerprintProvisioningIntent(intent: ProvisioningIntent):
   const canonicalFields = {
     version: 1,
     source: intent.source,
+    shopifyLinked: intent.shopifyLinked,
     externalOrderReference: intent.externalOrderReference,
     externalSetupReference: intent.externalSetupReference,
     business: intent.business,

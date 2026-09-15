@@ -1,5 +1,10 @@
 import { isValidEmail, normaliseEmail } from "./auth";
 import {
+  AdminPlaceSearchError,
+  createAdminPlaceSearchProvider,
+  type AdminPlaceSearchProvider
+} from "./admin-place-search";
+import {
   activateInsights,
   deactivateInsightsEntitlement,
   getProvisioningManifest,
@@ -21,6 +26,8 @@ const MAX_ADMIN_BODY_BYTES = 16_384;
 
 export interface AdminProvisioningDependencies {
   syncProgrammingManifest?: (manifest: ProvisioningManifest) => Promise<ShopifyOrderProgrammingResult>;
+  placeSearchProvider?: AdminPlaceSearchProvider;
+  googlePlacesApiKey?: string;
 }
 
 export interface AdminProvisioningShopifyEnv {
@@ -28,6 +35,7 @@ export interface AdminProvisioningShopifyEnv {
   SHOPIFY_CLIENT_SECRET: string;
   SHOPIFY_SHOP_DOMAIN: string;
   SHOPIFY_ADMIN_API_VERSION: string;
+  GOOGLE_PLACES_API_KEY?: string;
 }
 
 export function createShopifyProgrammingDependencies(
@@ -45,7 +53,9 @@ export function createShopifyProgrammingDependencies(
         accessToken,
         apiVersion: env.SHOPIFY_ADMIN_API_VERSION
       }, manifest);
-    }
+    },
+    placeSearchProvider: createAdminPlaceSearchProvider(),
+    googlePlacesApiKey: env.GOOGLE_PLACES_API_KEY || ""
   };
 }
 
@@ -166,6 +176,16 @@ async function syncProgrammingUrls(
   }
 }
 
+function placeSearchFailure(error: unknown): Response {
+  if (error instanceof AdminPlaceSearchError && error.code === "invalid_request") {
+    return json({ error: "Enter at least 3 characters or choose a valid business." }, 400);
+  }
+  if (error instanceof AdminPlaceSearchError && error.code === "not_found") {
+    return json({ error: "That Google business listing could not be found." }, 404);
+  }
+  return json({ error: "Google business search is unavailable right now. Enter the details manually instead." }, 503);
+}
+
 export async function handleAdminProvisioningRequest(
   request: Request,
   pathname: string,
@@ -175,6 +195,34 @@ export async function handleAdminProvisioningRequest(
   dependencies: AdminProvisioningDependencies = {}
 ): Promise<Response | null> {
   try {
+    if (pathname === "/api/admin/places/search") {
+      if (request.method !== "GET") return new Response("Method not allowed", { status: 405, headers: { Allow: "GET" } });
+      const query = new URL(request.url).searchParams.get("q")?.trim() || "";
+      if (query.length < 3 || query.length > 120) return json({ error: "Enter at least 3 characters." }, 400);
+      if (!dependencies.placeSearchProvider || !dependencies.googlePlacesApiKey) {
+        return json({ error: "Google business search is not configured. Enter the details manually instead." }, 503);
+      }
+      try {
+        return json({ suggestions: await dependencies.placeSearchProvider.search(query, dependencies.googlePlacesApiKey) });
+      } catch (error) {
+        return placeSearchFailure(error);
+      }
+    }
+
+    const placeMatch = pathname.match(/^\/api\/admin\/places\/([^/]+)$/);
+    if (placeMatch) {
+      if (request.method !== "GET") return new Response("Method not allowed", { status: 405, headers: { Allow: "GET" } });
+      const placeId = decodeURIComponent(placeMatch[1] || "");
+      if (!dependencies.placeSearchProvider || !dependencies.googlePlacesApiKey) {
+        return json({ error: "Google business search is not configured. Enter the details manually instead." }, 503);
+      }
+      try {
+        return json({ business: await dependencies.placeSearchProvider.getDetails(placeId, dependencies.googlePlacesApiKey) });
+      } catch (error) {
+        return placeSearchFailure(error);
+      }
+    }
+
     if (pathname === "/api/admin/provisioning/options") {
       if (request.method !== "GET") return new Response("Method not allowed", { status: 405, headers: { Allow: "GET" } });
       return json({ businesses: await listAdminBusinessOptions(db) });
@@ -188,17 +236,22 @@ export async function handleAdminProvisioningRequest(
       if (!intent) return json({ error: "Invalid provisioning request" }, 400);
       const timestamp = now().toISOString();
       const result = await provisionPhysicalCards(db, intent, timestamp);
-      await reconcileBillingAfterProvisioning(
-        db,
-        result.manifest.externalOrderReference,
-        result.manifest.externalSetupReference,
-        timestamp
-      );
-      const shopifyOrderSync = await syncProgrammingUrls(result.manifest, dependencies);
-      return json(
-        shopifyOrderSync ? { ...result, shopifyOrderSync } : result,
-        result.replayed ? 200 : 201
-      );
+
+      if (intent.shopifyLinked) {
+        await reconcileBillingAfterProvisioning(
+          db,
+          result.manifest.externalOrderReference,
+          result.manifest.externalSetupReference,
+          timestamp
+        );
+        const shopifyOrderSync = await syncProgrammingUrls(result.manifest, dependencies);
+        return json(
+          shopifyOrderSync ? { ...result, shopifyOrderSync } : result,
+          result.replayed ? 200 : 201
+        );
+      }
+
+      return json(result, result.replayed ? 200 : 201);
     }
 
     const batchMatch = pathname.match(/^\/api\/admin\/provisioning\/batches\/([^/]+)$/);

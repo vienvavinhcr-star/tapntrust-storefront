@@ -1,4 +1,5 @@
 import { ADMIN_PAGE } from "./admin-page";
+import { enhanceAdminPage } from "./admin-page-enhancements";
 import {
   createShopifyProgrammingDependencies,
   handleAdminProvisioningRequest,
@@ -25,6 +26,7 @@ const HTML_HEADERS = {
   "Referrer-Policy": "no-referrer",
   "X-Content-Type-Options": "nosniff"
 };
+const ENHANCED_ADMIN_PAGE = enhanceAdminPage(ADMIN_PAGE);
 
 function json(data: unknown, status = 200): Response {
   return Response.json(data, {
@@ -224,7 +226,7 @@ export async function handleRequest(
     }
     if (url.pathname === "/admin") {
       if (request.method !== "GET") return methodNotAllowed("GET");
-      return new Response(ADMIN_PAGE, {
+      return new Response(ENHANCED_ADMIN_PAGE, {
         headers: {
           ...HTML_HEADERS,
           "Content-Security-Policy": "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'"
