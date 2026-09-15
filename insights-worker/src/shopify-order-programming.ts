@@ -1,7 +1,8 @@
 import type { ProvisioningManifest } from "./provisioning";
 
 const MAX_ADMIN_RESPONSE_BYTES = 256 * 1024;
-const REQUEST_TIMEOUT_MS = 3500;
+const REQUEST_TIMEOUT_MS = 10_000;
+const RETRY_DELAY_MS = 200;
 const METAFIELD_NAMESPACE = "tapntrust";
 const METAFIELD_KEY = "programming_urls";
 const METAFIELD_TYPE = "multi_line_text_field";
@@ -205,6 +206,14 @@ async function readBoundedJson(response: Response): Promise<unknown> {
   }
 }
 
+function isTransientStatus(status: number | null): boolean {
+  return status === null || status === 408 || status === 429 || status >= 500;
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 async function graphql(
   configuration: ShopifyOrderProgrammingConfiguration,
   query: string,
@@ -218,34 +227,55 @@ async function graphql(
     throw new ShopifyOrderProgrammingError("configuration_error");
   }
 
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
-  try {
-    const response = await fetcher(`https://${shopDomain}/admin/api/${apiVersion}/graphql.json`, {
-      method: "POST",
-      redirect: "error",
-      signal: controller.signal,
-      headers: {
-        Accept: "application/json",
-        "Content-Type": "application/json",
-        "X-Shopify-Access-Token": accessToken
-      },
-      body: JSON.stringify({ query, variables })
-    });
-    if (!response.ok) throw new ShopifyOrderProgrammingError("request_failed", response.status);
-    const raw = await readBoundedJson(response);
-    if (!isRecord(raw)) throw new ShopifyOrderProgrammingError("invalid_response", response.status);
-    if (Array.isArray(raw.errors) ? raw.errors.length > 0 : raw.errors !== undefined) {
-      throw new ShopifyOrderProgrammingError("invalid_response", response.status);
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+    try {
+      const response = await fetcher(`https://${shopDomain}/admin/api/${apiVersion}/graphql.json`, {
+        method: "POST",
+        redirect: "error",
+        signal: controller.signal,
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+          "X-Shopify-Access-Token": accessToken
+        },
+        body: JSON.stringify({ query, variables })
+      });
+      if (!response.ok) {
+        const error = new ShopifyOrderProgrammingError("request_failed", response.status);
+        if (attempt === 0 && isTransientStatus(error.providerStatus)) {
+          await delay(RETRY_DELAY_MS);
+          continue;
+        }
+        throw error;
+      }
+      const raw = await readBoundedJson(response);
+      if (!isRecord(raw)) throw new ShopifyOrderProgrammingError("invalid_response", response.status);
+      if (Array.isArray(raw.errors) ? raw.errors.length > 0 : raw.errors !== undefined) {
+        throw new ShopifyOrderProgrammingError("invalid_response", response.status);
+      }
+      if (!isRecord(raw.data)) throw new ShopifyOrderProgrammingError("invalid_response", response.status);
+      return raw.data;
+    } catch (error) {
+      if (error instanceof ShopifyOrderProgrammingError) {
+        if (attempt === 0 && error.code === "request_failed" && isTransientStatus(error.providerStatus)) {
+          await delay(RETRY_DELAY_MS);
+          continue;
+        }
+        throw error;
+      }
+      if (attempt === 0) {
+        await delay(RETRY_DELAY_MS);
+        continue;
+      }
+      throw new ShopifyOrderProgrammingError("request_failed");
+    } finally {
+      clearTimeout(timeout);
     }
-    if (!isRecord(raw.data)) throw new ShopifyOrderProgrammingError("invalid_response", response.status);
-    return raw.data;
-  } catch (error) {
-    if (error instanceof ShopifyOrderProgrammingError) throw error;
-    throw new ShopifyOrderProgrammingError("request_failed");
-  } finally {
-    clearTimeout(timeout);
   }
+
+  throw new ShopifyOrderProgrammingError("request_failed");
 }
 
 function parseExistingMetafield(value: unknown): ExistingMetafield | null {
