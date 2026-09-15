@@ -1,0 +1,130 @@
+name: Backfill Shopify programming URLs from paid-order provisioning
+
+on:
+  push:
+    branches:
+      - fix/shopify-order-programming-urls
+    paths:
+      - .github/workflows/shopify-programming-sync-once.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch-and-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/shopify-order-programming-urls
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.19.0
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Patch automatic Shopify programming URL sync
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          provisioning = Path('insights-worker/src/shopify-order-provisioning.ts')
+          text = provisioning.read_text()
+          text = text.replace(
+              'import { normaliseGoogleReviewUrl, type ProvisioningIntent } from "./provisioning";',
+              'import { normaliseGoogleReviewUrl, type ProvisioningIntent, type ProvisioningManifest } from "./provisioning";'
+          )
+          text = text.replace(
+              'export interface AutoProvisionedShopifyBatch {\n  batchId: string;',
+              'export interface AutoProvisionedShopifyBatch {\n  manifest: ProvisioningManifest;\n  batchId: string;'
+          )
+          text = text.replace(
+              '    results.push({\n      batchId: provisioned.manifest.id,',
+              '    results.push({\n      manifest: provisioned.manifest,\n      batchId: provisioned.manifest.id,'
+          )
+          provisioning.write_text(text)
+
+          index = Path('insights-worker/src/index.ts')
+          text = index.read_text()
+          old = '''    if (url.pathname === "/api/shopify/webhooks/orders-paid") {\n      await autoProvisionPaidShopifyOrder(request.clone(), env, new Date());\n      return handleShopifyOrdersPaidWebhook(request, env, () => new Date(), billingDependencies);\n    }'''
+          new = '''    if (url.pathname === "/api/shopify/webhooks/orders-paid") {\n      const provisionedBatches = await autoProvisionPaidShopifyOrder(request.clone(), env, new Date());\n      if (adminDependencies.syncProgrammingManifest) {\n        for (const batch of provisionedBatches) {\n          ctx.waitUntil(\n            adminDependencies.syncProgrammingManifest(batch.manifest)\n              .then((result) => {\n                console.log(JSON.stringify({\n                  event: "shopify_programming_urls_synced",\n                  orderReference: batch.manifest.externalOrderReference.slice(0, 80),\n                  setupReference: batch.manifest.externalSetupReference.slice(0, 80),\n                  cardCount: batch.manifest.cards.length,\n                  orderName: result.orderName\n                }));\n              })\n              .catch((error) => {\n                console.warn(JSON.stringify({\n                  event: "shopify_programming_urls_sync_failed",\n                  orderReference: batch.manifest.externalOrderReference.slice(0, 80),\n                  setupReference: batch.manifest.externalSetupReference.slice(0, 80),\n                  error: error instanceof Error ? error.message : String(error)\n                }));\n              })\n          );\n        }\n      }\n      return handleShopifyOrdersPaidWebhook(request, env, () => new Date(), billingDependencies);\n    }'''
+          if old not in text:
+              raise SystemExit('orders-paid block not found')
+          index.write_text(text.replace(old, new, 1))
+
+          test_path = Path('insights-worker/test/shopify-auto-provisioning.test.ts')
+          test = test_path.read_text()
+          test = test.replace(
+              'import { handleRequest } from "../src/index";',
+              'import { handleRequest } from "../src/index";\nimport type { AdminProvisioningDependencies } from "../src/admin-provisioning";\nimport type { ProvisioningManifest } from "../src/provisioning";'
+          )
+          old_sig = 'async function deliver(payload: Record<string, unknown>, webhookId = unique("webhook")): Promise<Response> {'
+          new_sig = 'async function deliver(\n  payload: Record<string, unknown>,\n  webhookId = unique("webhook"),\n  syncProgrammingManifest?: AdminProvisioningDependencies["syncProgrammingManifest"]\n): Promise<Response> {'
+          if old_sig not in test:
+              raise SystemExit('deliver signature not found')
+          test = test.replace(old_sig, new_sig, 1)
+          old_call = '''  const context = createExecutionContext();\n  return handleRequest(\n    new Request(`${ORIGIN}/api/shopify/webhooks/orders-paid`, {'''
+          new_call = '''  const context = createExecutionContext();\n  const response = await handleRequest(\n    new Request(`${ORIGIN}/api/shopify/webhooks/orders-paid`, {'''
+          if old_call not in test:
+              raise SystemExit('deliver call start not found')
+          test = test.replace(old_call, new_call, 1)
+          old_tail = '''    { shopifyAdminProvider: provider }\n  );\n}'''
+          new_tail = '''    { shopifyAdminProvider: provider },\n    undefined,\n    syncProgrammingManifest ? { syncProgrammingManifest } : {}\n  );\n  await waitOnExecutionContext(context);\n  return response;\n}'''
+          if old_tail not in test:
+              raise SystemExit('deliver call tail not found')
+          test = test.replace(old_tail, new_tail, 1)
+
+          anchor = '''  it("activates Insights for the checkout email when the same paid order includes Insights", async () => {'''
+          extra_test = r'''  it("syncs each auto-provisioned card programming URL to Shopify order metadata", async () => {
+    const setupId = unique("setup");
+    const orderReference = unique("#order");
+    const payload = paidOrder({
+      setupId,
+      orderReference,
+      orderId: unique("order"),
+      email: "programming-owner@example.com",
+      primaryVariantTitle: "2 Card"
+    });
+    const synced: ProvisioningManifest[] = [];
+
+    const response = await deliver(payload, unique("webhook"), async (manifest) => {
+      synced.push(manifest);
+      return {
+        orderId: `gid://shopify/Order/${unique("synced")}`,
+        orderName: orderReference,
+        metafieldId: `gid://shopify/Metafield/${unique("metafield")}`
+      };
+    });
+
+    expect(response.status).toBe(200);
+    expect(synced).toHaveLength(1);
+    expect(synced[0]?.externalSetupReference).toBe(setupId);
+    expect(synced[0]?.cards).toHaveLength(2);
+    expect(synced[0]?.cards.every((card) => /^https:\/\/go\.tapntrust\.com\/t\/TNT-[A-Z2-9]{26}$/.test(card.programmingUrl))).toBe(true);
+  });
+
+'''
+          if anchor not in test:
+              raise SystemExit('test insertion anchor not found')
+          test = test.replace(anchor, extra_test + anchor, 1)
+          test_path.write_text(test)
+          PY
+      - name: Verify repository checks
+        run: pnpm run check:all
+      - name: Commit fix
+        shell: bash
+        run: |
+          if git diff --quiet; then
+            echo "No changes to commit."
+            exit 0
+          fi
+          git config user.name "Tapntrust automation"
+          git config user.email "actions@users.noreply.github.com"
+          git add insights-worker/src/index.ts insights-worker/src/shopify-order-provisioning.ts insights-worker/test/shopify-auto-provisioning.test.ts
+          git commit -m "fix: sync NFC programming URLs to Shopify orders"
+          git push origin HEAD:fix/shopify-order-programming-urls
