@@ -359,6 +359,17 @@ export function createCartUi({ cartActions, formatMoney, updatePackagesFromCatal
       renderCart(event.detail);
       updatePackagesFromCatalog(event.detail.catalog);
     });
+
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("openCart") === "1") {
+      window.requestAnimationFrame(() => {
+        openCart();
+        params.delete("openCart");
+        const remainingQuery = params.toString();
+        const cleanUrl = `${window.location.pathname}${remainingQuery ? `?${remainingQuery}` : ""}${window.location.hash}`;
+        window.history.replaceState({}, "", cleanUrl);
+      });
+    }
   }
 
   return { initialise, openCart, closeCart, renderCart };
