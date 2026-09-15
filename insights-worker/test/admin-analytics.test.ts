@@ -51,6 +51,7 @@ describe("admin CRM analytics", () => {
       env.DB.prepare("INSERT INTO customer_users (id, email) VALUES (?1, 'owner@example.com')").bind(userId),
       env.DB.prepare("INSERT INTO customer_business_access (user_id, business_id, role) VALUES (?1, ?2, 'owner')").bind(userId, businessId),
       env.DB.prepare("INSERT INTO insights_entitlements (location_id, status, source, activated_at) VALUES (?1, 'active', 'shopify', '2026-09-14T01:00:00.000Z')").bind(locationId),
+      env.DB.prepare(`INSERT INTO insights_subscriptions (id, business_id, location_id, provider, billing_email, external_setup_reference, first_provider_order_reference, most_recent_provider_order_reference, plan_code, status, currency, expected_intro_price_minor, expected_recurring_price_minor, started_at, last_paid_at, expected_next_billing_at, current_period_started_at, current_period_ends_at) VALUES ('sub-crm', ?1, ?2, 'shopify', 'owner@example.com', 'setup-crm', '#1001', '#1001', 'intro', 'active', 'AUD', 199, 699, '2026-09-14T01:00:00.000Z', '2026-09-14T01:00:00.000Z', '2026-10-14T01:00:00.000Z', '2026-09-14T01:00:00.000Z', '2026-10-14T01:00:00.000Z')`).bind(businessId, locationId),
       env.DB.prepare(`INSERT INTO customer_usage_events (id, user_id, location_id, event_type, outcome, provider_called, created_at) VALUES ('usage-open', ?1, ?2, 'dashboard_open', 'opened', 0, '2026-09-15T01:10:00.000Z')`).bind(userId, locationId),
       env.DB.prepare(`INSERT INTO customer_usage_events (id, user_id, location_id, event_type, outcome, provider_called, created_at) VALUES ('usage-summary', ?1, ?2, 'google_summary', 'available', 1, '2026-09-15T01:11:00.000Z')`).bind(userId, locationId),
       env.DB.prepare(`INSERT INTO customer_usage_events (id, user_id, location_id, event_type, outcome, provider_called, created_at) VALUES ('usage-reviews', ?1, ?2, 'google_reviews', 'rate_limited', 0, '2026-09-15T01:12:00.000Z')`).bind(userId, locationId)
@@ -63,6 +64,8 @@ describe("admin CRM analytics", () => {
     expect(snapshot.totals.cards).toBe(1);
     expect(snapshot.totals.tapsInRange).toBe(1);
     expect(snapshot.totals.lifetimeTaps).toBe(2);
+    expect(snapshot.totals.activeInsightsLocations).toBe(1);
+    expect(snapshot.totals.activePaidSubscriptions).toBe(1);
     expect(snapshot.totals.googleProviderCalls).toBe(1);
 
     const row = snapshot.locations.find((item) => item.locationId === locationId);
@@ -74,6 +77,13 @@ describe("admin CRM analytics", () => {
       tapsInRange: 1,
       lifetimeTaps: 2,
       insightsStatus: "active",
+      subscription: {
+        status: "active",
+        planCode: "intro",
+        billingEmail: "owner@example.com",
+        currency: "AUD",
+        recurringPriceMinor: 699
+      },
       dashboardUsage: {
         opens: 1,
         refreshGoogleDataClicks: 1,
@@ -102,5 +112,6 @@ describe("admin CRM analytics", () => {
     expect(row?.customerEmail).toBe("cardonly@example.com");
     expect(row?.insightsStatus).toBe("not_configured");
     expect(row?.subscription).toBeNull();
+    expect(snapshot.totals.activePaidSubscriptions).toBe(0);
   });
 });
