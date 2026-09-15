@@ -16,10 +16,9 @@ export type ProvisioningLocationIntent =
     }
   | { mode: "existing"; id: string; googleReviewUrl: string };
 
-export type ProvisioningSource = "admin_shopify" | "admin_manual";
-
 export interface ProvisioningIntent {
-  source: ProvisioningSource;
+  source: "admin_shopify";
+  shopifyLinked: boolean;
   externalOrderReference: string;
   externalSetupReference: string;
   business: ProvisioningBusinessIntent;
@@ -86,21 +85,18 @@ export function normaliseGoogleReviewUrl(value: unknown): string | null {
 export function parseProvisioningIntent(value: unknown): ProvisioningIntent | null {
   if (!value || typeof value !== "object") return null;
   const record = value as Record<string, unknown>;
-  const provisioningSource = record.provisioningSource === "manual" ? "manual" : "shopify";
-  let source: ProvisioningSource;
+  const shopifyLinked = record.provisioningSource !== "manual";
   let externalOrderReference: string;
   let externalSetupReference: string;
 
-  if (provisioningSource === "manual") {
+  if (!shopifyLinked) {
     const reference = crypto.randomUUID();
-    source = "admin_manual";
     externalOrderReference = `MANUAL-${reference}`;
     externalSetupReference = `MANUAL-${reference}`;
   } else {
     const orderReference = cleanText(record.externalOrderReference, 160);
     const setupReference = cleanText(record.externalSetupReference, 160);
     if (!orderReference || !setupReference) return null;
-    source = "admin_shopify";
     externalOrderReference = orderReference;
     externalSetupReference = setupReference;
   }
@@ -145,7 +141,8 @@ export function parseProvisioningIntent(value: unknown): ProvisioningIntent | nu
   }
 
   return {
-    source,
+    source: "admin_shopify",
+    shopifyLinked,
     externalOrderReference,
     externalSetupReference,
     business,
@@ -158,6 +155,7 @@ export async function fingerprintProvisioningIntent(intent: ProvisioningIntent):
   const canonicalFields = {
     version: 1,
     source: intent.source,
+    shopifyLinked: intent.shopifyLinked,
     externalOrderReference: intent.externalOrderReference,
     externalSetupReference: intent.externalSetupReference,
     business: intent.business,
