@@ -3,8 +3,8 @@ import { trackClarityInsightsAdded } from "./clarity-events.js";
 import { FULFILMENT_KEYS, ITEM_ROLES } from "./fulfilment.js";
 import {
   addCartLines,
+  addCartLinesWithDiscountCodes,
   fetchProductByHandle,
-  removeCartLines,
   updateCartDiscountCodes
 } from "./shopify.js";
 
@@ -188,6 +188,15 @@ export function initialiseInsightsOffer({ form, cartActions, toast } = {}) {
     return cartActions.getState();
   }
 
+  async function restoreDiscountCodes(cartId, previousCodes) {
+    try {
+      const restored = await updateCartDiscountCodes(cartId, previousCodes);
+      return adoptCartSnapshot(restored);
+    } catch {
+      return cartActions.getState();
+    }
+  }
+
   async function previewEligibility(details = {}) {
     latestDetails = detailsUsable(details) ? details : null;
     if (!latestDetails) {
@@ -284,47 +293,57 @@ export function initialiseInsightsOffer({ form, cartActions, toast } = {}) {
 
     const cartId = stateBefore.cart?.id;
     if (!cartId) throw new Error("Your Shopify cart is not ready. Please try again.");
-    const addedCart = await addCartLines(cartId, [{
+    const lineInput = {
       merchandiseId: variant.id,
       quantity: 1,
       sellingPlanId: plan.id,
       attributes
-    }]);
-    let current = await adoptCartSnapshot(addedCart);
-    const added = insightsForSetup(current, setupId);
-    if (!added) throw new Error("TapnTrust Insights was not returned by Shopify after it was added.");
+    };
 
+    let current;
     if (offer.offerKind === "intro") {
       if (!offerCode) {
-        await cartActions.removeLine(added.id);
         throw new Error("The A$1.99 first-month offer could not be attached. Please try again.");
       }
-      const previousCodes = [...(current.cart?.discountCodes || [])];
+      const previousCodes = [...(stateBefore.cart?.discountCodes || [])];
       const codes = [...new Set([...previousCodes, offerCode])];
-      const updated = await updateCartDiscountCodes(current.cart.id, codes);
-      const applicableCodes = (updated.discountCodes || [])
-        .filter((entry) => entry.applicable)
-        .map((entry) => String(entry.code).toLowerCase());
+      let combined;
+      try {
+        combined = await addCartLinesWithDiscountCodes(cartId, [lineInput], codes);
+      } catch (error) {
+        await restoreDiscountCodes(cartId, previousCodes);
+        throw error;
+      }
+
+      current = await adoptCartSnapshot(combined.discountErrors.length ? combined.addedCart : combined.cart);
+      const added = insightsForSetup(current, setupId);
+      if (!added) {
+        await restoreDiscountCodes(cartId, previousCodes);
+        throw new Error("TapnTrust Insights was not returned by Shopify after it was added.");
+      }
+
+      if (combined.discountErrors.length) {
+        await cartActions.removeLine(added.id);
+        await restoreDiscountCodes(cartId, previousCodes);
+        throw new Error(combined.discountErrors[0]?.message || "Shopify could not apply the A$1.99 first-month offer. No Insights subscription was added.");
+      }
+
+      const applicableCodes = (current.cart?.discountCodes || []).map((code) => String(code).toLowerCase());
       const applicable = applicableCodes.includes(offerCode.toLowerCase());
       const lostExistingCode = previousCodes.find((code) => !applicableCodes.includes(String(code).toLowerCase()));
-      current = await adoptCartSnapshot(updated);
       if (!applicable || lostExistingCode) {
-        const rollback = insightsForSetup(current, setupId);
-        if (rollback?.id) await cartActions.removeLine(rollback.id);
-        current = cartActions.getState();
-        if (current.cart?.id) {
-          try {
-            const restored = await updateCartDiscountCodes(current.cart.id, previousCodes);
-            current = await adoptCartSnapshot(restored);
-          } catch {
-            // Preserve the primary cart rollback even if restoring a previous code fails.
-          }
-        }
+        await cartActions.removeLine(added.id);
+        await restoreDiscountCodes(cartId, previousCodes);
         if (lostExistingCode) {
           throw new Error("The A$1.99 Insights offer cannot be combined with the discount already in your cart. Your existing discount was kept and Insights was not added.");
         }
         throw new Error("Shopify could not apply the A$1.99 first-month offer. No Insights subscription was added. Please try again.");
       }
+    } else {
+      const addedCart = await addCartLines(cartId, [lineInput]);
+      current = await adoptCartSnapshot(addedCart);
+      const added = insightsForSetup(current, setupId);
+      if (!added) throw new Error("TapnTrust Insights was not returned by Shopify after it was added.");
     }
 
     trackClarityInsightsAdded(current);
