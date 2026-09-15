@@ -31,6 +31,7 @@ async function clearDatabase(): Promise<void> {
     env.DB.prepare("DELETE FROM insights_subscription_lifecycle_events"),
     env.DB.prepare("DELETE FROM insights_cancellation_requests"),
     env.DB.prepare("DELETE FROM business_insights_intro_redemptions"),
+    env.DB.prepare("UPDATE insights_billing_events SET source_event_id = NULL WHERE source_event_id IS NOT NULL"),
     env.DB.prepare("DELETE FROM insights_billing_events"),
     env.DB.prepare("DELETE FROM insights_subscriptions"),
     env.DB.prepare("DELETE FROM shopify_webhook_receipts"),
