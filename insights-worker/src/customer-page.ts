@@ -37,7 +37,7 @@ export const CUSTOMER_PAGE = `<!doctype html>
 </head>
 <body>
   <main class="shell">
-    <header class="top"><div><div class="brand">Tapntrust <span>Insights</span></div><div class="muted">See what customers do. Know what to improve next.</div></div><div class="account" id="account" hidden><div class="account-copy"><span class="account-greeting" id="account-greeting">Welcome back 👋</span><button class="profile-link" id="edit-nickname" type="button">Edit name</button><span class="muted" id="account-email"></span></div><button class="button secondary" id="logout" type="button">Sign out</button></div></header>
+    <header class="top"><div><div class="brand">Tapntrust <span>Insight</span></div><div class="muted">See what customers do. Know what to improve next.</div></div><div class="account" id="account" hidden><div class="account-copy"><span class="account-greeting" id="account-greeting">Welcome back 👋</span><button class="profile-link" id="edit-nickname" type="button">Edit name</button><span class="muted" id="account-email"></span></div><button class="button secondary" id="logout" type="button">Sign out</button></div></header>
     <section class="panel login" id="login-panel">
       <div class="eyebrow">Passwordless sign in</div>
       <h1>See how your Tapntrust cards are being used.</h1>
