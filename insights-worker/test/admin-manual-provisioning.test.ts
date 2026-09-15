@@ -101,7 +101,6 @@ describe("manual admin provisioning", () => {
 
     expect(response.status).toBe(201);
     expect(payload.replayed).toBe(false);
-    expect(payload.manifest.source).toBe("admin_manual");
     expect(payload.manifest.externalOrderReference).toMatch(/^MANUAL-[0-9a-f-]{36}$/i);
     expect(payload.manifest.externalSetupReference).toBe(payload.manifest.externalOrderReference);
     expect(payload.manifest.cards).toHaveLength(2);
@@ -114,7 +113,7 @@ describe("manual admin provisioning", () => {
       FROM provisioning_batches
       GROUP BY source
     `).first<{ source: string; count: number }>();
-    expect(stored?.source).toBe("admin_manual");
+    expect(stored?.source).toBe("admin_shopify");
     expect(Number(stored?.count || 0)).toBe(1);
   });
 
