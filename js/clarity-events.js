@@ -108,6 +108,14 @@ export function trackClarityPackageAdded(packageCount, cartState) {
   trackClarityEventOnce(eventName);
 }
 
+// Call only after Tapntrust Insights has actually been returned in a successful
+// Shopify cart snapshot. Failed attempts and restored carts should not use it.
+export function trackClarityInsightsAdded(cartState) {
+  if (cartState?.mode !== "shopify") return;
+  const hasInsights = (cartState.cart?.lines || []).some((line) => line.kind === "insights");
+  if (hasInsights) trackClarityEventOnce("insights_added_to_cart");
+}
+
 // Call only after a successful manual upsell action. Automatic bundle gifts
 // never pass through this hook, even though they use the same stand variant.
 export function trackClarityUpsellAdded(kind, cartState) {
@@ -172,6 +180,52 @@ function initialiseBusinessSearchTracking() {
   });
 }
 
+function initialiseInsightsTracking() {
+  if (clarityTestMode) return;
+
+  document.addEventListener("click", (event) => {
+    if (!(event.target instanceof Element)) return;
+    if (event.target.closest("[data-insights-promo-cta]")) {
+      trackClarityEventOnce("insights_popup_try_now");
+    }
+  });
+
+  document.addEventListener("change", (event) => {
+    if (!(event.target instanceof Element)) return;
+    const toggle = event.target.closest("[data-insights-toggle]");
+    if (toggle?.checked) trackClarityEventOnce("insights_selected");
+  });
+
+  if (!("MutationObserver" in window) || !document.body) return;
+
+  const observePromo = (promo) => {
+    const maybeTrackShown = () => {
+      if (!promo.hidden && promo.classList.contains("is-open")) {
+        trackClarityEventOnce("insights_popup_shown");
+      }
+    };
+    new MutationObserver(maybeTrackShown).observe(promo, {
+      attributes: true,
+      attributeFilter: ["class", "hidden"]
+    });
+    maybeTrackShown();
+  };
+
+  const existingPromo = document.querySelector("[data-insights-promo]");
+  if (existingPromo) {
+    observePromo(existingPromo);
+    return;
+  }
+
+  const bodyObserver = new MutationObserver(() => {
+    const promo = document.querySelector("[data-insights-promo]");
+    if (!promo) return;
+    bodyObserver.disconnect();
+    observePromo(promo);
+  });
+  bodyObserver.observe(document.body, { childList: true, subtree: true });
+}
+
 function initialiseCheckoutTracking() {
   if (clarityTestMode) return;
 
@@ -184,8 +238,13 @@ function initialiseCheckoutTracking() {
     if (!href || href === "#") return;
 
     trackClarityEventOnce("begin_checkout");
+    const cartRoot = checkout.closest("[data-cart-drawer]") || document;
+    if (cartRoot.querySelector(".cart-line--insights")) {
+      trackClarityEventOnce("insights_begin_checkout");
+    }
   }, { capture: true });
 }
 
 initialiseBusinessSearchTracking();
+initialiseInsightsTracking();
 initialiseCheckoutTracking();

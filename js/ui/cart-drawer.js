@@ -113,7 +113,7 @@ export function createCartUi({ cartActions, formatMoney, updatePackagesFromCatal
     const title = document.createElement("h3");
     title.textContent = line.title;
     details.append(title);
-    if (line.variantTitle) {
+    if (line.variantTitle && line.kind !== "insights") {
       const variant = document.createElement("p");
       variant.className = "cart-line__variant";
       variant.textContent = line.variantTitle;
@@ -157,8 +157,8 @@ export function createCartUi({ cartActions, formatMoney, updatePackagesFromCatal
         noteTitle.textContent = "Optional clear acrylic display";
         noteText.textContent = "Keeps your Tapntrust card upright, stable and easy to notice on the counter.";
       } else if (line.kind === "insights") {
-        noteTitle.textContent = "TapnTrust Insights";
-        noteText.textContent = "Renews at A$6.99/month. Cancel anytime. After purchase, we'll email you a secure sign-in link to your private Insights dashboard, where you can view activity and manage your Insights setup.";
+        noteTitle.textContent = "Your private Insights dashboard";
+        noteText.textContent = "Secure sign-in link sent by email after purchase. Renews at A$6.99/month · Cancel anytime.";
       } else {
         noteTitle.textContent = "Extra card for your selected location";
         noteText.textContent = "Programmed with the same business and Google review link as your card package.";

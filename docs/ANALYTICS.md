@@ -50,6 +50,11 @@ When changing Shopify/Meta integrations, verify in Meta Test Events rather than 
 | `extra_card_added` | The visitor's manual Extra Card add-on action succeeds. |
 | `counter_stand_added` | The visitor's manual Counter Stand add-on action succeeds. The automatic free stand in a 5-card bundle never triggers this event. |
 | `begin_checkout` | A visitor clicks an enabled checkout link with a non-empty destination. This is intent, not proof that Shopify loaded or a purchase completed. |
+| `insights_popup_shown` | The Tapntrust Insights promo popup actually becomes visible. |
+| `insights_popup_try_now` | A visitor clicks the Insights popup CTA. |
+| `insights_selected` | A visitor turns the Tapntrust Insights selector on. |
+| `insights_added_to_cart` | Tapntrust Insights is successfully attached to the Shopify cart after the subscription line and required intro offer checks succeed. |
+| `insights_begin_checkout` | A visitor clicks an enabled checkout link while an Insights line is present in the rendered cart. This is checkout intent, not purchase completion. |
 
 Package, claim and add-on events exclude preview carts. Failed additions, changing the selected package before submission, editing business details, restored carts and automatic gifts do not count as successful Add to Cart actions. Package events describe the package at the time of addition, not a later variant change or the final purchased package. Add-on events measure manual additions, not purchases or whether the item remains in the cart.
 
@@ -60,8 +65,9 @@ In Clarity, use API events in Smart Events / Funnels after new visitor activity 
 - Per-package funnel: `add_to_cart_2_cards` (or another package) → `begin_checkout`.
 - Optional claim branch: `add_to_cart` → `welcome_offer_claimed` → `begin_checkout`.
 - Optional upsell branches: `add_to_cart` → `extra_card_added` or `counter_stand_added` → `begin_checkout`.
+- Tapntrust Insights popup funnel: `insights_popup_shown` → `insights_popup_try_now` → `insights_selected` → `insights_added_to_cart` → `insights_begin_checkout`.
 
-Do not require both add-ons or a claim in the main funnel: they are optional and can happen in different orders. The storefront cannot observe email entry or other actions inside Shopify Checkout. These events do not backfill historical sessions and remain suppressed in owner test mode. Reference: [Clarity client API](https://learn.microsoft.com/en-us/clarity/setup-and-installation/clarity-api).
+Do not require both add-ons or a claim in the main funnel: they are optional and can happen in different orders. The storefront cannot observe email entry or other actions inside Shopify Checkout. `insights_begin_checkout` only proves the customer clicked the storefront checkout CTA while Insights was in the cart; purchase completion remains Shopify-side. These events do not backfill historical sessions and remain suppressed in owner test mode. Reference: [Clarity client API](https://learn.microsoft.com/en-us/clarity/setup-and-installation/clarity-api).
 
 ### Owner test mode
 
