@@ -19,9 +19,15 @@ import {
 import { isAllowedGoogleReviewUrl, isValidPublicToken, normalisePublicToken } from "./destinations";
 import { handleInsightsPurchaseRequest, type InsightsPurchaseDependencies } from "./insights-purchase";
 import { createD1Repository, type CardUpdate, type InsightsRepository, type PlacementType } from "./repository";
+import {
+  processPaidOrderEmailAutomation,
+  type ShopifyEmailAutomationDependencies,
+  type ShopifyEmailAutomationEnv
+} from "./shopify-email-automation";
+import { handleSubscriptionInsightsOrderUpdated } from "./shopify-subscription-email-gate";
 import { autoProvisionPaidShopifyOrder } from "./shopify-order-provisioning";
 
-type WorkerEnv = Env & { ADMIN_API_TOKEN?: string };
+type WorkerEnv = Env & ShopifyEmailAutomationEnv & { ADMIN_API_TOKEN?: string };
 
 const PLACEMENT_TYPES = new Set<PlacementType>(["counter", "table", "reception", "register", "other"]);
 const HTML_HEADERS = {
@@ -217,15 +223,46 @@ export async function handleRequest(
   customerDependencies: CustomerAuthDependencies = {},
   billingDependencies: BillingDependencies = {},
   purchaseDependencies: InsightsPurchaseDependencies = {},
-  adminDependencies: AdminProvisioningDependencies = {}
+  adminDependencies: AdminProvisioningDependencies = {},
+  emailAutomationDependencies: ShopifyEmailAutomationDependencies = {}
 ): Promise<Response> {
   const url = new URL(request.url);
 
   try {
     if (url.pathname === "/health") return json({ ok: true });
+    if (url.pathname === "/ap") {
+      if (request.method !== "GET") return methodNotAllowed("GET");
+      return new Response(null, {
+        status: 302,
+        headers: {
+          "Cache-Control": "no-store",
+          Location: "/app",
+          "Referrer-Policy": "no-referrer"
+        }
+      });
+    }
     if (url.pathname === "/api/shopify/webhooks/orders-paid") {
-      await autoProvisionPaidShopifyOrder(request.clone(), env, new Date());
-      return handleShopifyOrdersPaidWebhook(request, env, () => new Date(), billingDependencies);
+      const now = new Date();
+      await autoProvisionPaidShopifyOrder(request.clone(), env, now);
+      const emailOutcome = await processPaidOrderEmailAutomation(
+        request.clone() as unknown as Request,
+        env,
+        now,
+        emailAutomationDependencies
+      );
+      const billingResponse = await handleShopifyOrdersPaidWebhook(request, env, () => now, billingDependencies);
+      if (emailOutcome.retry && billingResponse.ok) {
+        return json({ error: "Webhook temporarily unavailable" }, 503);
+      }
+      return billingResponse;
+    }
+    if (url.pathname === "/api/shopify/webhooks/orders-updated") {
+      return handleSubscriptionInsightsOrderUpdated(
+        request as unknown as Request,
+        env,
+        new Date(),
+        emailAutomationDependencies
+      );
     }
     if (url.pathname === "/api/shopify/webhooks/refunds-create") {
       return handleShopifyRefundCreatedWebhook(request, env, () => new Date(), {
@@ -284,7 +321,8 @@ export default {
       {},
       {},
       {},
-      createShopifyProgrammingDependencies(workerEnv)
+      createShopifyProgrammingDependencies(workerEnv),
+      {}
     );
   },
   async scheduled(_event, env, ctx) {
