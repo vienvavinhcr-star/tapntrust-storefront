@@ -1,4 +1,5 @@
 import config from "./config.js";
+import { trackClarityInsightsAdded } from "./clarity-events.js";
 import { FULFILMENT_KEYS, ITEM_ROLES } from "./fulfilment.js";
 import { addCartLines, fetchProductByHandle } from "./shopify.js";
 
@@ -286,6 +287,7 @@ export function initialiseInsightsOffer({ form, cartActions, toast } = {}) {
     const current = await adoptCartSnapshot(addedCart);
     const added = insightsForSetup(current, setupId);
     if (!added) throw new Error("TapnTrust Insights was not returned by Shopify after it was added.");
+    trackClarityInsightsAdded(current);
     return current;
   }
 
