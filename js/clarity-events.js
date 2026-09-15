@@ -188,6 +188,9 @@ function initialiseInsightsTracking() {
     if (event.target.closest("[data-insights-promo-cta]")) {
       trackClarityEventOnce("insights_popup_try_now");
     }
+    if (event.target.closest("[data-insights-offer-details]")) {
+      trackClarityEventOnce("insights_how_it_works_clicked");
+    }
   });
 
   document.addEventListener("change", (event) => {
