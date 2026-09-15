@@ -33,7 +33,7 @@ async function sign(rawBody: string): Promise<string> {
   return btoa(String.fromCharCode(...signature));
 }
 
-async function requestFor(tags: string): Promise<Request> {
+async function requestFor(tags: string, hmacOverride?: string): Promise<Request> {
   const payload = {
     id: "1234567890",
     admin_graphql_api_id: "gid://shopify/Order/1234567890",
@@ -48,7 +48,7 @@ async function requestFor(tags: string): Promise<Request> {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "X-Shopify-Hmac-Sha256": await sign(body),
+      "X-Shopify-Hmac-Sha256": hmacOverride ?? await sign(body),
       "X-Shopify-Shop-Domain": SHOP_DOMAIN,
       "X-Shopify-Topic": "orders/updated",
       "X-Shopify-Webhook-Id": crypto.randomUUID()
@@ -58,7 +58,7 @@ async function requestFor(tags: string): Promise<Request> {
 }
 
 describe("Shopify Insights subscription tag gate", () => {
-  it("ignores insight-progress on a non-subscription order", async () => {
+  it("ignores insight-progress on a verified non-subscription order", async () => {
     const fetcher = vi.fn() as unknown as typeof fetch;
     const response = await handleSubscriptionInsightsOrderUpdated(
       await requestFor("insight-progress"),
@@ -76,7 +76,20 @@ describe("Shopify Insights subscription tag gate", () => {
     expect(fetcher).not.toHaveBeenCalled();
   });
 
-  it("allows a subscription order to continue into the verified Insights handler", async () => {
+  it("does not let an invalid HMAC bypass verification through the subscription gate", async () => {
+    const fetcher = vi.fn() as unknown as typeof fetch;
+    const response = await handleSubscriptionInsightsOrderUpdated(
+      await requestFor("insight-progress", "invalid"),
+      automationEnv(),
+      new Date(),
+      { fetcher }
+    );
+
+    expect(response.status).toBe(401);
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+
+  it("allows a verified subscription order to continue into the Insights handler", async () => {
     const calls: string[] = [];
     const fetcher = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
