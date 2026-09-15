@@ -4,9 +4,7 @@ import {
   GooglePlacesProviderError,
   type GooglePlacesProvider
 } from "./places-provider";
-import { getShopifyAdminAccessToken } from "./shopify-admin-token";
 
-const INTRO_DISCOUNT_AMOUNT = "5.00";
 const INTRO_FIRST_MONTH_MINOR = 199;
 const STANDARD_MONTH_MINOR = 699;
 const OFFER_TTL_MS = 24 * 60 * 60 * 1000;
@@ -15,43 +13,14 @@ const MAX_BODY_BYTES = 4096;
 export interface InsightsPurchaseEnv {
   DB: D1Database;
   GOOGLE_PLACES_API_KEY: string;
-  SHOPIFY_SHOP_DOMAIN: string;
-  SHOPIFY_ADMIN_API_VERSION: string;
-  SHOPIFY_CLIENT_ID: string;
-  SHOPIFY_CLIENT_SECRET: string;
   SHOPIFY_INSIGHTS_VARIANT_ID: string;
-  SHOPIFY_INSIGHTS_INTRO_SELLING_PLAN_ID: string;
   SHOPIFY_INSIGHTS_STANDARD_SELLING_PLAN_ID: string;
+  SHOPIFY_INSIGHTS_INTRO_DISCOUNT_CODE?: string;
   STOREFRONT_ORIGIN: string;
 }
 
-export interface IntroDiscountInput {
-  code: string;
-  title: string;
-  startsAt: string;
-  endsAt: string;
-  variantId: string;
-}
-
-export interface IntroDiscountResult {
-  nodeId: string;
-  code: string;
-}
-
-export interface ShopifyDiscountProvider {
-  createIntroDiscount(input: IntroDiscountInput): Promise<IntroDiscountResult>;
-}
-
 export interface InsightsPurchaseDependencies {
-  discountProvider?: ShopifyDiscountProvider;
   placesProvider?: GooglePlacesProvider;
-}
-
-export class ShopifyDiscountProviderError extends Error {
-  constructor(message: string, readonly category = "provider_error") {
-    super(message);
-    this.name = "ShopifyDiscountProviderError";
-  }
 }
 
 interface PurchaseRequestBody {
@@ -74,8 +43,6 @@ interface OfferRow {
   identity_key: string;
   business_id: string | null;
   setup_id: string;
-  discount_code: string | null;
-  shopify_discount_node_id: string | null;
   status: string;
   expires_at: string | null;
 }
@@ -225,10 +192,9 @@ function offerPayload(env: InsightsPurchaseEnv, eligibility: EligibilityResoluti
   };
 }
 
-function randomCode(): string {
-  const bytes = crypto.getRandomValues(new Uint8Array(12));
-  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-  return `TNTI-${[...bytes].map((part) => alphabet[part % alphabet.length]).join("")}`;
+function sharedIntroCode(env: InsightsPurchaseEnv): string {
+  const code = clean(env.SHOPIFY_INSIGHTS_INTRO_DISCOUNT_CODE, 120);
+  return code && !/\s/.test(code) ? code : "";
 }
 
 function randomId(prefix: string): string {
@@ -237,7 +203,7 @@ function randomId(prefix: string): string {
 
 async function findOffer(db: D1Database, identityKeyValue: string): Promise<OfferRow | null> {
   return db.prepare(`
-    SELECT id, identity_key, business_id, setup_id, discount_code, shopify_discount_node_id, status, expires_at
+    SELECT id, identity_key, business_id, setup_id, status, expires_at
     FROM insights_intro_offers
     WHERE identity_key = ?
     LIMIT 1
@@ -245,133 +211,57 @@ async function findOffer(db: D1Database, identityKeyValue: string): Promise<Offe
 }
 
 function isUnexpiredIssued(row: OfferRow | null, now: Date): boolean {
-  if (!row || row.status !== "issued" || !row.discount_code || !row.expires_at) return false;
+  if (!row || row.status !== "issued" || !row.expires_at) return false;
   return Date.parse(row.expires_at) > now.getTime();
 }
 
-async function reserveOffer(
+async function issueIntroReservation(
   db: D1Database,
   eligibility: EligibilityResolution,
   setupId: string,
   now: Date
-): Promise<OfferRow> {
+): Promise<{ id: string; expiresAt: string }> {
   const existing = await findOffer(db, eligibility.identityKey);
+  const expiresAt = new Date(now.getTime() + OFFER_TTL_MS).toISOString();
+
+  if (existing && isUnexpiredIssued(existing, now)) {
+    if (existing.setup_id !== setupId || existing.business_id !== eligibility.businessId) {
+      await db.prepare(`
+        UPDATE insights_intro_offers
+        SET business_id = ?, setup_id = ?, discount_code = NULL,
+            shopify_discount_node_id = NULL, updated_at = ?
+        WHERE id = ?
+      `).bind(eligibility.businessId, setupId, now.toISOString(), existing.id).run();
+    }
+    return { id: existing.id, expiresAt: existing.expires_at as string };
+  }
+
   if (existing) {
     await db.prepare(`
       UPDATE insights_intro_offers
-      SET business_id = ?, setup_id = ?, status = 'creating', discount_code = NULL,
-          shopify_discount_node_id = NULL, expires_at = NULL, updated_at = ?
+      SET business_id = ?, setup_id = ?, status = 'issued', discount_code = NULL,
+          shopify_discount_node_id = NULL, expires_at = ?, updated_at = ?
       WHERE id = ?
-    `).bind(eligibility.businessId, setupId, now.toISOString(), existing.id).run();
-    return { ...existing, business_id: eligibility.businessId, setup_id: setupId, status: "creating", discount_code: null, shopify_discount_node_id: null, expires_at: null };
+    `).bind(eligibility.businessId, setupId, expiresAt, now.toISOString(), existing.id).run();
+    return { id: existing.id, expiresAt };
   }
+
   const id = randomId("offer");
   await db.prepare(`
     INSERT INTO insights_intro_offers (
-      id, identity_key, business_id, setup_id, status, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, 'creating', ?, ?)
-  `).bind(id, eligibility.identityKey, eligibility.businessId, setupId, now.toISOString(), now.toISOString()).run();
-  return {
+      id, identity_key, business_id, setup_id, status, discount_code,
+      shopify_discount_node_id, expires_at, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, 'issued', NULL, NULL, ?, ?, ?)
+  `).bind(
     id,
-    identity_key: eligibility.identityKey,
-    business_id: eligibility.businessId,
-    setup_id: setupId,
-    discount_code: null,
-    shopify_discount_node_id: null,
-    status: "creating",
-    expires_at: null
-  };
-}
-
-async function markOfferFailed(db: D1Database, id: string, now: Date): Promise<void> {
-  await db.prepare(`
-    UPDATE insights_intro_offers SET status = 'failed', updated_at = ? WHERE id = ?
-  `).bind(now.toISOString(), id).run();
-}
-
-async function completeOffer(
-  db: D1Database,
-  id: string,
-  result: IntroDiscountResult,
-  expiresAt: string,
-  now: Date
-): Promise<void> {
-  await db.prepare(`
-    UPDATE insights_intro_offers
-    SET status = 'issued', discount_code = ?, shopify_discount_node_id = ?, expires_at = ?, updated_at = ?
-    WHERE id = ?
-  `).bind(result.code, result.nodeId, expiresAt, now.toISOString(), id).run();
-}
-
-export function createShopifyDiscountProvider(env: InsightsPurchaseEnv, fetcher: typeof fetch = fetch): ShopifyDiscountProvider {
-  return {
-    async createIntroDiscount(input) {
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 2500);
-      try {
-        const endpoint = `https://${env.SHOPIFY_SHOP_DOMAIN}/admin/api/${env.SHOPIFY_ADMIN_API_VERSION}/graphql.json`;
-        const query = `
-          mutation CreateTapnTrustIntro($input: DiscountCodeBasicInput!) {
-            discountCodeBasicCreate(basicCodeDiscount: $input) {
-              codeDiscountNode { id }
-              userErrors { field message code }
-            }
-          }
-        `;
-        const variables = {
-          input: {
-            title: input.title,
-            code: input.code,
-            startsAt: input.startsAt,
-            endsAt: input.endsAt,
-            customerSelection: { all: true },
-            customerGets: {
-              value: { discountAmount: { amount: INTRO_DISCOUNT_AMOUNT, appliesOnEachItem: false } },
-              items: { products: { productVariantsToAdd: [input.variantId] } },
-              appliesOnOneTimePurchase: false,
-              appliesOnSubscription: true
-            },
-            appliesOncePerCustomer: true,
-            recurringCycleLimit: 1,
-            usageLimit: 1,
-            combinesWith: { orderDiscounts: true, productDiscounts: true, shippingDiscounts: true }
-          }
-        };
-        const response = await fetcher(endpoint, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "X-Shopify-Access-Token": await getShopifyAdminAccessToken({
-              shopDomain: env.SHOPIFY_SHOP_DOMAIN,
-              clientId: env.SHOPIFY_CLIENT_ID,
-              clientSecret: env.SHOPIFY_CLIENT_SECRET
-            })
-          },
-          body: JSON.stringify({ query, variables }),
-          signal: controller.signal
-        });
-        if (!response.ok) throw new ShopifyDiscountProviderError(`Shopify discount API returned ${response.status}`, "http_error");
-        const payload = await response.json() as {
-          errors?: Array<{ message?: string }>;
-          data?: { discountCodeBasicCreate?: { codeDiscountNode?: { id?: string }; userErrors?: Array<{ message?: string }> } };
-        };
-        const topError = payload.errors?.[0]?.message;
-        const mutation = payload.data?.discountCodeBasicCreate;
-        const userError = mutation?.userErrors?.[0]?.message;
-        const nodeId = clean(mutation?.codeDiscountNode?.id, 240);
-        if (topError || userError || !nodeId) {
-          throw new ShopifyDiscountProviderError(topError || userError || "Shopify did not create the intro discount", "graphql_error");
-        }
-        return { nodeId, code: input.code };
-      } catch (error) {
-        if (error instanceof ShopifyDiscountProviderError) throw error;
-        const category = error instanceof DOMException && error.name === "AbortError" ? "timeout" : "network_error";
-        throw new ShopifyDiscountProviderError("Shopify intro discount creation failed", category);
-      } finally {
-        clearTimeout(timer);
-      }
-    }
-  };
+    eligibility.identityKey,
+    eligibility.businessId,
+    setupId,
+    expiresAt,
+    now.toISOString(),
+    now.toISOString()
+  ).run();
+  return { id, expiresAt };
 }
 
 export async function handleInsightsPurchaseRequest(
@@ -409,43 +299,17 @@ export async function handleInsightsPurchaseRequest(
     return json(env, offerPayload(env, eligibility));
   }
 
-  const now = nowFactory();
-  const existing = await findOffer(env.DB, eligibility.identityKey);
-  if (isUnexpiredIssued(existing, now)) {
-    return json(env, offerPayload(env, eligibility, {
-      offerId: existing?.id,
-      discountCode: existing?.discount_code,
-      expiresAt: existing?.expires_at
-    }));
-  }
-  if (existing?.status === "creating") {
-    return json(env, { error: "Offer is being prepared. Please try again." }, 409);
+  const discountCode = sharedIntroCode(env);
+  if (!discountCode) {
+    console.error(JSON.stringify({ message: "insights shared intro discount code is not configured" }));
+    return json(env, { error: "The A$1.99 intro offer is temporarily unavailable. Please try again." }, 503);
   }
 
-  const reservation = await reserveOffer(env.DB, eligibility, body.setupId || "", now);
-  const code = randomCode();
-  const expiresAt = new Date(now.getTime() + OFFER_TTL_MS).toISOString();
-  const provider = dependencies.discountProvider || createShopifyDiscountProvider(env);
-  try {
-    const created = await provider.createIntroDiscount({
-      code,
-      title: `TapnTrust Insights first month ${reservation.id.slice(-8)}`,
-      startsAt: now.toISOString(),
-      endsAt: expiresAt,
-      variantId: env.SHOPIFY_INSIGHTS_VARIANT_ID
-    });
-    await completeOffer(env.DB, reservation.id, created, expiresAt, now);
-    return json(env, offerPayload(env, eligibility, {
-      offerId: reservation.id,
-      discountCode: created.code,
-      expiresAt
-    }));
-  } catch (error) {
-    await markOfferFailed(env.DB, reservation.id, now).catch(() => {});
-    console.error(JSON.stringify({
-      message: "insights intro offer provider failure",
-      category: error instanceof ShopifyDiscountProviderError ? error.category : "unknown"
-    }));
-    return json(env, { error: "The A$1.99 intro offer could not be prepared right now. Please try again." }, 503);
-  }
+  const now = nowFactory();
+  const reservation = await issueIntroReservation(env.DB, eligibility, body.setupId || "", now);
+  return json(env, offerPayload(env, eligibility, {
+    discountCode,
+    offerId: reservation.id,
+    expiresAt: reservation.expiresAt
+  }));
 }

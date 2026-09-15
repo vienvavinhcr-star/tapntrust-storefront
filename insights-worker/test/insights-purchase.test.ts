@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { createExecutionContext } from "cloudflare:test";
 import { env } from "cloudflare:workers";
 import { handleRequest } from "../src/index";
-import type { IntroDiscountInput, InsightsPurchaseDependencies, ShopifyDiscountProvider } from "../src/insights-purchase";
+import type { InsightsPurchaseDependencies } from "../src/insights-purchase";
 import {
   GooglePlacesProviderError,
   type GooglePlacesFailureCode,
@@ -12,17 +12,7 @@ import {
 const WORKER_ORIGIN = "https://go.tapntrust.com";
 const STOREFRONT_ORIGIN = "https://tapntrust.com";
 const ADMIN_TOKEN = "test-admin-token-that-is-not-a-production-secret";
-
-class MockDiscountProvider implements ShopifyDiscountProvider {
-  readonly calls: IntroDiscountInput[] = [];
-  fail = false;
-
-  async createIntroDiscount(input: IntroDiscountInput) {
-    this.calls.push(input);
-    if (this.fail) throw new Error("provider down");
-    return { nodeId: `gid://shopify/DiscountCodeNode/${this.calls.length}`, code: input.code };
-  }
-}
+const INTRO_CODE = "TNTI-TEST-INTRO-CODE";
 
 class MockPlacesProvider implements GooglePlacesProvider {
   readonly summaryCalls: string[] = [];
@@ -43,17 +33,14 @@ class MockPlacesProvider implements GooglePlacesProvider {
   }
 }
 
-const discountProvider = new MockDiscountProvider();
 const placesProvider = new MockPlacesProvider();
-const purchaseDependencies: InsightsPurchaseDependencies = { discountProvider, placesProvider };
+const purchaseDependencies: InsightsPurchaseDependencies = { placesProvider };
 
 function unique(prefix: string) {
   return `${prefix}-${crypto.randomUUID()}`;
 }
 
 async function clearDatabase() {
-  discountProvider.calls.length = 0;
-  discountProvider.fail = false;
   placesProvider.summaryCalls.length = 0;
   placesProvider.failCode = null;
   await env.DB.batch([
@@ -161,7 +148,7 @@ async function seedRedeemedBusiness(placeId: string) {
 
 beforeEach(clearDatabase);
 
-describe("Phase 4C storefront Insights offer", () => {
+describe("storefront Insights shared intro offer", () => {
   it("rejects requests from a different origin", async () => {
     const response = await requestOffer({
       action: "quote",
@@ -182,10 +169,9 @@ describe("Phase 4C storefront Insights offer", () => {
     });
     expect(response.status).toBe(400);
     expect(placesProvider.summaryCalls).toHaveLength(0);
-    expect(discountProvider.calls).toHaveLength(0);
   });
 
-  it("quotes a server-verified Google business as intro eligible without creating a discount", async () => {
+  it("quotes a verified business as intro eligible without exposing the shared code", async () => {
     const response = await requestOffer({
       action: "quote",
       businessName: "New Test Business",
@@ -197,8 +183,9 @@ describe("Phase 4C storefront Insights offer", () => {
     expect(payload.offerKind).toBe("intro");
     expect(payload.firstMonthMinor).toBe(199);
     expect(payload.recurringMinor).toBe(699);
+    expect(payload.sellingPlanId).toBe(String(env.SHOPIFY_INSIGHTS_STANDARD_SELLING_PLAN_ID));
+    expect(payload.discountCode).toBeUndefined();
     expect(placesProvider.summaryCalls).toEqual(["ChIJ-new-business"]);
-    expect(discountProvider.calls).toHaveLength(0);
   });
 
   it("does not issue an intro when Google says the Place ID is invalid or missing", async () => {
@@ -211,7 +198,6 @@ describe("Phase 4C storefront Insights offer", () => {
       reviewUrl: "https://search.google.com/local/writereview?placeid=ChIJ-fake-business"
     });
     expect(response.status).toBe(400);
-    expect(discountProvider.calls).toHaveLength(0);
     const row = await env.DB.prepare("SELECT id FROM insights_intro_offers LIMIT 1").first<{ id: string }>();
     expect(row).toBeNull();
   });
@@ -226,10 +212,9 @@ describe("Phase 4C storefront Insights offer", () => {
       reviewUrl: "https://search.google.com/local/writereview?placeid=ChIJ-timeout-business"
     });
     expect(response.status).toBe(503);
-    expect(discountProvider.calls).toHaveLength(0);
   });
 
-  it("creates one subscription-only A$5 discount for one billing cycle and reuses it", async () => {
+  it("issues the single configured intro code and reuses the reservation without creating Shopify discount rows", async () => {
     const body = {
       action: "issue",
       setupId: unique("setup"),
@@ -239,20 +224,26 @@ describe("Phase 4C storefront Insights offer", () => {
     };
     const first = await requestOffer(body);
     expect(first.status).toBe(200);
-    const firstPayload = await first.json<{ discountCode: string; offerId: string }>();
-    expect(firstPayload.discountCode).toMatch(/^TNTI-/);
-    expect(discountProvider.calls).toHaveLength(1);
-    expect(discountProvider.calls[0]?.variantId).toBe(String(env.SHOPIFY_INSIGHTS_VARIANT_ID));
+    const firstPayload = await first.json<{ discountCode: string; offerId: string; sellingPlanId: string }>();
+    expect(firstPayload.discountCode).toBe(INTRO_CODE);
+    expect(firstPayload.offerId).toMatch(/^offer_/);
+    expect(firstPayload.sellingPlanId).toBe(String(env.SHOPIFY_INSIGHTS_STANDARD_SELLING_PLAN_ID));
+
+    const firstRow = await env.DB.prepare(`
+      SELECT status, discount_code, shopify_discount_node_id
+      FROM insights_intro_offers
+      LIMIT 1
+    `).first<{ status: string; discount_code: string | null; shopify_discount_node_id: string | null }>();
+    expect(firstRow).toEqual({ status: "issued", discount_code: null, shopify_discount_node_id: null });
 
     const second = await requestOffer(body);
     expect(second.status).toBe(200);
     const secondPayload = await second.json<{ discountCode: string; offerId: string }>();
-    expect(secondPayload.discountCode).toBe(firstPayload.discountCode);
+    expect(secondPayload.discountCode).toBe(INTRO_CODE);
     expect(secondPayload.offerId).toBe(firstPayload.offerId);
-    expect(discountProvider.calls).toHaveLength(1);
   });
 
-  it("returns standard pricing for a verified business that already consumed its intro", async () => {
+  it("returns standard pricing without the shared code after the business consumed its intro", async () => {
     const placeId = "ChIJ-redeemed-business";
     await seedRedeemedBusiness(placeId);
     const response = await requestOffer({
@@ -268,7 +259,8 @@ describe("Phase 4C storefront Insights offer", () => {
     expect(payload.introEligible).toBe(false);
     expect(payload.firstMonthMinor).toBe(699);
     expect(payload.reason).toBe("intro_already_used");
-    expect(discountProvider.calls).toHaveLength(0);
+    expect(payload.sellingPlanId).toBe(String(env.SHOPIFY_INSIGHTS_STANDARD_SELLING_PLAN_ID));
+    expect(payload.discountCode).toBeUndefined();
   });
 
   it("quotes a manual business at standard A$6.99 without Google verification", async () => {
@@ -284,11 +276,12 @@ describe("Phase 4C storefront Insights offer", () => {
     expect(payload.reason).toBe("manual_unverified");
     expect(payload.firstMonthMinor).toBe(699);
     expect(payload.recurringMinor).toBe(699);
+    expect(payload.sellingPlanId).toBe(String(env.SHOPIFY_INSIGHTS_STANDARD_SELLING_PLAN_ID));
+    expect(payload.discountCode).toBeUndefined();
     expect(placesProvider.summaryCalls).toHaveLength(0);
-    expect(discountProvider.calls).toHaveLength(0);
   });
 
-  it("never creates an intro discount for a manual business issue request", async () => {
+  it("does not create an intro reservation for a manual business issue request", async () => {
     const response = await requestOffer({
       action: "issue",
       setupId: unique("setup"),
@@ -299,25 +292,8 @@ describe("Phase 4C storefront Insights offer", () => {
     const payload = await response.json<Record<string, unknown>>();
     expect(payload.offerKind).toBe("standard");
     expect(payload.reason).toBe("manual_unverified");
-    expect(payload.firstMonthMinor).toBe(699);
-    expect(discountProvider.calls).toHaveLength(0);
     const row = await env.DB.prepare("SELECT id FROM insights_intro_offers LIMIT 1").first<{ id: string }>();
     expect(row).toBeNull();
-  });
-
-  it("fails closed when Shopify cannot create the intro discount", async () => {
-    discountProvider.fail = true;
-    const response = await requestOffer({
-      action: "issue",
-      setupId: unique("setup"),
-      businessName: "Provider Failure Business",
-      googlePlaceId: "ChIJ-provider-fail",
-      reviewUrl: "https://search.google.com/local/writereview?placeid=ChIJ-provider-fail"
-    });
-    expect(response.status).toBe(503);
-    const row = await env.DB.prepare("SELECT status, discount_code FROM insights_intro_offers LIMIT 1").first<{ status: string; discount_code: string | null }>();
-    expect(row?.status).toBe("failed");
-    expect(row?.discount_code).toBeNull();
   });
 
   it("supports CORS preflight only for the configured storefront", async () => {

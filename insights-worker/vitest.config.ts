@@ -11,6 +11,7 @@ export default defineConfig({
           GOOGLE_PLACES_API_KEY: "test-google-places-key-not-a-production-secret",
           SHOPIFY_CLIENT_ID: "test-shopify-client-id",
           SHOPIFY_CLIENT_SECRET: "test-shopify-webhook-secret-not-for-production",
+          SHOPIFY_INSIGHTS_INTRO_DISCOUNT_CODE: "TNTI-TEST-INTRO-CODE",
           SHOPIFY_SHOP_DOMAIN: "tapntrust-test.myshopify.com",
           SHOPIFY_ADMIN_API_VERSION: "2026-07",
           STOREFRONT_ORIGIN: "https://tapntrust.com",
