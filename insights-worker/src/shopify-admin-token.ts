@@ -1,7 +1,7 @@
 import { ShopifyAdminProviderError } from "./shopify-admin";
 
 const REFRESH_SKEW_MS = 5 * 60 * 1000;
-const TOKEN_TIMEOUT_MS = 3000;
+const TOKEN_TIMEOUT_MS = 10_000;
 
 interface TokenConfig {
   shopDomain: string;
