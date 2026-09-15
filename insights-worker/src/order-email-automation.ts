@@ -117,7 +117,7 @@ function orderHasInsightsVariant(payload: OrderRecord, configuredVariantId: stri
 }
 
 async function readVerifiedOrderWebhook(
-  request: Request,
+  request: Request<any, any>,
   env: OrderEmailAutomationEnv,
   expectedTopic: "orders/paid" | "orders/updated"
 ): Promise<OrderRecord> {
@@ -228,7 +228,7 @@ async function addOrderTag(
 }
 
 export async function processPaidOrderQuickGuide(
-  request: Request,
+  request: Request<any, any>,
   env: OrderEmailAutomationEnv,
   now: Date = new Date()
 ): Promise<"scheduled" | "ignored"> {
@@ -260,7 +260,7 @@ export async function processPaidOrderQuickGuide(
 }
 
 export async function handleUpdatedOrderInsightsEmail(
-  request: Request,
+  request: Request<any, any>,
   env: OrderEmailAutomationEnv
 ): Promise<Response> {
   try {
