@@ -9,6 +9,7 @@ const QUICK_GUIDE_SENT_TAG = "quick-guide-sent";
 const INSIGHTS_PROGRESS_TAG = "insight-progress";
 const INSIGHTS_EMAIL_SENT_TAG = "insight-email-sent";
 const SUBSCRIPTION_TAG = "subscription";
+const DEFAULT_EMAIL_AUTOMATION_CUTOFF = "2026-09-15T00:00:00+10:00";
 
 export interface OrderEmailAutomationEnv {
   RESEND_API_KEY?: string;
@@ -91,8 +92,7 @@ function orderCreatedAt(payload: OrderRecord): Date | null {
 }
 
 function cutoffDate(env: OrderEmailAutomationEnv): Date | null {
-  if (!env.EMAIL_AUTOMATION_CUTOFF) return null;
-  const date = new Date(env.EMAIL_AUTOMATION_CUTOFF);
+  const date = new Date(env.EMAIL_AUTOMATION_CUTOFF || DEFAULT_EMAIL_AUTOMATION_CUTOFF);
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
