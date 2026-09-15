@@ -1,5 +1,7 @@
 import { ADMIN_PAGE } from "./admin-page";
 import { enhanceAdminPage } from "./admin-page-enhancements";
+import { enhanceAdminAnalyticsPage } from "./admin-analytics-page";
+import { handleAdminAnalyticsRequest } from "./admin-analytics";
 import {
   createShopifyProgrammingDependencies,
   handleAdminProvisioningRequest,
@@ -7,6 +9,7 @@ import {
 } from "./admin-provisioning";
 import { handleShopifyOrdersPaidWebhook, type BillingDependencies } from "./billing-service";
 import { handleCustomerRequest, type CustomerAuthDependencies } from "./customer-auth";
+import { queueCustomerUsageTracking } from "./customer-usage";
 import {
   handleAdminSubscriptionLifecycleRequest,
   handleCustomerBillingRequest,
@@ -27,7 +30,7 @@ const HTML_HEADERS = {
   "Referrer-Policy": "no-referrer",
   "X-Content-Type-Options": "nosniff"
 };
-const ENHANCED_ADMIN_PAGE = enhanceAdminPage(ADMIN_PAGE);
+const ENHANCED_ADMIN_PAGE = enhanceAdminAnalyticsPage(enhanceAdminPage(ADMIN_PAGE));
 
 function json(data: unknown, status = 200): Response {
   return Response.json(data, {
@@ -171,6 +174,9 @@ async function handleAdmin(
     return json(await repository.getSummary(monthStartUtc(new Date())));
   }
 
+  const analyticsResponse = await handleAdminAnalyticsRequest(request, env.DB, env.AUTH_BASE_URL, new Date());
+  if (analyticsResponse) return analyticsResponse;
+
   const lifecycleResponse = await handleAdminSubscriptionLifecycleRequest(request, pathname, env.DB);
   if (lifecycleResponse) return lifecycleResponse;
 
@@ -246,7 +252,10 @@ export async function handleRequest(
     if (billingCustomerResponse) return billingCustomerResponse;
 
     const customerResponse = await handleCustomerRequest(request, url, env, ctx, customerDependencies);
-    if (customerResponse) return customerResponse;
+    if (customerResponse) {
+      queueCustomerUsageTracking(request, url, customerResponse, env, ctx);
+      return customerResponse;
+    }
 
     const tapMatch = url.pathname.match(/^\/t\/([^/]+)\/?$/);
     if (tapMatch) return handleTap(request, decodeURIComponent(tapMatch[1] || ""), repository, ctx);
