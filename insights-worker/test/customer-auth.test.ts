@@ -245,8 +245,8 @@ describe("customer magic-link authentication", () => {
     expect(page).toContain("document.addEventListener('visibilitychange'");
     expect(page).toContain("window.addEventListener('focus'");
     expect(page).toContain("if(response.status===401){showLogin();return}");
-    expect(page).toContain('src="/tapntrust-insights-mascot.png"');
-    expect(page.match(/src="\/tapntrust-insights-mascot\.png"/g)).toHaveLength(4);
+    expect(page).toContain('src="/tapntrust-insights-mascot-transparent.png"');
+    expect(page.match(/src="\/tapntrust-insights-mascot-transparent\.png"/g)).toHaveLength(4);
     expect(page).toContain("mascot-crop mascot-insights");
     expect(page).toContain("mascot-crop mascot-guidance");
     expect(page).toContain(".guide-art,.guide-art .mascot-crop{width:82px}");
