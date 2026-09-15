@@ -224,7 +224,20 @@ export async function handleRequest(
   try {
     if (url.pathname === "/health") return json({ ok: true });
     if (url.pathname === "/api/shopify/webhooks/orders-paid") {
-      await autoProvisionPaidShopifyOrder(request.clone(), env, new Date());
+      const provisionedBatches = await autoProvisionPaidShopifyOrder(request.clone(), env, new Date());
+      if (adminDependencies.syncProgrammingManifest) {
+        for (const batch of provisionedBatches) {
+          ctx.waitUntil(
+            adminDependencies.syncProgrammingManifest(batch.manifest)
+              .then((result) => {
+                console.log(JSON.stringify({ event: "shopify_programming_urls_synced", orderReference: batch.manifest.externalOrderReference.slice(0, 80), setupReference: batch.manifest.externalSetupReference.slice(0, 80), cardCount: batch.manifest.cards.length, orderName: result.orderName }));
+              })
+              .catch((error) => {
+                console.warn(JSON.stringify({ event: "shopify_programming_urls_sync_failed", orderReference: batch.manifest.externalOrderReference.slice(0, 80), setupReference: batch.manifest.externalSetupReference.slice(0, 80), error: error instanceof Error ? error.message : String(error) }));
+              })
+          );
+        }
+      }
       return handleShopifyOrdersPaidWebhook(request, env, () => new Date(), billingDependencies);
     }
     if (url.pathname === "/api/shopify/webhooks/refunds-create") {
