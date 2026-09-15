@@ -108,15 +108,19 @@ Shopify remains authoritative for payment and the first-party Shopify Subscripti
 
 ## Phase 4C purchase flow
 
-The storefront presents TapnTrust Insights as an optional add-on beside the physical card setup. Ticking the option does **not** activate Insights. It adds a Shopify subscription line using the confirmed TapnTrust Insights variant and monthly selling plan. Activation remains payment-authoritative through the existing verified 'orders/paid' pipeline.
+The storefront presents TapnTrust Insights as an optional add-on beside the physical card setup. Ticking the option does **not** activate Insights. It adds a Shopify subscription line using the confirmed TapnTrust Insights variant and monthly selling plan. Activation remains payment-authoritative through the existing verified `orders/paid` pipeline.
 
 Confirmed Shopify identities:
-- variant: 'gid://shopify/ProductVariant/48192855376003'
-- monthly selling plan: 'gid://shopify/SellingPlan/2791899267'
+- variant: `gid://shopify/ProductVariant/48192855376003`
+- monthly selling plan: `gid://shopify/SellingPlan/2791899267`
 - base recurring price: A$6.99 AUD/month
 
-The same monthly selling plan is used for the first payment and renewals. Eligible businesses receive a short-lived, single-use A$5 Shopify discount code restricted to the Insights subscription variant with 'recurringCycleLimit: 1'. That makes the first successful charge A$1.99 while later billing cycles remain A$6.99. The Worker requires the Shopify Admin app token to have 'write_discounts' before production rollout.
+The same Shopify Subscriptions monthly selling plan remains authoritative for the first payment and renewals. TapnTrust uses one pre-created A$5 Shopify discount code for the A$1.99 intro. That shared code must be restricted in Shopify to the Insights subscription product, subscription purchases only, the first recurring payment only, and one use per customer. The code is stored only as a Cloudflare Worker secret and is returned by the Worker only after the business passes intro eligibility checks; quote responses never expose it.
 
-Intro eligibility is keyed to a Google Place ID that the Worker verifies server-side with Google Places before any A$5 discount can be created. The authoritative once-per-business redemption remains 'business_insights_intro_redemptions' after payment; pre-checkout offer issuance is an eligibility gate, not proof of payment. Manual businesses are intentionally treated as unverified in Phase 4C: they can still buy the physical NFC card and add Insights at the standard A$6.99/month price, but they do not receive the A$1.99 intro discount until a verifiable Google business identity is available.
+The Worker no longer creates a Shopify Discount object for every checkout. D1 `insights_intro_offers` rows are only short-lived reservation/audit records and deliberately keep `discount_code` and `shopify_discount_node_id` null so the shared code does not collide with the table's unique legacy column. The storefront adds the Insights line and applies the shared code in one Storefront GraphQL request, then verifies that the intro code and any existing compatible codes remain applicable. If Shopify rejects the combination, Insights is rolled back and the previous discount state is restored.
 
-A cart may contain only one Insights location during Phase 4C to avoid ambiguous stacking of multiple first-cycle product discounts. Physical card purchases remain available without Insights.
+Intro eligibility is keyed to a Google Place ID that the Worker verifies server-side with Google Places before the shared code can be issued to the storefront. The authoritative once-per-business redemption remains `business_insights_intro_redemptions` after payment; pre-checkout offer issuance is an eligibility gate, not proof of payment. Manual businesses are intentionally treated as unverified: they can still buy the physical NFC card and add Insights at the standard A$6.99/month price, but they do not receive the A$1.99 intro until a verifiable Google business identity is available.
+
+The shared code is intentionally long and unmarketed, but it is still visible to a customer once Shopify applies it at checkout. Do not treat secrecy of the code as the authorization boundary. Shopify's one-use-per-customer rule, server-side business eligibility, the paid webhook, and `business_insights_intro_redemptions` remain the abuse and entitlement controls.
+
+A cart may contain only one Insights location during Phase 4C. Physical card purchases remain available without Insights.
