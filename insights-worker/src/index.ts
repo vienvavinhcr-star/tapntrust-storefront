@@ -20,11 +20,11 @@ import { isAllowedGoogleReviewUrl, isValidPublicToken, normalisePublicToken } fr
 import { handleInsightsPurchaseRequest, type InsightsPurchaseDependencies } from "./insights-purchase";
 import { createD1Repository, type CardUpdate, type InsightsRepository, type PlacementType } from "./repository";
 import {
-  handleOrdersUpdatedEmailAutomation,
   processPaidOrderEmailAutomation,
   type ShopifyEmailAutomationDependencies,
   type ShopifyEmailAutomationEnv
 } from "./shopify-email-automation";
+import { handleSubscriptionInsightsOrderUpdated } from "./shopify-subscription-email-gate";
 import { autoProvisionPaidShopifyOrder } from "./shopify-order-provisioning";
 
 type WorkerEnv = Env & ShopifyEmailAutomationEnv & { ADMIN_API_TOKEN?: string };
@@ -257,7 +257,7 @@ export async function handleRequest(
       return billingResponse;
     }
     if (url.pathname === "/api/shopify/webhooks/orders-updated") {
-      return handleOrdersUpdatedEmailAutomation(request, env, new Date(), emailAutomationDependencies);
+      return handleSubscriptionInsightsOrderUpdated(request, env, new Date(), emailAutomationDependencies);
     }
     if (url.pathname === "/api/shopify/webhooks/refunds-create") {
       return handleShopifyRefundCreatedWebhook(request, env, () => new Date(), {
