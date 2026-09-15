@@ -16,6 +16,7 @@ import {
 import { isAllowedGoogleReviewUrl, isValidPublicToken, normalisePublicToken } from "./destinations";
 import { handleInsightsPurchaseRequest, type InsightsPurchaseDependencies } from "./insights-purchase";
 import { createD1Repository, type CardUpdate, type InsightsRepository, type PlacementType } from "./repository";
+import { autoProvisionPaidShopifyOrder } from "./shopify-order-provisioning";
 
 type WorkerEnv = Env & { ADMIN_API_TOKEN?: string };
 
@@ -217,6 +218,7 @@ export async function handleRequest(
   try {
     if (url.pathname === "/health") return json({ ok: true });
     if (url.pathname === "/api/shopify/webhooks/orders-paid") {
+      await autoProvisionPaidShopifyOrder(request.clone(), env, new Date());
       return handleShopifyOrdersPaidWebhook(request, env, () => new Date(), billingDependencies);
     }
     if (url.pathname === "/api/shopify/webhooks/refunds-create") {
