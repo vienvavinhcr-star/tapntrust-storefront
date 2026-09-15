@@ -187,14 +187,14 @@ export async function addCartLines(cartId, lines) {
 }
 
 export async function addCartLinesWithDiscountCodes(cartId, lines, discountCodes) {
+  // Keep these as two Storefront requests. Shopify evaluates discount applicability
+  // against the cart's current contents; applying the code only after the subscription
+  // line is committed avoids the code being evaluated before the new selling-plan line
+  // is visible to discount qualification.
+  const addedCart = await addCartLines(cartId, lines);
   const mutation = `
-    mutation CartLinesAddWithDiscounts($cartId: ID!, $lines: [CartLineInput!]!, $discountCodes: [String!]!) {
-      add: cartLinesAdd(cartId: $cartId, lines: $lines) {
-        cart { ...CartFields }
-        userErrors { field message code }
-        warnings { code message target }
-      }
-      discounts: cartDiscountCodesUpdate(cartId: $cartId, discountCodes: $discountCodes) {
+    mutation CartDiscountCodesUpdate($cartId: ID!, $discountCodes: [String!]!) {
+      cartDiscountCodesUpdate(cartId: $cartId, discountCodes: $discountCodes) {
         cart { ...CartFields }
         userErrors { field message code }
         warnings { code message target }
@@ -202,14 +202,12 @@ export async function addCartLinesWithDiscountCodes(cartId, lines, discountCodes
     }
     ${CART_FRAGMENT}
   `;
-  const data = await storefrontRequest(mutation, { cartId, lines, discountCodes });
-  const addedCart = assertMutation(data, "add");
-  const discountPayload = data?.discounts;
-  const discountErrors = discountPayload?.userErrors || [];
+  const data = await storefrontRequest(mutation, { cartId, discountCodes });
+  const discountPayload = data?.cartDiscountCodesUpdate;
   return {
     cart: discountPayload?.cart || addedCart,
     addedCart,
-    discountErrors,
+    discountErrors: discountPayload?.userErrors || [],
     discountWarnings: discountPayload?.warnings || []
   };
 }
