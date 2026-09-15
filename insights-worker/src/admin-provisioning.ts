@@ -8,10 +8,46 @@ import {
   provisionPhysicalCards,
   revokeCustomerBusinessAccess
 } from "./provisioning-repository";
-import { parseProvisioningIntent, ProvisioningError } from "./provisioning";
+import { parseProvisioningIntent, ProvisioningError, type ProvisioningManifest } from "./provisioning";
 import { reconcileBillingAfterProvisioning } from "./billing-service";
+import { getShopifyAdminAccessToken } from "./shopify-admin-token";
+import {
+  ShopifyOrderProgrammingError,
+  syncProgrammingManifestToShopifyOrder,
+  type ShopifyOrderProgrammingResult
+} from "./shopify-order-programming";
 
 const MAX_ADMIN_BODY_BYTES = 16_384;
+
+export interface AdminProvisioningDependencies {
+  syncProgrammingManifest?: (manifest: ProvisioningManifest) => Promise<ShopifyOrderProgrammingResult>;
+}
+
+export interface AdminProvisioningShopifyEnv {
+  SHOPIFY_CLIENT_ID: string;
+  SHOPIFY_CLIENT_SECRET: string;
+  SHOPIFY_SHOP_DOMAIN: string;
+  SHOPIFY_ADMIN_API_VERSION: string;
+}
+
+export function createShopifyProgrammingDependencies(
+  env: AdminProvisioningShopifyEnv
+): AdminProvisioningDependencies {
+  return {
+    syncProgrammingManifest: async (manifest) => {
+      const accessToken = await getShopifyAdminAccessToken({
+        shopDomain: env.SHOPIFY_SHOP_DOMAIN,
+        clientId: env.SHOPIFY_CLIENT_ID,
+        clientSecret: env.SHOPIFY_CLIENT_SECRET
+      });
+      return syncProgrammingManifestToShopifyOrder({
+        shopDomain: env.SHOPIFY_SHOP_DOMAIN,
+        accessToken,
+        apiVersion: env.SHOPIFY_ADMIN_API_VERSION
+      }, manifest);
+    }
+  };
+}
 
 function json(data: unknown, status = 200): Response {
   return Response.json(data, {
@@ -104,12 +140,39 @@ async function readAdminPost(request: Request, authBaseUrl: string): Promise<unk
   return readBoundedJson(request);
 }
 
+async function syncProgrammingUrls(
+  manifest: ProvisioningManifest,
+  dependencies: AdminProvisioningDependencies
+): Promise<
+  | { status: "synced"; orderName: string }
+  | { status: "failed"; reason: string }
+  | null
+> {
+  if (!dependencies.syncProgrammingManifest) return null;
+  try {
+    const result = await dependencies.syncProgrammingManifest(manifest);
+    return { status: "synced", orderName: result.orderName };
+  } catch (error) {
+    const reason = error instanceof ShopifyOrderProgrammingError
+      ? error.code
+      : "unexpected_error";
+    console.warn(JSON.stringify({
+      event: "shopify_programming_urls_sync_failed",
+      orderReference: manifest.externalOrderReference.slice(0, 80),
+      setupReference: manifest.externalSetupReference.slice(0, 80),
+      reason
+    }));
+    return { status: "failed", reason };
+  }
+}
+
 export async function handleAdminProvisioningRequest(
   request: Request,
   pathname: string,
   db: D1Database,
   authBaseUrl: string,
-  now: () => Date = () => new Date()
+  now: () => Date = () => new Date(),
+  dependencies: AdminProvisioningDependencies = {}
 ): Promise<Response | null> {
   try {
     if (pathname === "/api/admin/provisioning/options") {
@@ -123,14 +186,19 @@ export async function handleAdminProvisioningRequest(
       if (body instanceof Response) return body;
       const intent = parseProvisioningIntent(body);
       if (!intent) return json({ error: "Invalid provisioning request" }, 400);
-      const result = await provisionPhysicalCards(db, intent, now().toISOString());
+      const timestamp = now().toISOString();
+      const result = await provisionPhysicalCards(db, intent, timestamp);
       await reconcileBillingAfterProvisioning(
         db,
         result.manifest.externalOrderReference,
         result.manifest.externalSetupReference,
-        now().toISOString()
+        timestamp
       );
-      return json(result, result.replayed ? 200 : 201);
+      const shopifyOrderSync = await syncProgrammingUrls(result.manifest, dependencies);
+      return json(
+        shopifyOrderSync ? { ...result, shopifyOrderSync } : result,
+        result.replayed ? 200 : 201
+      );
     }
 
     const batchMatch = pathname.match(/^\/api\/admin\/provisioning\/batches\/([^/]+)$/);
