@@ -73,6 +73,7 @@ export interface AdminAnalyticsSnapshot {
     tapsInRange: number;
     lifetimeTaps: number;
     activeInsightsLocations: number;
+    activePaidSubscriptions: number;
     dashboardOpens: number;
     refreshGoogleDataClicks: number;
     showGoogleReviewsClicks: number;
@@ -351,6 +352,7 @@ export function createAdminAnalyticsRepository(db: D1Database, baseUrl: string) 
       let tapsInRange = 0;
       let lifetimeTaps = 0;
       let activeInsightsLocations = 0;
+      let activePaidSubscriptions = 0;
       let dashboardOpens = 0;
       let refreshGoogleDataClicks = 0;
       let showGoogleReviewsClicks = 0;
@@ -363,6 +365,7 @@ export function createAdminAnalyticsRepository(db: D1Database, baseUrl: string) 
         tapsInRange += location.tapsInRange;
         lifetimeTaps += location.lifetimeTaps;
         if (location.insightsStatus === "active") activeInsightsLocations += 1;
+        if (location.subscription?.status === "active") activePaidSubscriptions += 1;
         dashboardOpens += location.dashboardUsage.opens;
         refreshGoogleDataClicks += location.dashboardUsage.refreshGoogleDataClicks;
         showGoogleReviewsClicks += location.dashboardUsage.showGoogleReviewsClicks;
@@ -381,6 +384,7 @@ export function createAdminAnalyticsRepository(db: D1Database, baseUrl: string) 
           tapsInRange,
           lifetimeTaps,
           activeInsightsLocations,
+          activePaidSubscriptions,
           dashboardOpens,
           refreshGoogleDataClicks,
           showGoogleReviewsClicks,
