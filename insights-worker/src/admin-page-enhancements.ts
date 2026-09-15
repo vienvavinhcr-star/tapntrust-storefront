@@ -2,7 +2,7 @@ const ADMIN_PROVISIONING_STYLE = `<style>
   .provision-source{display:flex;gap:10px;flex-wrap:wrap;padding:4px 0 2px}.provision-source label{display:flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:12px;padding:10px 14px;background:#fff;cursor:pointer}.provision-source input{width:auto}.admin-finder{grid-column:1/-1;border:1px solid var(--line);border-radius:14px;padding:16px;background:#f8fbff}.admin-finder__top{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:10px}.admin-finder__search{position:relative}.admin-finder__search input{width:100%;border:1px solid var(--line);border-radius:10px;padding:11px 12px;font:inherit}.admin-finder__results{display:grid;gap:6px;margin-top:8px}.admin-finder__result{width:100%;text-align:left;border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:#fff;color:var(--navy);cursor:pointer}.admin-finder__result strong,.admin-finder__result small{display:block}.admin-finder__result small{color:var(--muted);margin-top:2px}.admin-finder__status{font-size:.82rem;color:var(--muted);margin-top:8px}.admin-finder__selected{border:1px solid #9fc2fb;border-radius:12px;padding:12px;background:#eef5ff}.admin-finder__selected strong,.admin-finder__selected span{display:block}.admin-finder__selected span{color:var(--muted);font-size:.86rem}.admin-finder__actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}@media(max-width:700px){.provision-source{display:grid}.admin-finder__top{align-items:flex-start;flex-direction:column}}
 </style>`;
 
-const ADMIN_PROVISIONING_SCRIPT = `<script>
+const ADMIN_PROVISIONING_SCRIPT = `
 (() => {
   const form = document.querySelector('#provision-form');
   if (!form || form.dataset.manualEnhanced === '1') return;
@@ -204,11 +204,10 @@ const ADMIN_PROVISIONING_SCRIPT = `<script>
 
   syncSource();
   syncFinderVisibility();
-})();
-</script>`;
+})();`;
 
 export function enhanceAdminPage(page: string): string {
   return page
     .replace("</head>", `${ADMIN_PROVISIONING_STYLE}</head>`)
-    .replace("</body>", `${ADMIN_PROVISIONING_SCRIPT}</body>`);
+    .replace("</script>\n</body>", `${ADMIN_PROVISIONING_SCRIPT}\n</script>\n</body>`);
 }
