@@ -31,7 +31,10 @@ jobs:
       - name: Refresh customer dashboard UI
         run: python3 scripts/app-dashboard-refresh-once.py
       - name: Update dashboard presentation contract
-        run: sed -i 's/toHaveLength(3);/toHaveLength(4);/' insights-worker/test/customer-auth.test.ts
+        shell: bash
+        run: |
+          sed -i 's/toHaveLength(3);/toHaveLength(4);/' insights-worker/test/customer-auth.test.ts
+          sed -i 's/Welcome to Tapntrust Insights/Welcome to Tapntrust Insight/' insights-worker/test/customer-auth.test.ts
       - run: pnpm run check:all
       - name: Commit refreshed dashboard
         shell: bash
