@@ -14,7 +14,14 @@
     "crons": ["0 * * * *"]
   },
   "secrets": {
-    "required": ["ADMIN_API_TOKEN", "ZEPTOMAIL_API_KEY", "GOOGLE_PLACES_API_KEY", "SHOPIFY_CLIENT_ID", "SHOPIFY_CLIENT_SECRET"]
+    "required": [
+      "ADMIN_API_TOKEN",
+      "ZEPTOMAIL_API_KEY",
+      "GOOGLE_PLACES_API_KEY",
+      "SHOPIFY_CLIENT_ID",
+      "SHOPIFY_CLIENT_SECRET",
+      "RESEND_API_KEY"
+    ]
   },
   "assets": {
     "directory": "./assets"
@@ -27,7 +34,8 @@
     "SHOPIFY_ADMIN_API_VERSION": "2026-07",
     "SHOPIFY_INSIGHTS_VARIANT_ID": "gid://shopify/ProductVariant/48192855376003",
     "SHOPIFY_INSIGHTS_INTRO_SELLING_PLAN_ID": "gid://shopify/SellingPlan/2791899267",
-    "SHOPIFY_INSIGHTS_STANDARD_SELLING_PLAN_ID": "gid://shopify/SellingPlan/2791899267"
+    "SHOPIFY_INSIGHTS_STANDARD_SELLING_PLAN_ID": "gid://shopify/SellingPlan/2791899267",
+    "EMAIL_AUTOMATION_CUTOFF": "2026-09-15T00:00:00+10:00"
   },
   "observability": {
     "enabled": true,
