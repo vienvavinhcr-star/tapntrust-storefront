@@ -2,7 +2,7 @@ const ADMIN_ANALYTICS_STYLE = `<style>
   .crm-panel{order:-10}.crm-toolbar{display:flex;align-items:end;justify-content:space-between;gap:12px;flex-wrap:wrap}.crm-periods{display:flex;gap:6px;flex-wrap:wrap}.crm-period{border:1px solid var(--line);background:#fff;color:var(--navy);border-radius:9px;padding:8px 11px;font:inherit;font-size:.82rem;font-weight:800;cursor:pointer}.crm-period.active{background:var(--navy);color:#fff;border-color:var(--navy)}.crm-tools{display:flex;gap:8px;flex-wrap:wrap;align-items:end}.crm-field{display:grid;gap:4px}.crm-field span{font-size:.72rem;color:var(--muted);font-weight:800}.crm-field input{border:1px solid var(--line);border-radius:9px;padding:9px 10px;font:inherit;min-width:170px}.crm-kpis{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px;margin:16px 0}.crm-kpi{border:1px solid var(--line);border-radius:14px;padding:13px;background:#fbfcff}.crm-kpi__label{font-size:.68rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:850}.crm-kpi__value{font-size:1.65rem;font-weight:900;letter-spacing:-.04em;margin-top:3px}.crm-kpi__note{font-size:.7rem;color:var(--muted);margin-top:2px}.crm-note{border:1px solid #cbdcf8;background:#f5f8ff;border-radius:12px;padding:10px 12px;font-size:.8rem;color:#31537d;margin:12px 0}.crm-table-wrap{overflow:auto;border:1px solid var(--line);border-radius:14px}.crm-table{width:100%;min-width:1240px;border-collapse:collapse;background:#fff}.crm-table th,.crm-table td{text-align:left;vertical-align:top;padding:11px 9px;border-bottom:1px solid var(--line)}.crm-table th{background:#f8faff;font-size:.68rem;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);position:sticky;top:0;z-index:1}.crm-table tr:last-child td{border-bottom:0}.crm-title{font-weight:850}.crm-sub{font-size:.75rem;color:var(--muted);margin-top:2px}.crm-number{font-size:1.15rem;font-weight:900}.crm-pill{display:inline-flex;padding:3px 7px;border-radius:999px;font-size:.7rem;font-weight:850}.crm-pill.active{background:#e9f7ef;color:#087a47}.crm-pill.inactive{background:#fff0ee;color:#b42318}.crm-pill.pending{background:#fff7df;color:#9a6700}.crm-cards{display:grid;gap:5px;margin-top:6px}.crm-cardline{display:flex;align-items:center;gap:6px;max-width:310px}.crm-cardline code{font-size:.69rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}.crm-copy{border:0;background:#edf3fc;color:var(--navy);border-radius:7px;padding:4px 7px;font-size:.68rem;font-weight:800;cursor:pointer}.crm-empty{text-align:center;padding:24px;color:var(--muted)}@media(max-width:1000px){.crm-kpis{grid-template-columns:repeat(3,minmax(0,1fr))}}@media(max-width:620px){.crm-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.crm-tools{width:100%}.crm-field{flex:1}.crm-field input{width:100%;min-width:0}}
 </style>`;
 
-const ADMIN_ANALYTICS_SCRIPT = `<script>
+const ADMIN_ANALYTICS_SCRIPT = `
 (() => {
   const dashboard = document.querySelector('#dashboard');
   const loginForm = document.querySelector('#login-form');
@@ -114,11 +114,10 @@ const ADMIN_ANALYTICS_SCRIPT = `<script>
   });
   loginForm.addEventListener('submit', () => setTimeout(() => loadAnalytics().catch(() => undefined), 0));
   if (sessionStorage.getItem('tnt-admin-token')) loadAnalytics().catch(() => undefined);
-})();
-</script>`;
+})();`;
 
 export function enhanceAdminAnalyticsPage(page: string): string {
   return page
     .replace("</head>", `${ADMIN_ANALYTICS_STYLE}</head>`)
-    .replace("</body>", `${ADMIN_ANALYTICS_SCRIPT}</body>`);
+    .replace("</script>\n</body>", `${ADMIN_ANALYTICS_SCRIPT}\n</script>\n</body>`);
 }
