@@ -1,5 +1,5 @@
 import { provisionPhysicalCards } from "./provisioning-repository";
-import { normaliseGoogleReviewUrl, type ProvisioningIntent } from "./provisioning";
+import { normaliseGoogleReviewUrl, type ProvisioningIntent, type ProvisioningManifest } from "./provisioning";
 import {
   SHOPIFY_ORDERS_PAID_TOPIC,
   SHOPIFY_WEBHOOK_MAX_BODY_BYTES,
@@ -28,6 +28,7 @@ interface SetupAccumulator {
 }
 
 export interface AutoProvisionedShopifyBatch {
+  manifest: ProvisioningManifest;
   batchId: string;
   setupId: string;
   businessName: string;
@@ -212,7 +213,7 @@ export async function autoProvisionPaidShopifyOrder(
   } catch {
     return [];
   }
-  if (!isRecord(payload) || payload.test === true) return [];
+  if (!isRecord(payload)) return [];
 
   const orderReference = cleanText(payload.name ?? payload.order_number ?? payload.id, 160);
   if (!orderReference) return [];
@@ -247,6 +248,7 @@ export async function autoProvisionPaidShopifyOrder(
     }
 
     results.push({
+      manifest: provisioned.manifest,
       batchId: provisioned.manifest.id,
       setupId: setup.setupId,
       businessName: provisioned.manifest.businessName,
