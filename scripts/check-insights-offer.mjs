@@ -94,8 +94,9 @@ assert.match(experienceUi, /assets\/marketing\/tapntrust-insights-popup-mascot\.
 assert.match(cartDrawer, /INSIGHTS_PRODUCT_ARTWORK\s*=\s*"assets\/products\/tapntrust-insights\.png"/);
 assert.match(cartDrawer, /line\.kind === "insights"[\s\S]*INSIGHTS_PRODUCT_ARTWORK/);
 assert.doesNotMatch(cartDrawer, /insights-popup-mascot/);
-assert.match(cartDrawer, /Renews at A\$6\.99\/month\. Cancel anytime\./);
-assert.match(cartDrawer, /secure sign-in link to your private Insights dashboard/);
+assert.match(cartDrawer, /line\.variantTitle && line\.kind !== "insights"/);
+assert.match(cartDrawer, /Your private Insights dashboard/);
+assert.match(cartDrawer, /Secure sign-in link sent by email after purchase\. Renews at A\$6\.99\/month · Cancel anytime\./);
 assert.ok(fs.existsSync("assets/products/tapntrust-insights.png"));
 assert.ok(fs.existsSync("assets/marketing/tapntrust-insights-popup-mascot.png"));
 assert.ok(fs.existsSync("insights-worker/assets/tapntrust-insights-mascot-transparent.png"));
