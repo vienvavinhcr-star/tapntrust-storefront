@@ -12,6 +12,7 @@ import {
 const WORKER_ORIGIN = "https://go.tapntrust.com";
 const STOREFRONT_ORIGIN = "https://tapntrust.com";
 const ADMIN_TOKEN = "test-admin-token-that-is-not-a-production-secret";
+const INTRO_CODE = "TNTI-TEST-INTRO-CODE";
 
 class MockPlacesProvider implements GooglePlacesProvider {
   readonly summaryCalls: string[] = [];
@@ -224,7 +225,7 @@ describe("storefront Insights shared intro offer", () => {
     const first = await requestOffer(body);
     expect(first.status).toBe(200);
     const firstPayload = await first.json<{ discountCode: string; offerId: string; sellingPlanId: string }>();
-    expect(firstPayload.discountCode).toBe(String(env.SHOPIFY_INSIGHTS_INTRO_DISCOUNT_CODE));
+    expect(firstPayload.discountCode).toBe(INTRO_CODE);
     expect(firstPayload.offerId).toMatch(/^offer_/);
     expect(firstPayload.sellingPlanId).toBe(String(env.SHOPIFY_INSIGHTS_STANDARD_SELLING_PLAN_ID));
 
@@ -238,7 +239,7 @@ describe("storefront Insights shared intro offer", () => {
     const second = await requestOffer(body);
     expect(second.status).toBe(200);
     const secondPayload = await second.json<{ discountCode: string; offerId: string }>();
-    expect(secondPayload.discountCode).toBe(firstPayload.discountCode);
+    expect(secondPayload.discountCode).toBe(INTRO_CODE);
     expect(secondPayload.offerId).toBe(firstPayload.offerId);
   });
 
