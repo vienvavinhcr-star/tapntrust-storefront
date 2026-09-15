@@ -237,7 +237,7 @@ export async function handleAdminProvisioningRequest(
       const timestamp = now().toISOString();
       const result = await provisionPhysicalCards(db, intent, timestamp);
 
-      if (result.manifest.source === "admin_shopify") {
+      if (intent.shopifyLinked) {
         await reconcileBillingAfterProvisioning(
           db,
           result.manifest.externalOrderReference,
