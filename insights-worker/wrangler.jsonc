@@ -14,7 +14,7 @@
     "crons": ["0 * * * *"]
   },
   "secrets": {
-    "required": ["ADMIN_API_TOKEN", "ZEPTOMAIL_API_KEY", "GOOGLE_PLACES_API_KEY", "SHOPIFY_CLIENT_ID", "SHOPIFY_CLIENT_SECRET", "SHOPIFY_INSIGHTS_INTRO_DISCOUNT_CODE"]
+    "required": ["ADMIN_API_TOKEN", "ZEPTOMAIL_API_KEY", "GOOGLE_PLACES_API_KEY", "SHOPIFY_CLIENT_ID", "SHOPIFY_CLIENT_SECRET"]
   },
   "assets": {
     "directory": "./assets"
