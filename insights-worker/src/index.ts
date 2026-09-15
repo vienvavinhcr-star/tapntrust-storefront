@@ -245,7 +245,7 @@ export async function handleRequest(
       const now = new Date();
       await autoProvisionPaidShopifyOrder(request.clone(), env, now);
       const emailOutcome = await processPaidOrderEmailAutomation(
-        request.clone(),
+        request.clone() as unknown as Request,
         env,
         now,
         emailAutomationDependencies
@@ -257,7 +257,12 @@ export async function handleRequest(
       return billingResponse;
     }
     if (url.pathname === "/api/shopify/webhooks/orders-updated") {
-      return handleSubscriptionInsightsOrderUpdated(request, env, new Date(), emailAutomationDependencies);
+      return handleSubscriptionInsightsOrderUpdated(
+        request as unknown as Request,
+        env,
+        new Date(),
+        emailAutomationDependencies
+      );
     }
     if (url.pathname === "/api/shopify/webhooks/refunds-create") {
       return handleShopifyRefundCreatedWebhook(request, env, () => new Date(), {
