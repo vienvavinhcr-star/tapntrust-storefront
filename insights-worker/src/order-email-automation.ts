@@ -174,7 +174,7 @@ async function resendTemplate(
 ): Promise<void> {
   if (!env.RESEND_API_KEY) throw new OrderEmailAutomationError("configuration_error", 503);
   const body: Record<string, unknown> = {
-    from: "TapnTrust <contact@tapntrust.com>",
+    from: "Tapntrust <contact@tapntrust.com>",
     to: [input.to],
     reply_to: "contact@tapntrust.com",
     template: { id: input.template }
@@ -250,8 +250,8 @@ export async function processPaidOrderQuickGuide(
     idempotencyKey: `quick-guide/${orderId}`,
     scheduledAt: new Date(now.getTime() + 2 * 60 * 1000).toISOString(),
     attachments: [
-      { filename: "TapnTrust-Quick-Setup-Guide.pdf", path: env.QUICK_SETUP_GUIDE_URL },
-      { filename: "TapnTrust-Useful-Guide.pdf", path: env.USEFUL_GUIDE_URL }
+      { filename: "Tapntrust-Quick-Setup-Guide.pdf", path: env.QUICK_SETUP_GUIDE_URL },
+      { filename: "Tapntrust-Useful-Guide.pdf", path: env.USEFUL_GUIDE_URL }
     ]
   });
   await addOrderTag(env, orderId, QUICK_GUIDE_SENT_TAG);
