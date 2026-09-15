@@ -1,5 +1,9 @@
 import { ADMIN_PAGE } from "./admin-page";
-import { handleAdminProvisioningRequest } from "./admin-provisioning";
+import {
+  createShopifyProgrammingDependencies,
+  handleAdminProvisioningRequest,
+  type AdminProvisioningDependencies
+} from "./admin-provisioning";
 import { handleShopifyOrdersPaidWebhook, type BillingDependencies } from "./billing-service";
 import { handleCustomerRequest, type CustomerAuthDependencies } from "./customer-auth";
 import {
@@ -152,7 +156,8 @@ async function handleAdmin(
   request: Request,
   pathname: string,
   env: WorkerEnv,
-  repository: InsightsRepository
+  repository: InsightsRepository,
+  adminDependencies: AdminProvisioningDependencies
 ): Promise<Response> {
   if (!(await isAdminRequest(request, env))) {
     return json({ error: "Unauthorized" }, 401);
@@ -170,7 +175,9 @@ async function handleAdmin(
     request,
     pathname,
     env.DB,
-    env.AUTH_BASE_URL
+    env.AUTH_BASE_URL,
+    () => new Date(),
+    adminDependencies
   );
   if (provisioningResponse) return provisioningResponse;
 
@@ -200,7 +207,8 @@ export async function handleRequest(
   repository: InsightsRepository = createD1Repository(env.DB),
   customerDependencies: CustomerAuthDependencies = {},
   billingDependencies: BillingDependencies = {},
-  purchaseDependencies: InsightsPurchaseDependencies = {}
+  purchaseDependencies: InsightsPurchaseDependencies = {},
+  adminDependencies: AdminProvisioningDependencies = {}
 ): Promise<Response> {
   const url = new URL(request.url);
 
@@ -223,7 +231,9 @@ export async function handleRequest(
         }
       });
     }
-    if (url.pathname.startsWith("/api/admin/")) return handleAdmin(request, url.pathname, env, repository);
+    if (url.pathname.startsWith("/api/admin/")) {
+      return handleAdmin(request, url.pathname, env, repository, adminDependencies);
+    }
 
     const purchaseResponse = await handleInsightsPurchaseRequest(request, url, env, purchaseDependencies);
     if (purchaseResponse) return purchaseResponse;
@@ -252,7 +262,17 @@ export async function handleRequest(
 
 export default {
   async fetch(request, env, ctx) {
-    return handleRequest(request, env as WorkerEnv, ctx);
+    const workerEnv = env as WorkerEnv;
+    return handleRequest(
+      request,
+      workerEnv,
+      ctx,
+      createD1Repository(workerEnv.DB),
+      {},
+      {},
+      {},
+      createShopifyProgrammingDependencies(workerEnv)
+    );
   },
   async scheduled(_event, env, ctx) {
     ctx.waitUntil(runSubscriptionLifecycle((env as WorkerEnv).DB));
