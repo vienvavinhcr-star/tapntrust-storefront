@@ -246,7 +246,7 @@ describe("customer magic-link authentication", () => {
     expect(page).toContain("window.addEventListener('focus'");
     expect(page).toContain("if(response.status===401){showLogin();return}");
     expect(page).toContain('src="/tapntrust-insights-mascot.png"');
-    expect(page.match(/src="\/tapntrust-insights-mascot\.png"/g)).toHaveLength(3);
+    expect(page.match(/src="\/tapntrust-insights-mascot\.png"/g)).toHaveLength(4);
     expect(page).toContain("mascot-crop mascot-insights");
     expect(page).toContain("mascot-crop mascot-guidance");
     expect(page).toContain(".guide-art,.guide-art .mascot-crop{width:82px}");
@@ -305,7 +305,7 @@ describe("customer magic-link authentication", () => {
     expect(page).toContain('id="recent-taps"');
     expect(page).toContain("Google does not identify which visitor left which review.");
     expect(page).toContain("View on Google Maps");
-    expect(page).toContain("Welcome to Tapntrust Insights");
+    expect(page).toContain("Welcome to Tapntrust Insight");
     expect(page).toContain("What can we call you?");
     expect(page).toContain("Skip for now");
     expect(page).toContain("No new activity since your last visit.");
