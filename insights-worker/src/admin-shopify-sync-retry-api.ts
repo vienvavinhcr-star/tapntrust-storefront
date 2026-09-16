@@ -34,6 +34,7 @@ function shopifyFailure(error: unknown): {
   stage: "authentication" | "programming" | "unexpected";
   code: string;
   providerStatus: number | null;
+  diagnostic: string | null;
 } {
   if (error instanceof ShopifyAdminProviderError) {
     const providerStatus = error.providerStatus;
@@ -42,7 +43,8 @@ function shopifyFailure(error: unknown): {
         message: "Shopify Admin credentials are not configured correctly in the Worker.",
         stage: "authentication",
         code: error.code,
-        providerStatus
+        providerStatus,
+        diagnostic: null
       };
     }
     if (providerStatus) {
@@ -50,25 +52,29 @@ function shopifyFailure(error: unknown): {
         message: `Shopify Admin authentication failed (provider status ${providerStatus}).`,
         stage: "authentication",
         code: error.code,
-        providerStatus
+        providerStatus,
+        diagnostic: null
       };
     }
     return {
       message: "Shopify Admin authentication request failed before programming URLs could be synced.",
       stage: "authentication",
       code: error.code,
-      providerStatus
+      providerStatus,
+      diagnostic: null
     };
   }
 
   if (error instanceof ShopifyOrderProgrammingError) {
     const providerStatus = error.providerStatus;
+    const diagnostic = error.diagnostic;
     if (error.code === "order_not_found") {
       return {
         message: "The linked Shopify order could not be found.",
         stage: "programming",
         code: error.code,
-        providerStatus
+        providerStatus,
+        diagnostic
       };
     }
     if (error.code === "metafield_write_failed") {
@@ -76,7 +82,8 @@ function shopifyFailure(error: unknown): {
         message: "Shopify rejected the TapNTrust Programming URLs metafield write.",
         stage: "programming",
         code: error.code,
-        providerStatus
+        providerStatus,
+        diagnostic
       };
     }
     if (error.code === "configuration_error") {
@@ -84,7 +91,44 @@ function shopifyFailure(error: unknown): {
         message: "Shopify programming sync configuration is invalid.",
         stage: "programming",
         code: error.code,
-        providerStatus
+        providerStatus,
+        diagnostic
+      };
+    }
+    if (diagnostic === "timeout") {
+      return {
+        message: "The Cloudflare Worker timed out while contacting the Shopify Admin API before Shopify returned a response.",
+        stage: "programming",
+        code: error.code,
+        providerStatus,
+        diagnostic
+      };
+    }
+    if (diagnostic === "network_error") {
+      return {
+        message: "The Cloudflare Worker could not complete the network request to the Shopify Admin API before receiving an HTTP response.",
+        stage: "programming",
+        code: error.code,
+        providerStatus,
+        diagnostic
+      };
+    }
+    if (diagnostic === "redirect") {
+      return {
+        message: `Shopify Admin API unexpectedly returned a redirect${providerStatus ? ` (provider status ${providerStatus})` : ""}. The Worker did not follow it.`,
+        stage: "programming",
+        code: error.code,
+        providerStatus,
+        diagnostic
+      };
+    }
+    if (diagnostic === "graphql_error") {
+      return {
+        message: "Shopify returned GraphQL errors while TapNTrust was syncing the programming URLs.",
+        stage: "programming",
+        code: error.code,
+        providerStatus,
+        diagnostic
       };
     }
     if (providerStatus) {
@@ -92,7 +136,8 @@ function shopifyFailure(error: unknown): {
         message: `Could not sync programming URLs to Shopify (provider status ${providerStatus}).`,
         stage: "programming",
         code: error.code,
-        providerStatus
+        providerStatus,
+        diagnostic
       };
     }
     return {
@@ -101,7 +146,8 @@ function shopifyFailure(error: unknown): {
         : "Could not sync programming URLs to Shopify.",
       stage: "programming",
       code: error.code,
-      providerStatus
+      providerStatus,
+      diagnostic
     };
   }
 
@@ -109,7 +155,8 @@ function shopifyFailure(error: unknown): {
     message: "Could not sync programming URLs to Shopify because an unexpected Worker error occurred.",
     stage: "unexpected",
     code: "unexpected_error",
-    providerStatus: null
+    providerStatus: null,
+    diagnostic: null
   };
 }
 
@@ -168,7 +215,8 @@ export async function handleAdminShopifySyncRetryRequest(
       cardCount: manifest.cards.length,
       stage: failure.stage,
       reason: failure.code,
-      providerStatus: failure.providerStatus
+      providerStatus: failure.providerStatus,
+      diagnostic: failure.diagnostic
     }));
     return json({
       error: failure.message,
@@ -176,7 +224,8 @@ export async function handleAdminShopifySyncRetryRequest(
         status: "failed",
         stage: failure.stage,
         reason: failure.code,
-        providerStatus: failure.providerStatus
+        providerStatus: failure.providerStatus,
+        diagnostic: failure.diagnostic
       }
     }, 502);
   }
