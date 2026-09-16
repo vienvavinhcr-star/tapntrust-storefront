@@ -80,7 +80,9 @@ export async function provisionPartnerCards(
   const businessId = matched?.business_id || crypto.randomUUID();
   const locationId = matched?.id || crypto.randomUUID();
   const batchId = crypto.randomUUID();
-  const ref = `CTV-${partnerId}-${input.requestId}`;
+  // Partner setups are manual fulfilment, not Shopify orders. The MANUAL- prefix
+  // also excludes these batches from the owner's Shopify sync recovery UI/API.
+  const ref = `MANUAL-CTV-${partnerId}-${input.requestId}`;
   const cards = Array.from({ length: input.physicalCardCount }, (_, i) => ({
     id: crypto.randomUUID(), ordinal: i + 1, token: generatePublicCardToken(), label: `Card ${i + 1}`
   }));
