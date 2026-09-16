@@ -2,7 +2,7 @@ const ADMIN_SHOPIFY_SYNC_RETRY_STYLE = `<style>
   .shopify-sync-recovery{margin:14px 0 18px;border:1px solid #c9daf7;border-radius:14px;background:#f7faff;padding:14px}.shopify-sync-recovery__head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}.shopify-sync-recovery__head h3{margin:0;font-size:1rem}.shopify-sync-recovery__head p{margin:4px 0 0;font-size:.82rem;color:var(--muted)}.shopify-sync-recovery__list{display:grid;gap:8px;margin-top:12px}.shopify-sync-recovery__item{display:flex;align-items:center;justify-content:space-between;gap:12px;border:1px solid var(--line);border-radius:12px;background:#fff;padding:10px 12px}.shopify-sync-recovery__meta{min-width:0}.shopify-sync-recovery__meta strong,.shopify-sync-recovery__meta span{display:block}.shopify-sync-recovery__meta span{font-size:.78rem;color:var(--muted);overflow-wrap:anywhere}.shopify-sync-recovery__status{margin-top:10px;font-size:.82rem;color:var(--muted)}.shopify-sync-recovery__status.ok{color:#087a47}.shopify-sync-recovery__status.error{color:#b42318}@media(max-width:700px){.shopify-sync-recovery__head,.shopify-sync-recovery__item{align-items:stretch;flex-direction:column}.shopify-sync-recovery__item .button{width:100%}}
 </style>`;
 
-const ADMIN_SHOPIFY_SYNC_RETRY_SCRIPT = `<script>
+const ADMIN_SHOPIFY_SYNC_RETRY_SCRIPT = `
 (() => {
   const batchesBody = document.querySelector('#batches');
   if (!batchesBody || document.querySelector('[data-shopify-sync-recovery]')) return;
@@ -120,17 +120,15 @@ const ADMIN_SHOPIFY_SYNC_RETRY_SCRIPT = `<script>
     }
   });
 
-  recovery.querySelector('[data-sync-refresh]').addEventListener('click', loadBatches);
   document.querySelector('#login-form')?.addEventListener('submit', () => {
     window.setTimeout(loadBatches, 250);
     window.setTimeout(loadBatches, 750);
   });
   if (adminToken()) window.setTimeout(loadBatches, 0);
-})();
-</script>`;
+})();`;
 
 export function enhanceAdminShopifySyncRetry(page: string): string {
   return page
     .replace("</head>", `${ADMIN_SHOPIFY_SYNC_RETRY_STYLE}</head>`)
-    .replace("</body>", `${ADMIN_SHOPIFY_SYNC_RETRY_SCRIPT}</body>`);
+    .replace("</script>\n</body>", `${ADMIN_SHOPIFY_SYNC_RETRY_SCRIPT}\n</script>\n</body>`);
 }
