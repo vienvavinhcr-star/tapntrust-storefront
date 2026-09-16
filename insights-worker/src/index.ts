@@ -40,13 +40,15 @@ const HTML_HEADERS = {
   "Referrer-Policy": "no-referrer",
   "X-Content-Type-Options": "nosniff"
 };
+// Existing owner dashboard has two inline scripts. Append partner behaviour to the
+// second script rather than introducing an extra independent bootstrap.
 const ENHANCED_ADMIN_PAGE = enhanceAdminPartnersPage(enhanceAdminEmailActionsPage(
   enhanceAdminCardActivityPage(
     enhanceAdminShopifySyncRetry(
       enhanceAdminAnalyticsPage(enhanceAdminPage(ADMIN_PAGE))
     )
   )
-));
+)).replace("</script>\n<script>\n(() => {", "\n(() => {");
 
 function json(data: unknown, status = 200): Response {
   return Response.json(data, {
@@ -308,7 +310,10 @@ export async function handleRequest(
     if (purchaseResponse) return purchaseResponse;
 
     const billingCustomerResponse = await handleCustomerBillingRequest(request, url, env);
-    if (billingCustomerResponse) return billingCustomerResponse;
+    if (billingCustomerResponse) {
+      queueCustomerUsageTracking(request, url, billingCustomerResponse, env, ctx);
+      return billingCustomerResponse;
+    }
 
     const customerResponse = await handleCustomerRequest(request, url, env, ctx, customerDependencies);
     if (customerResponse) {
