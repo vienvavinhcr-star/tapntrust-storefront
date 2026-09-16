@@ -191,8 +191,7 @@ async function syncProgrammingUrls(
       event: "shopify_programming_urls_sync_failed",
       orderReference: manifest.externalOrderReference.slice(0, 80),
       setupReference: manifest.externalSetupReference.slice(0, 80),
-      reason,
-      providerStatus: error instanceof ShopifyOrderProgrammingError ? error.providerStatus : null
+      reason
     }));
     return { status: "failed", reason };
   }
@@ -245,97 +244,75 @@ export async function handleAdminProvisioningRequest(
       }
     }
 
-    if (pathname === "/api/admin/provisioning/businesses") {
+    if (pathname === "/api/admin/provisioning/options") {
       if (request.method !== "GET") return new Response("Method not allowed", { status: 405, headers: { Allow: "GET" } });
       return json({ businesses: await listAdminBusinessOptions(db) });
     }
 
     if (pathname === "/api/admin/provisioning/batches") {
-      if (request.method !== "GET") return new Response("Method not allowed", { status: 405, headers: { Allow: "GET" } });
-      return json({ batches: await listProvisioningBatches(db) });
-    }
-
-    if (pathname === "/api/admin/provisioning") {
+      if (request.method === "GET") return json({ batches: await listProvisioningBatches(db) });
       const body = await readAdminPost(request, authBaseUrl);
       if (body instanceof Response) return body;
       const intent = parseProvisioningIntent(body);
-      const result = await provisionPhysicalCards(db, intent, authBaseUrl, now());
-      const programmingSync = intent.source === "shopify_order"
-        ? await syncProgrammingUrls(result.manifest, dependencies)
-        : null;
-      let billingReconciliation: { status: string; subscriptionId?: string | null } | null = null;
-      if (intent.source === "shopify_order") {
-        try {
-          const reconciled = await reconcileBillingAfterProvisioning(db, intent.externalOrderReference, result.manifest.businessId, result.manifest.locationId);
-          billingReconciliation = { status: reconciled.status, subscriptionId: reconciled.subscriptionId };
-        } catch (error) {
-          console.warn(JSON.stringify({
-            event: "shopify_billing_reconciliation_failed",
-            orderReference: intent.externalOrderReference.slice(0, 80),
-            setupReference: intent.externalSetupReference.slice(0, 80),
-            error: error instanceof Error ? error.message : String(error)
-          }));
-          billingReconciliation = { status: "failed" };
-        }
+      if (!intent) return json({ error: "Invalid provisioning request" }, 400);
+      const timestamp = now().toISOString();
+      const result = await provisionPhysicalCards(db, intent, timestamp);
+
+      if (intent.shopifyLinked) {
+        await reconcileBillingAfterProvisioning(
+          db,
+          result.manifest.externalOrderReference,
+          result.manifest.externalSetupReference,
+          timestamp
+        );
+        const shopifyOrderSync = await syncProgrammingUrls(result.manifest, dependencies);
+        return json(
+          shopifyOrderSync ? { ...result, shopifyOrderSync } : result,
+          result.replayed ? 200 : 201
+        );
       }
-      return json({
-        batch: result.manifest,
-        replayed: result.replayed,
-        programmingSync,
-        billingReconciliation
-      }, result.replayed ? 200 : 201);
+
+      return json(result, result.replayed ? 200 : 201);
     }
 
-    const manifestMatch = pathname.match(/^\/api\/admin\/provisioning\/([^/]+)$/);
-    if (manifestMatch) {
+    const batchMatch = pathname.match(/^\/api\/admin\/provisioning\/batches\/([^/]+)$/);
+    if (batchMatch) {
       if (request.method !== "GET") return new Response("Method not allowed", { status: 405, headers: { Allow: "GET" } });
-      const manifest = await getProvisioningManifest(db, decodeURIComponent(manifestMatch[1] || ""), authBaseUrl);
-      return manifest ? json({ batch: manifest }) : json({ error: "Not found" }, 404);
+      const batchId = cleanIdentifier(decodeURIComponent(batchMatch[1] || ""));
+      if (!batchId) return json({ error: "Invalid provisioning batch" }, 400);
+      const manifest = await getProvisioningManifest(db, batchId);
+      return manifest ? json({ manifest }) : json({ error: "Not found" }, 404);
     }
 
-    if (pathname === "/api/admin/insights/activate") {
+    if (pathname === "/api/admin/insights/activations") {
       const body = await readAdminPost(request, authBaseUrl);
       if (body instanceof Response) return body;
-      const activation = parseActivation(body);
-      if (!activation) return json({ error: "Invalid activation request" }, 400);
-      const entitlement = await activateInsights(db, activation, now());
-      return entitlement ? json({ entitlement }, 201) : json({ error: "Business or location not found" }, 404);
+      const input = parseActivation(body);
+      if (!input) return json({ error: "Invalid Insights activation" }, 400);
+      return json({ activation: await activateInsights(db, input, now().toISOString()) });
     }
 
-    if (pathname === "/api/admin/insights/revoke-access") {
+    if (pathname === "/api/admin/insights/access/revoke") {
       const body = await readAdminPost(request, authBaseUrl);
       if (body instanceof Response) return body;
-      const change = parseAccessRevocation(body);
-      if (!change) return json({ error: "Invalid access revocation request" }, 400);
-      return json({ revoked: await revokeCustomerBusinessAccess(db, change.email, change.businessId) });
+      const input = parseAccessRevocation(body);
+      if (!input) return json({ error: "Invalid access revocation" }, 400);
+      const revoked = await revokeCustomerBusinessAccess(db, input.email, input.businessId);
+      return revoked ? json({ revoked: true }) : json({ error: "Access was not found" }, 404);
     }
 
-    if (pathname === "/api/admin/insights/deactivate") {
+    if (pathname === "/api/admin/insights/entitlements/deactivate") {
       const body = await readAdminPost(request, authBaseUrl);
       if (body instanceof Response) return body;
-      const change = parseEntitlementChange(body);
-      if (!change) return json({ error: "Invalid entitlement request" }, 400);
-      return json({ entitlement: await deactivateInsightsEntitlement(db, change.locationId, now()) });
+      const input = parseEntitlementChange(body);
+      if (!input) return json({ error: "Invalid entitlement change" }, 400);
+      const deactivated = await deactivateInsightsEntitlement(db, input.locationId, now().toISOString());
+      return deactivated ? json({ deactivated: true }) : json({ error: "Active entitlement was not found" }, 404);
     }
 
     return null;
   } catch (error) {
-    if (error instanceof ProvisioningError) {
-      const status = error.code === "not_found" ? 404 : error.code === "conflict" ? 409 : 400;
-      return json({ error: error.message }, status);
-    }
-    if (error instanceof ShopifyOrderProgrammingError) {
-      const status = error.code === "configuration_error" ? 503
-        : error.code === "order_not_found" ? 404
-          : error.code === "metafield_write_failed" ? 409
-            : 502;
-      return json({ error: "Shopify programming URL sync failed", reason: error.code }, status);
-    }
-    console.error(JSON.stringify({
-      message: "admin provisioning request failed",
-      path: pathname,
-      error: error instanceof Error ? error.message : String(error)
-    }));
-    return json({ error: "Internal server error" }, 500);
+    if (error instanceof ProvisioningError) return json({ error: error.message, code: error.code }, error.status);
+    throw error;
   }
 }
