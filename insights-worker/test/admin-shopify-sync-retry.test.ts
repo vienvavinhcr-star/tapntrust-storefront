@@ -77,7 +77,7 @@ beforeEach(clearDatabase);
 describe("admin Shopify programming sync recovery", () => {
   it("retries Shopify write-back from an existing batch without creating or replacing cards", async () => {
     const initialFailure = vi.fn(async () => {
-      throw new ShopifyOrderProgrammingError("request_failed", 503);
+      throw new ShopifyOrderProgrammingError("request_failed", 503, "http_error");
     });
     const provisionResponse = await provision(shopifyBody(), { syncProgrammingManifest: initialFailure });
     const provisionPayload = await provisionResponse.json<{
@@ -120,7 +120,7 @@ describe("admin Shopify programming sync recovery", () => {
     const retryResponse = await retry(provisionPayload.manifest.id, { syncProgrammingManifest });
     const retryPayload = await retryResponse.json<{
       error: string;
-      shopifyOrderSync: { status: string; stage: string; reason: string; providerStatus: number | null };
+      shopifyOrderSync: { status: string; stage: string; reason: string; providerStatus: number | null; diagnostic: string | null };
     }>();
 
     expect(retryResponse.status).toBe(502);
@@ -129,10 +129,36 @@ describe("admin Shopify programming sync recovery", () => {
       status: "failed",
       stage: "authentication",
       reason: "request_failed",
-      providerStatus: 401
+      providerStatus: 401,
+      diagnostic: null
     });
     expect(JSON.stringify(retryPayload)).not.toContain("client_secret");
     expect(JSON.stringify(retryPayload)).not.toContain("access_token");
+  });
+
+  it("returns the Worker network diagnostic for a programming request failure", async () => {
+    const provisionResponse = await provision(shopifyBody(), {});
+    const provisionPayload = await provisionResponse.json<{ manifest: { id: string } }>();
+    const syncProgrammingManifest = vi.fn(async () => {
+      throw new ShopifyOrderProgrammingError("request_failed", null, "network_error");
+    });
+
+    const retryResponse = await retry(provisionPayload.manifest.id, { syncProgrammingManifest });
+    const retryPayload = await retryResponse.json<{
+      error: string;
+      shopifyOrderSync: { status: string; stage: string; reason: string; providerStatus: number | null; diagnostic: string | null };
+    }>();
+
+    expect(retryResponse.status).toBe(502);
+    expect(retryPayload.error).toContain("Cloudflare Worker could not complete the network request");
+    expect(retryPayload.shopifyOrderSync).toEqual({
+      status: "failed",
+      stage: "programming",
+      reason: "request_failed",
+      providerStatus: null,
+      diagnostic: "network_error"
+    });
+    expect(JSON.stringify(retryPayload)).not.toContain("test-admin-token");
   });
 
   it("does not allow Shopify sync recovery for manual provisioning batches", async () => {

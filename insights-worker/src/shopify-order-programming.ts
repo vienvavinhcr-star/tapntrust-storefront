@@ -9,6 +9,14 @@ const METAFIELD_TYPE = "multi_line_text_field";
 const METAFIELD_NAME = "TapNTrust Programming URLs";
 const MAX_METAFIELD_VALUE_LENGTH = 60_000;
 
+export type ShopifyOrderProgrammingDiagnostic =
+  | "timeout"
+  | "network_error"
+  | "redirect"
+  | "http_error"
+  | "graphql_error"
+  | null;
+
 export interface ShopifyOrderProgrammingConfiguration {
   shopDomain: string;
   accessToken: string;
@@ -29,7 +37,8 @@ export class ShopifyOrderProgrammingError extends Error {
       | "invalid_response"
       | "order_not_found"
       | "metafield_write_failed",
-    public readonly providerStatus: number | null = null
+    public readonly providerStatus: number | null = null,
+    public readonly diagnostic: ShopifyOrderProgrammingDiagnostic = null
   ) {
     super(code);
     this.name = "ShopifyOrderProgrammingError";
@@ -221,6 +230,11 @@ function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function aborted(controller: AbortController, error: unknown): boolean {
+  if (controller.signal.aborted) return true;
+  return error instanceof DOMException && error.name === "AbortError";
+}
+
 async function graphql(
   configuration: ShopifyOrderProgrammingConfiguration,
   query: string,
@@ -240,7 +254,7 @@ async function graphql(
     try {
       const response = await fetcher(`https://${shopDomain}/admin/api/${apiVersion}/graphql.json`, {
         method: "POST",
-        redirect: "error",
+        redirect: "manual",
         signal: controller.signal,
         headers: {
           Accept: "application/json",
@@ -249,18 +263,23 @@ async function graphql(
         },
         body: JSON.stringify({ query, variables })
       });
+
+      if (response.status >= 300 && response.status < 400) {
+        throw new ShopifyOrderProgrammingError("request_failed", response.status, "redirect");
+      }
       if (!response.ok) {
-        const error = new ShopifyOrderProgrammingError("request_failed", response.status);
+        const error = new ShopifyOrderProgrammingError("request_failed", response.status, "http_error");
         if (attempt === 0 && isTransientStatus(error.providerStatus)) {
           await delay(RETRY_DELAY_MS);
           continue;
         }
         throw error;
       }
+
       const raw = await readBoundedJson(response);
       if (!isRecord(raw)) throw new ShopifyOrderProgrammingError("invalid_response", response.status);
       if (Array.isArray(raw.errors) ? raw.errors.length > 0 : raw.errors !== undefined) {
-        throw new ShopifyOrderProgrammingError("invalid_response", response.status);
+        throw new ShopifyOrderProgrammingError("invalid_response", response.status, "graphql_error");
       }
       if (!isRecord(raw.data)) throw new ShopifyOrderProgrammingError("invalid_response", response.status);
       return raw.data;
@@ -272,17 +291,21 @@ async function graphql(
         }
         throw error;
       }
+
+      const diagnostic: ShopifyOrderProgrammingDiagnostic = aborted(controller, error)
+        ? "timeout"
+        : "network_error";
       if (attempt === 0) {
         await delay(RETRY_DELAY_MS);
         continue;
       }
-      throw new ShopifyOrderProgrammingError("request_failed");
+      throw new ShopifyOrderProgrammingError("request_failed", null, diagnostic);
     } finally {
       clearTimeout(timeout);
     }
   }
 
-  throw new ShopifyOrderProgrammingError("request_failed");
+  throw new ShopifyOrderProgrammingError("request_failed", null, "network_error");
 }
 
 function parseExistingMetafield(value: unknown): ExistingMetafield | null {
@@ -389,7 +412,6 @@ async function ensureDefinition(
     const created = exactDefinition(payload.createdDefinition);
     if (created && userErrors(payload.userErrors).length === 0) return;
 
-    // A concurrent first-time provisioning can create the definition between our read and write.
     definition = await queryDefinition(configuration, fetcher);
     if (!definition) throw new ShopifyOrderProgrammingError("metafield_write_failed");
   }
@@ -448,7 +470,6 @@ export async function syncProgrammingManifestToShopifyOrder(
   let order = await resolveOrder(configuration, manifest.externalOrderReference, fetcher);
   let metafieldId = await setMetafield(configuration, order, manifest, fetcher);
   if (!metafieldId) {
-    // Re-read and retry once so concurrent updates do not silently overwrite another setup's URLs.
     order = await resolveOrder(configuration, manifest.externalOrderReference, fetcher);
     metafieldId = await setMetafield(configuration, order, manifest, fetcher);
   }

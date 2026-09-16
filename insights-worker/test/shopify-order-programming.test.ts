@@ -285,4 +285,34 @@ describe("Shopify order programming metadata", () => {
     await expect(syncProgrammingManifestToShopifyOrder(CONFIG, manifest(), fetcher))
       .rejects.toMatchObject(expectedError);
   });
+
+  it("preserves a network failure diagnostic after retrying the Worker request", async () => {
+    const fetcher = vi.fn<typeof fetch>()
+      .mockRejectedValue(new TypeError("simulated network failure"));
+
+    await expect(syncProgrammingManifestToShopifyOrder(CONFIG, manifest(), fetcher))
+      .rejects.toMatchObject({
+        code: "request_failed",
+        providerStatus: null,
+        diagnostic: "network_error"
+      });
+    expect(fetcher).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not follow an unexpected Shopify redirect and reports its status", async () => {
+    const fetcher = vi.fn<typeof fetch>()
+      .mockResolvedValue(new Response(null, {
+        status: 302,
+        headers: { Location: "https://example.invalid/redirect" }
+      }));
+
+    await expect(syncProgrammingManifestToShopifyOrder(CONFIG, manifest(), fetcher))
+      .rejects.toMatchObject({
+        code: "request_failed",
+        providerStatus: 302,
+        diagnostic: "redirect"
+      });
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    expect(fetcher.mock.calls[0]?.[1]?.redirect).toBe("manual");
+  });
 });
