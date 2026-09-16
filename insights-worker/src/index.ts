@@ -3,8 +3,10 @@ import { enhanceAdminPage } from "./admin-page-enhancements";
 import { enhanceAdminAnalyticsPage } from "./admin-analytics-page";
 import { enhanceAdminCardActivityPage } from "./admin-card-activity-page";
 import { enhanceAdminShopifySyncRetry } from "./admin-shopify-sync-retry";
+import { enhanceAdminEmailActionsPage } from "./admin-email-actions-page";
 import { handleAdminAnalyticsRequest } from "./admin-analytics";
 import { handleAdminCardActivityRequest } from "./admin-card-activity";
+import { handleAdminEmailActionsRequest, type AdminEmailActionsEnv } from "./admin-email-actions";
 import {
   createShopifyProgrammingDependencies,
   handleAdminProvisioningRequest,
@@ -25,7 +27,7 @@ import { handleInsightsPurchaseRequest, type InsightsPurchaseDependencies } from
 import { createD1Repository, type CardUpdate, type InsightsRepository, type PlacementType } from "./repository";
 import { autoProvisionPaidShopifyOrder } from "./shopify-order-provisioning";
 
-type WorkerEnv = Env & { ADMIN_API_TOKEN?: string };
+type WorkerEnv = Env & AdminEmailActionsEnv & { ADMIN_API_TOKEN?: string };
 
 const PLACEMENT_TYPES = new Set<PlacementType>(["counter", "table", "reception", "register", "other"]);
 const HTML_HEADERS = {
@@ -34,9 +36,11 @@ const HTML_HEADERS = {
   "Referrer-Policy": "no-referrer",
   "X-Content-Type-Options": "nosniff"
 };
-const ENHANCED_ADMIN_PAGE = enhanceAdminCardActivityPage(
-  enhanceAdminShopifySyncRetry(
-    enhanceAdminAnalyticsPage(enhanceAdminPage(ADMIN_PAGE))
+const ENHANCED_ADMIN_PAGE = enhanceAdminEmailActionsPage(
+  enhanceAdminCardActivityPage(
+    enhanceAdminShopifySyncRetry(
+      enhanceAdminAnalyticsPage(enhanceAdminPage(ADMIN_PAGE))
+    )
   )
 );
 
@@ -181,6 +185,9 @@ async function handleAdmin(
     if (request.method !== "GET") return methodNotAllowed("GET");
     return json(await repository.getSummary(monthStartUtc(new Date())));
   }
+
+  const emailActionsResponse = await handleAdminEmailActionsRequest(request, pathname, env);
+  if (emailActionsResponse) return emailActionsResponse;
 
   const cardActivityResponse = await handleAdminCardActivityRequest(request, pathname, env.DB, new Date());
   if (cardActivityResponse) return cardActivityResponse;
