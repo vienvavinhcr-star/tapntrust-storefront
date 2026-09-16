@@ -50,15 +50,17 @@ interface ResolvedOrder {
 }
 
 const ORDER_QUERY = `
-  query TapnTrustProgrammingOrder($identifier: OrderIdentifierInput!) {
-    orderByIdentifier(identifier: $identifier) {
-      id
-      name
-      metafield(namespace: "${METAFIELD_NAMESPACE}", key: "${METAFIELD_KEY}") {
+  query TapnTrustProgrammingOrder($query: String!) {
+    orders(first: 5, query: $query) {
+      nodes {
         id
-        value
-        type
-        compareDigest
+        name
+        metafield(namespace: "${METAFIELD_NAMESPACE}", key: "${METAFIELD_KEY}") {
+          id
+          value
+          type
+          compareDigest
+        }
       }
     }
   }
@@ -136,6 +138,11 @@ function validApiVersion(value: string): boolean {
 
 function safeLine(value: string): string {
   return value.replace(/[\r\n]+/g, " ").trim();
+}
+
+function orderNameSearchQuery(name: string): string {
+  const escaped = name.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+  return `name:"${escaped}"`;
 }
 
 function setupMarkers(setupReference: string): { start: string; end: string } {
@@ -300,10 +307,28 @@ async function resolveOrder(
 ): Promise<ResolvedOrder> {
   const name = cleanText(orderName, 160);
   if (!name) throw new ShopifyOrderProgrammingError("configuration_error");
-  const data = await graphql(configuration, ORDER_QUERY, { identifier: { name } }, fetcher);
-  const order = data.orderByIdentifier;
-  if (order === null || order === undefined) throw new ShopifyOrderProgrammingError("order_not_found");
-  if (!isRecord(order)) throw new ShopifyOrderProgrammingError("invalid_response");
+
+  const data = await graphql(
+    configuration,
+    ORDER_QUERY,
+    { query: orderNameSearchQuery(name) },
+    fetcher
+  );
+  const connection = data.orders;
+  if (!isRecord(connection) || !Array.isArray(connection.nodes)) {
+    throw new ShopifyOrderProgrammingError("invalid_response");
+  }
+
+  const matches = connection.nodes.filter((candidate) => {
+    if (!isRecord(candidate)) return false;
+    return cleanText(candidate.name, 160) === name;
+  });
+  if (matches.length === 0) throw new ShopifyOrderProgrammingError("order_not_found");
+  if (matches.length !== 1 || !isRecord(matches[0])) {
+    throw new ShopifyOrderProgrammingError("invalid_response");
+  }
+
+  const order = matches[0];
   const id = cleanText(order.id, 200);
   const returnedName = cleanText(order.name, 160);
   if (!id || !returnedName || returnedName !== name) {
