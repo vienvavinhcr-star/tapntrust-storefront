@@ -45,6 +45,20 @@ function bodyOf(init?: RequestInit): { query: string; variables: Record<string, 
   return JSON.parse(init.body) as { query: string; variables: Record<string, unknown> };
 }
 
+function orderSearchResult(value: {
+  id?: string;
+  name?: string;
+  metafield?: unknown;
+} | null): Response {
+  return json({
+    data: {
+      orders: {
+        nodes: value ? [value] : []
+      }
+    }
+  });
+}
+
 describe("Shopify order programming metadata", () => {
   it("builds readable card URLs and replaces only the matching setup block", () => {
     const first = manifest();
@@ -80,14 +94,10 @@ describe("Shopify order programming metadata", () => {
           }
         }
       }))
-      .mockResolvedValueOnce(json({
-        data: {
-          orderByIdentifier: {
-            id: "gid://shopify/Order/1001",
-            name: "#1001",
-            metafield: null
-          }
-        }
+      .mockResolvedValueOnce(orderSearchResult({
+        id: "gid://shopify/Order/1001",
+        name: "#1001",
+        metafield: null
       }))
       .mockResolvedValueOnce(json({
         data: {
@@ -126,7 +136,7 @@ describe("Shopify order programming metadata", () => {
     });
 
     const orderBody = bodyOf(fetcher.mock.calls[2]?.[1]);
-    expect(orderBody.variables).toEqual({ identifier: { name: "#1001" } });
+    expect(orderBody.variables).toEqual({ query: 'name:"#1001"' });
 
     const setBody = bodyOf(fetcher.mock.calls[3]?.[1]);
     const metafields = setBody.variables.metafields as Array<Record<string, unknown>>;
@@ -165,18 +175,14 @@ describe("Shopify order programming metadata", () => {
           }
         }
       }))
-      .mockResolvedValueOnce(json({
-        data: {
-          orderByIdentifier: {
-            id: "gid://shopify/Order/1001",
-            name: "#1001",
-            metafield: {
-              id: "gid://shopify/Metafield/10",
-              value: existingValue,
-              type: "multi_line_text_field",
-              compareDigest: "digest-1"
-            }
-          }
+      .mockResolvedValueOnce(orderSearchResult({
+        id: "gid://shopify/Order/1001",
+        name: "#1001",
+        metafield: {
+          id: "gid://shopify/Metafield/10",
+          value: existingValue,
+          type: "multi_line_text_field",
+          compareDigest: "digest-1"
         }
       }))
       .mockResolvedValueOnce(json({
@@ -211,18 +217,14 @@ describe("Shopify order programming metadata", () => {
           }
         }
       }))
-      .mockResolvedValueOnce(json({
-        data: {
-          orderByIdentifier: {
-            id: "gid://shopify/Order/1001",
-            name: "#1001",
-            metafield: {
-              id: "gid://shopify/Metafield/10",
-              value: "existing",
-              type: "multi_line_text_field",
-              compareDigest: "digest-old"
-            }
-          }
+      .mockResolvedValueOnce(orderSearchResult({
+        id: "gid://shopify/Order/1001",
+        name: "#1001",
+        metafield: {
+          id: "gid://shopify/Metafield/10",
+          value: "existing",
+          type: "multi_line_text_field",
+          compareDigest: "digest-old"
         }
       }))
       .mockResolvedValueOnce(json({
@@ -233,18 +235,14 @@ describe("Shopify order programming metadata", () => {
           }
         }
       }))
-      .mockResolvedValueOnce(json({
-        data: {
-          orderByIdentifier: {
-            id: "gid://shopify/Order/1001",
-            name: "#1001",
-            metafield: {
-              id: "gid://shopify/Metafield/10",
-              value: "concurrent setup data",
-              type: "multi_line_text_field",
-              compareDigest: "digest-new"
-            }
-          }
+      .mockResolvedValueOnce(orderSearchResult({
+        id: "gid://shopify/Order/1001",
+        name: "#1001",
+        metafield: {
+          id: "gid://shopify/Metafield/10",
+          value: "concurrent setup data",
+          type: "multi_line_text_field",
+          compareDigest: "digest-new"
         }
       }))
       .mockResolvedValueOnce(json({
@@ -281,7 +279,7 @@ describe("Shopify order programming metadata", () => {
           }
         }
       }))
-      .mockResolvedValueOnce(json({ data: { orderByIdentifier: null } }));
+      .mockResolvedValueOnce(orderSearchResult(null));
 
     const expectedError: Partial<ShopifyOrderProgrammingError> = { code: "order_not_found" };
     await expect(syncProgrammingManifestToShopifyOrder(CONFIG, manifest(), fetcher))
