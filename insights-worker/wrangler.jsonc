@@ -14,7 +14,7 @@
     "crons": ["0 * * * *"]
   },
   "secrets": {
-    "required": ["ADMIN_API_TOKEN", "ZEPTOMAIL_API_KEY", "GOOGLE_PLACES_API_KEY", "SHOPIFY_CLIENT_ID", "SHOPIFY_CLIENT_SECRET", "RESEND_API_KEY"]
+    "required": ["ADMIN_API_TOKEN", "ZEPTOMAIL_API_KEY", "GOOGLE_PLACES_API_KEY", "SHOPIFY_CLIENT_ID", "SHOPIFY_CLIENT_SECRET"]
   },
   "assets": {
     "directory": "./assets"
@@ -27,9 +27,7 @@
     "SHOPIFY_ADMIN_API_VERSION": "2026-07",
     "SHOPIFY_INSIGHTS_VARIANT_ID": "gid://shopify/ProductVariant/48192855376003",
     "SHOPIFY_INSIGHTS_INTRO_SELLING_PLAN_ID": "gid://shopify/SellingPlan/2791899267",
-    "SHOPIFY_INSIGHTS_STANDARD_SELLING_PLAN_ID": "gid://shopify/SellingPlan/2791899267",
-    "QUICK_SETUP_GUIDE_URL": "https://cdn.shopify.com/s/files/1/0748/1635/6483/files/TapnTrust_NFC_Review_Card_Quick_Start_Guide.pdf?v=1789513072",
-    "USEFUL_GUIDE_URL": "https://cdn.shopify.com/s/files/1/0748/1635/6483/files/tapntrust-google-review-growth-kit.pdf?v=1789513046"
+    "SHOPIFY_INSIGHTS_STANDARD_SELLING_PLAN_ID": "gid://shopify/SellingPlan/2791899267"
   },
   "observability": {
     "enabled": true,
