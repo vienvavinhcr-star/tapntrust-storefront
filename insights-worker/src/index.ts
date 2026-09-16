@@ -1,8 +1,10 @@
 import { ADMIN_PAGE } from "./admin-page";
 import { enhanceAdminPage } from "./admin-page-enhancements";
 import { enhanceAdminAnalyticsPage } from "./admin-analytics-page";
+import { enhanceAdminCardActivityPage } from "./admin-card-activity-page";
 import { enhanceAdminShopifySyncRetry } from "./admin-shopify-sync-retry";
 import { handleAdminAnalyticsRequest } from "./admin-analytics";
+import { handleAdminCardActivityRequest } from "./admin-card-activity";
 import {
   createShopifyProgrammingDependencies,
   handleAdminProvisioningRequest,
@@ -32,8 +34,10 @@ const HTML_HEADERS = {
   "Referrer-Policy": "no-referrer",
   "X-Content-Type-Options": "nosniff"
 };
-const ENHANCED_ADMIN_PAGE = enhanceAdminShopifySyncRetry(
-  enhanceAdminAnalyticsPage(enhanceAdminPage(ADMIN_PAGE))
+const ENHANCED_ADMIN_PAGE = enhanceAdminCardActivityPage(
+  enhanceAdminShopifySyncRetry(
+    enhanceAdminAnalyticsPage(enhanceAdminPage(ADMIN_PAGE))
+  )
 );
 
 function json(data: unknown, status = 200): Response {
@@ -177,6 +181,9 @@ async function handleAdmin(
     if (request.method !== "GET") return methodNotAllowed("GET");
     return json(await repository.getSummary(monthStartUtc(new Date())));
   }
+
+  const cardActivityResponse = await handleAdminCardActivityRequest(request, pathname, env.DB, new Date());
+  if (cardActivityResponse) return cardActivityResponse;
 
   const analyticsResponse = await handleAdminAnalyticsRequest(request, env.DB, env.AUTH_BASE_URL, new Date());
   if (analyticsResponse) return analyticsResponse;
