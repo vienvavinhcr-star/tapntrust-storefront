@@ -89,7 +89,7 @@ async function readBoundedJson(request: Request, byteLimit: number): Promise<{ v
       await reader.cancel();
       return { status: 413 };
     }
-    text += decoder.decode();
+    text += decoder.decode(chunk.value, { stream: true });
   }
   text += decoder.decode();
 
