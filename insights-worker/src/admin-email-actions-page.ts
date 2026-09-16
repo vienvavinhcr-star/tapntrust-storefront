@@ -7,65 +7,85 @@ const ADMIN_EMAIL_ACTIONS_SCRIPT = `
   const statusCache = new Map();
   const pending = new Map();
 
-  const adminToken = () => sessionStorage.getItem('tnt-admin-token') || document.querySelector('#token')?.value || '';
-  const request = async (path, init = {}) => {
+  function adminToken() {
+    const stored = sessionStorage.getItem('tnt-admin-token');
+    const input = document.querySelector('#token');
+    return stored || (input ? input.value : '') || '';
+  }
+
+  async function apiRequest(path, init) {
     const token = adminToken();
     if (!token) throw new Error('Sign in to the private admin first.');
-    const response = await fetch(path, {
-      ...init,
-      headers: {
-        Authorization: 'Bearer ' + token,
-        'Content-Type': 'application/json',
-        ...(init.headers || {})
-      }
+    const options = init || {};
+    const headers = Object.assign({}, options.headers || {}, {
+      Authorization: 'Bearer ' + token,
+      'Content-Type': 'application/json'
     });
-    const data = await response.json().catch(() => ({}));
+    const response = await fetch(path, Object.assign({}, options, { headers: headers }));
+    const data = await response.json().catch(function () { return {}; });
     if (!response.ok) throw new Error(data.error || 'Email action failed.');
     return data;
-  };
+  }
 
-  const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
+  function esc(value) {
+    return String(value == null ? '' : value)
+      .replaceAll('&', '&amp;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;')
+      .replaceAll('"', '&quot;')
+      .replaceAll("'", '&#39;');
+  }
 
   function orderReferenceFromRow(row) {
-    const firstCell = row.cells?.[0];
+    const firstCell = row.cells && row.cells.length ? row.cells[0] : null;
     if (!firstCell) return '';
-    const orderLine = Array.from(firstCell.querySelectorAll('.crm-sub')).find(node => node.textContent.trim().startsWith('Order:'));
+    const lines = Array.from(firstCell.querySelectorAll('.crm-sub'));
+    const orderLine = lines.find(function (node) {
+      return node.textContent.trim().indexOf('Order:') === 0;
+    });
     if (!orderLine) return '';
-    const value = orderLine.textContent.replace(/^Order:\s*/, '').trim();
+    const raw = orderLine.textContent.trim();
+    const value = raw.slice('Order:'.length).trim();
     return value === 'Manual / legacy setup' ? '' : value;
   }
 
   function totalCardsFromRow(row) {
-    const text = row.cells?.[2]?.querySelector('.crm-number')?.textContent || '';
-    const match = text.match(/(\d+)\s*\/\s*(\d+)/);
-    return match ? Number(match[2]) : 0;
+    const cell = row.cells && row.cells.length > 2 ? row.cells[2] : null;
+    const numberNode = cell ? cell.querySelector('.crm-number') : null;
+    const text = numberNode ? numberNode.textContent : '';
+    const parts = String(text || '').split('/');
+    if (parts.length < 2) return 0;
+    const total = Number(parts[1].trim());
+    return Number.isFinite(total) ? total : 0;
   }
 
   function cellHtml(status) {
-    if (!status.hasCards) {
-      return '<div class="tnt-email-pill no">No provisioned cards</div>';
-    }
-    const email = status.email
+    if (!status.hasCards) return '<div class="tnt-email-pill no">No provisioned cards</div>';
+
+    const emailHtml = status.email
       ? '<div class="tnt-email-actions__email">Send to: ' + esc(status.email) + '</div>'
       : '<div class="tnt-email-actions__error">No customer email captured</div>';
-    const quick = status.quickGuideSent
+
+    const quickHtml = status.quickGuideSent
       ? '<div class="tnt-email-pill sent">✓ Quick Guide Sent</div>'
       : '<div class="tnt-email-pill ready">Quick Guide Ready</div>' + (status.email ? '<button class="tnt-email-button" type="button" data-email-kind="quick-guide">Send Quick Guide</button>' : '');
-    let insights = '<div class="tnt-email-pill no">Insights not purchased</div>';
+
+    let insightsHtml = '<div class="tnt-email-pill no">Insights not purchased</div>';
     if (status.hasInsightsPurchase) {
-      insights = status.insightsSent
+      insightsHtml = status.insightsSent
         ? '<div class="tnt-email-pill sent">✓ Insights Email Sent</div>'
         : '<div class="tnt-email-pill ready">Insights Purchased</div>' + (status.email ? '<button class="tnt-email-button" type="button" data-email-kind="insights">Send Insights Email</button>' : '');
     }
-    return '<div class="tnt-email-actions__stack">' + email
-      + '<div class="tnt-email-actions__group"><div class="tnt-email-actions__label">Quick setup guide</div>' + quick + '</div>'
-      + '<div class="tnt-email-actions__group"><div class="tnt-email-actions__label">Tapntrust Insights</div>' + insights + '</div>'
+
+    return '<div class="tnt-email-actions__stack">' + emailHtml
+      + '<div class="tnt-email-actions__group"><div class="tnt-email-actions__label">Quick setup guide</div>' + quickHtml + '</div>'
+      + '<div class="tnt-email-actions__group"><div class="tnt-email-actions__label">Tapntrust Insights</div>' + insightsHtml + '</div>'
       + '</div>';
   }
 
   function renderCell(cell, status) {
     cell.innerHTML = cellHtml(status);
-    cell.dataset.orderReference = status.orderReference || cell.dataset.orderReference || '';
+    if (status.orderReference) cell.dataset.orderReference = status.orderReference;
   }
 
   async function loadStatus(orderReference, cell) {
@@ -77,26 +97,29 @@ const ADMIN_EMAIL_ACTIONS_SCRIPT = `
       renderCell(cell, statusCache.get(orderReference));
       return;
     }
+
     cell.innerHTML = '<div class="tnt-email-actions__loading">Checking email status…</div>';
     let task = pending.get(orderReference);
     if (!task) {
-      task = request('/api/admin/email-actions/status?orderReference=' + encodeURIComponent(orderReference))
-        .then(data => {
+      task = apiRequest('/api/admin/email-actions/status?orderReference=' + encodeURIComponent(orderReference))
+        .then(function (data) {
           statusCache.set(orderReference, data.status);
           return data.status;
         })
-        .finally(() => pending.delete(orderReference));
+        .finally(function () { pending.delete(orderReference); });
       pending.set(orderReference, task);
     }
+
     try {
       renderCell(cell, await task);
     } catch (error) {
-      cell.innerHTML = '<div class="tnt-email-actions__error">' + esc(error instanceof Error ? error.message : 'Could not check email status.') + '</div><button class="tnt-email-button" type="button" data-email-retry>Retry</button>';
+      const message = error instanceof Error ? error.message : 'Could not check email status.';
+      cell.innerHTML = '<div class="tnt-email-actions__error">' + esc(message) + '</div><button class="tnt-email-button" type="button" data-email-retry>Retry</button>';
     }
   }
 
   function ensureHeader(table) {
-    const row = table?.querySelector('thead tr');
+    const row = table ? table.querySelector('thead tr') : null;
     if (!row || row.querySelector('[data-email-actions-header]')) return;
     const th = document.createElement('th');
     th.dataset.emailActionsHeader = '1';
@@ -106,25 +129,29 @@ const ADMIN_EMAIL_ACTIONS_SCRIPT = `
 
   function decorateRows() {
     const panel = document.querySelector('#crm-analytics');
-    const table = panel?.querySelector('.crm-table');
-    const body = panel?.querySelector('[data-crm-body]');
+    const table = panel ? panel.querySelector('.crm-table') : null;
+    const body = panel ? panel.querySelector('[data-crm-body]') : null;
     if (!table || !body) return;
+
     ensureHeader(table);
-    body.querySelectorAll(':scope > tr').forEach(row => {
-      let cell = row.querySelector(':scope > td[data-email-actions-cell]');
+    Array.from(body.children).forEach(function (row) {
+      if (!row || row.tagName !== 'TR') return;
+      let cell = row.querySelector('td[data-email-actions-cell]');
       if (!cell) {
         cell = document.createElement('td');
         cell.className = 'tnt-email-actions';
         cell.dataset.emailActionsCell = '1';
         row.append(cell);
       }
+
       const orderReference = orderReferenceFromRow(row);
       cell.dataset.orderReference = orderReference;
       if (totalCardsFromRow(row) <= 0) {
         cell.innerHTML = '<div class="tnt-email-pill no">No cards</div>';
         return;
       }
-      if (!cell.dataset.statusLoadedFor || cell.dataset.statusLoadedFor !== orderReference) {
+
+      if (cell.dataset.statusLoadedFor !== orderReference) {
         cell.dataset.statusLoadedFor = orderReference;
         loadStatus(orderReference, cell);
       }
@@ -134,43 +161,48 @@ const ADMIN_EMAIL_ACTIONS_SCRIPT = `
   async function sendEmail(button, kind, cell) {
     const orderReference = cell.dataset.orderReference || '';
     const current = statusCache.get(orderReference);
-    const email = current?.email || '';
+    const email = current && current.email ? current.email : '';
     const label = kind === 'quick-guide' ? 'Quick Guide' : 'Tapntrust Insights email';
     const confirmation = email
       ? 'Send ' + label + ' to ' + email + ' for order ' + orderReference + '?'
       : 'Send ' + label + ' for order ' + orderReference + '?';
     if (!window.confirm(confirmation)) return;
+
     const original = button.textContent;
     button.disabled = true;
     button.textContent = 'Sending…';
     try {
-      const data = await request('/api/admin/email-actions/send', {
+      const data = await apiRequest('/api/admin/email-actions/send', {
         method: 'POST',
-        body: JSON.stringify({ orderReference, kind })
+        body: JSON.stringify({ orderReference: orderReference, kind: kind })
       });
       statusCache.set(orderReference, data.status);
       renderCell(cell, data.status);
     } catch (error) {
       button.disabled = false;
       button.textContent = original;
-      let message = cell.querySelector('.tnt-email-actions__error');
-      if (!message) {
-        message = document.createElement('div');
-        message.className = 'tnt-email-actions__error';
-        cell.append(message);
+      let messageNode = cell.querySelector('.tnt-email-actions__error');
+      if (!messageNode) {
+        messageNode = document.createElement('div');
+        messageNode.className = 'tnt-email-actions__error';
+        cell.append(messageNode);
       }
-      message.textContent = error instanceof Error ? error.message : 'Could not send email.';
+      messageNode.textContent = error instanceof Error ? error.message : 'Could not send email.';
     }
   }
 
-  document.addEventListener('click', event => {
-    const button = event.target.closest('[data-email-kind]');
+  document.addEventListener('click', function (event) {
+    const target = event.target instanceof Element ? event.target : null;
+    if (!target) return;
+
+    const button = target.closest('[data-email-kind]');
     if (button) {
       const cell = button.closest('[data-email-actions-cell]');
       if (cell) sendEmail(button, button.dataset.emailKind, cell);
       return;
     }
-    const retry = event.target.closest('[data-email-retry]');
+
+    const retry = target.closest('[data-email-retry]');
     if (retry) {
       const cell = retry.closest('[data-email-actions-cell]');
       if (!cell) return;
@@ -181,26 +213,32 @@ const ADMIN_EMAIL_ACTIONS_SCRIPT = `
     }
   });
 
-  document.addEventListener('click', event => {
-    if (event.target.closest('[data-crm-refresh]') || event.target.closest('[data-crm-period]')) statusCache.clear();
-  }, true);
-  document.addEventListener('change', event => {
-    if (event.target.closest('[data-crm-date]')) statusCache.clear();
+  document.addEventListener('click', function (event) {
+    const target = event.target instanceof Element ? event.target : null;
+    if (target && (target.closest('[data-crm-refresh]') || target.closest('[data-crm-period]'))) statusCache.clear();
   }, true);
 
-  const start = () => {
+  document.addEventListener('change', function (event) {
+    const target = event.target instanceof Element ? event.target : null;
+    if (target && target.closest('[data-crm-date]')) statusCache.clear();
+  }, true);
+
+  function start() {
     const body = document.querySelector('#crm-analytics [data-crm-body]');
     if (!body) return false;
-    const observer = new MutationObserver(() => window.setTimeout(decorateRows, 0));
-    observer.observe(body, { childList:true });
+    const observer = new MutationObserver(function () {
+      window.setTimeout(decorateRows, 0);
+    });
+    observer.observe(body, { childList: true });
     decorateRows();
     return true;
-  };
+  }
+
   if (!start()) {
-    const observer = new MutationObserver(() => {
-      if (start()) observer.disconnect();
+    const pageObserver = new MutationObserver(function () {
+      if (start()) pageObserver.disconnect();
     });
-    observer.observe(document.body, { childList:true, subtree:true });
+    pageObserver.observe(document.body, { childList: true, subtree: true });
   }
 })();`;
 
