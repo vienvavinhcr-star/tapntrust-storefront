@@ -5,6 +5,8 @@ const QUICK_GUIDE_TEMPLATE = "tapntrust-order-quick-setup";
 const INSIGHTS_TEMPLATE = "tapntrust-insights-getting-started";
 const QUICK_GUIDE_SENT_TAG = "quick-guide-sent";
 const INSIGHTS_EMAIL_SENT_TAG = "insight-email-sent";
+const DEFAULT_QUICK_SETUP_GUIDE_URL = "https://cdn.shopify.com/s/files/1/0748/1635/6483/files/TapnTrust_NFC_Review_Card_Quick_Start_Guide.pdf?v=1789513072";
+const DEFAULT_USEFUL_GUIDE_URL = "https://cdn.shopify.com/s/files/1/0748/1635/6483/files/tapntrust-google-review-growth-kit.pdf?v=1789513046";
 const MAX_ORDER_REFERENCE_LENGTH = 160;
 const MAX_REQUEST_BODY_BYTES = 2048;
 
@@ -59,7 +61,7 @@ function cleanOrderReference(value: unknown): string | null {
   if (typeof value !== "string" && typeof value !== "number") return null;
   const reference = String(value).trim();
   if (!reference || reference.length > MAX_ORDER_REFERENCE_LENGTH) return null;
-  if (/^[\u0000-\u001f\u007f]/.test(reference)) return null;
+  if (/[\u0000-\u001f\u007f]/.test(reference)) return null;
   return reference;
 }
 
@@ -266,14 +268,15 @@ async function sendManualEmail(
 
   if (kind === "quick-guide") {
     if (status.quickGuideSent) return { result: "duplicate", status };
-    if (!env.QUICK_SETUP_GUIDE_URL || !env.USEFUL_GUIDE_URL) throw new Error("guide_urls_missing");
+    const quickSetupUrl = env.QUICK_SETUP_GUIDE_URL || DEFAULT_QUICK_SETUP_GUIDE_URL;
+    const usefulGuideUrl = env.USEFUL_GUIDE_URL || DEFAULT_USEFUL_GUIDE_URL;
     await sendResendTemplate(env, {
       to: status.email,
       template: QUICK_GUIDE_TEMPLATE,
       idempotencyKey: `admin-quick-guide/${order.id}`,
       attachments: [
-        { filename: "Tapntrust-Quick-Setup-Guide.pdf", path: env.QUICK_SETUP_GUIDE_URL },
-        { filename: "Tapntrust-Useful-Guide.pdf", path: env.USEFUL_GUIDE_URL }
+        { filename: "Tapntrust-Quick-Setup-Guide.pdf", path: quickSetupUrl },
+        { filename: "Tapntrust-Useful-Guide.pdf", path: usefulGuideUrl }
       ]
     });
     await addOrderTag(env, order.id, QUICK_GUIDE_SENT_TAG);
@@ -303,7 +306,7 @@ function publicError(error: unknown): { status: number; message: string } {
   if (code === "no_provisioned_cards") return { status: 409, message: "This order has no provisioned Tapntrust cards." };
   if (code === "customer_email_missing") return { status: 409, message: "No customer email is available for this order." };
   if (code === "insights_not_purchased") return { status: 409, message: "Tapntrust Insights was not purchased on this Shopify order." };
-  if (code === "guide_urls_missing" || code === "resend_configuration_error" || code === "shopify_configuration_error") {
+  if (code === "resend_configuration_error" || code === "shopify_configuration_error") {
     return { status: 503, message: "Email sending is not configured yet." };
   }
   if (code.startsWith("resend_")) return { status: 502, message: "Resend could not send this email. No sent label was added." };
