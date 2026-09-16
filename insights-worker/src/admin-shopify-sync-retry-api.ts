@@ -1,4 +1,5 @@
 import type { AdminProvisioningDependencies } from "./admin-provisioning";
+import { ShopifyAdminProviderError } from "./shopify-admin";
 import { getProvisioningManifest } from "./provisioning-repository";
 import { ShopifyOrderProgrammingError } from "./shopify-order-programming";
 
@@ -26,6 +27,90 @@ function hasSafeAdminSource(request: Request, authBaseUrl: string): boolean {
 function cleanIdentifier(value: string): string | null {
   const cleaned = value.trim();
   return cleaned && cleaned.length <= 160 ? cleaned : null;
+}
+
+function shopifyFailure(error: unknown): {
+  message: string;
+  stage: "authentication" | "programming" | "unexpected";
+  code: string;
+  providerStatus: number | null;
+} {
+  if (error instanceof ShopifyAdminProviderError) {
+    const providerStatus = error.providerStatus;
+    if (error.code === "configuration_error") {
+      return {
+        message: "Shopify Admin credentials are not configured correctly in the Worker.",
+        stage: "authentication",
+        code: error.code,
+        providerStatus
+      };
+    }
+    if (providerStatus) {
+      return {
+        message: `Shopify Admin authentication failed (provider status ${providerStatus}).`,
+        stage: "authentication",
+        code: error.code,
+        providerStatus
+      };
+    }
+    return {
+      message: "Shopify Admin authentication request failed before programming URLs could be synced.",
+      stage: "authentication",
+      code: error.code,
+      providerStatus
+    };
+  }
+
+  if (error instanceof ShopifyOrderProgrammingError) {
+    const providerStatus = error.providerStatus;
+    if (error.code === "order_not_found") {
+      return {
+        message: "The linked Shopify order could not be found.",
+        stage: "programming",
+        code: error.code,
+        providerStatus
+      };
+    }
+    if (error.code === "metafield_write_failed") {
+      return {
+        message: "Shopify rejected the TapNTrust Programming URLs metafield write.",
+        stage: "programming",
+        code: error.code,
+        providerStatus
+      };
+    }
+    if (error.code === "configuration_error") {
+      return {
+        message: "Shopify programming sync configuration is invalid.",
+        stage: "programming",
+        code: error.code,
+        providerStatus
+      };
+    }
+    if (providerStatus) {
+      return {
+        message: `Could not sync programming URLs to Shopify (provider status ${providerStatus}).`,
+        stage: "programming",
+        code: error.code,
+        providerStatus
+      };
+    }
+    return {
+      message: error.code === "invalid_response"
+        ? "Shopify returned an unexpected response while syncing programming URLs."
+        : "Could not sync programming URLs to Shopify.",
+      stage: "programming",
+      code: error.code,
+      providerStatus
+    };
+  }
+
+  return {
+    message: "Could not sync programming URLs to Shopify because an unexpected Worker error occurred.",
+    stage: "unexpected",
+    code: "unexpected_error",
+    providerStatus: null
+  };
 }
 
 export async function handleAdminShopifySyncRetryRequest(
@@ -74,26 +159,25 @@ export async function handleAdminShopifySyncRetryRequest(
       shopifyOrderSync: { status: "synced", orderName: result.orderName }
     });
   } catch (error) {
-    const reason = error instanceof ShopifyOrderProgrammingError
-      ? error.code
-      : "unexpected_error";
-    const providerStatus = error instanceof ShopifyOrderProgrammingError
-      ? error.providerStatus
-      : undefined;
+    const failure = shopifyFailure(error);
     console.warn(JSON.stringify({
       event: "admin_shopify_programming_urls_sync_failed",
       orderReference: manifest.externalOrderReference.slice(0, 80),
       setupReference: manifest.externalSetupReference.slice(0, 80),
       batchId: manifest.id,
       cardCount: manifest.cards.length,
-      reason,
-      providerStatus
+      stage: failure.stage,
+      reason: failure.code,
+      providerStatus: failure.providerStatus
     }));
     return json({
-      error: providerStatus
-        ? `Could not sync programming URLs to Shopify (provider status ${providerStatus}).`
-        : "Could not sync programming URLs to Shopify.",
-      shopifyOrderSync: { status: "failed", reason, providerStatus }
+      error: failure.message,
+      shopifyOrderSync: {
+        status: "failed",
+        stage: failure.stage,
+        reason: failure.code,
+        providerStatus: failure.providerStatus
+      }
     }, 502);
   }
 }
