@@ -4,6 +4,10 @@ import { enhanceAdminAnalyticsPage } from "./admin-analytics-page";
 import { enhanceAdminCardActivityPage } from "./admin-card-activity-page";
 import { enhanceAdminShopifySyncRetry } from "./admin-shopify-sync-retry";
 import { enhanceAdminEmailActionsPage } from "./admin-email-actions-page";
+import { enhanceAdminPartnersPage } from "./admin-partners-page";
+import { PARTNER_PAGE } from "./partner-page";
+import { handlePartnerAuth, type PartnerEnv } from "./partner-auth";
+import { handleOwnerPartners, handlePartnerOperations } from "./partner-operations";
 import { handleAdminAnalyticsRequest } from "./admin-analytics";
 import { handleAdminCardActivityRequest } from "./admin-card-activity";
 import { handleAdminEmailActionsRequest, type AdminEmailActionsEnv } from "./admin-email-actions";
@@ -27,7 +31,7 @@ import { handleInsightsPurchaseRequest, type InsightsPurchaseDependencies } from
 import { createD1Repository, type CardUpdate, type InsightsRepository, type PlacementType } from "./repository";
 import { autoProvisionPaidShopifyOrder } from "./shopify-order-provisioning";
 
-type WorkerEnv = Env & AdminEmailActionsEnv & { ADMIN_API_TOKEN?: string };
+type WorkerEnv = Env & AdminEmailActionsEnv & PartnerEnv & { ADMIN_API_TOKEN?: string };
 
 const PLACEMENT_TYPES = new Set<PlacementType>(["counter", "table", "reception", "register", "other"]);
 const HTML_HEADERS = {
@@ -36,13 +40,13 @@ const HTML_HEADERS = {
   "Referrer-Policy": "no-referrer",
   "X-Content-Type-Options": "nosniff"
 };
-const ENHANCED_ADMIN_PAGE = enhanceAdminEmailActionsPage(
+const ENHANCED_ADMIN_PAGE = enhanceAdminPartnersPage(enhanceAdminEmailActionsPage(
   enhanceAdminCardActivityPage(
     enhanceAdminShopifySyncRetry(
       enhanceAdminAnalyticsPage(enhanceAdminPage(ADMIN_PAGE))
     )
   )
-);
+));
 
 function json(data: unknown, status = 200): Response {
   return Response.json(data, {
@@ -85,7 +89,7 @@ async function readBoundedJson(request: Request, byteLimit: number): Promise<{ v
       await reader.cancel();
       return { status: 413 };
     }
-    text += decoder.decode(chunk.value, { stream: true });
+    text += decoder.decode();
   }
   text += decoder.decode();
 
@@ -186,6 +190,9 @@ async function handleAdmin(
     return json(await repository.getSummary(monthStartUtc(new Date())));
   }
 
+  const partnerAdminResponse = await handleOwnerPartners(request, pathname, env);
+  if (partnerAdminResponse) return partnerAdminResponse;
+
   const emailActionsResponse = await handleAdminEmailActionsRequest(request, pathname, env);
   if (emailActionsResponse) return emailActionsResponse;
 
@@ -284,6 +291,18 @@ export async function handleRequest(
     if (url.pathname.startsWith("/api/admin/")) {
       return handleAdmin(request, url.pathname, env, repository, adminDependencies);
     }
+
+    if (url.pathname === "/ctv") {
+      if (request.method !== "GET") return methodNotAllowed("GET");
+      return new Response(PARTNER_PAGE, { headers: {
+        ...HTML_HEADERS,
+        "Content-Security-Policy": "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'"
+      } });
+    }
+    const partnerAuthResponse = await handlePartnerAuth(request, url.pathname, env);
+    if (partnerAuthResponse) return partnerAuthResponse;
+    const partnerOperationsResponse = await handlePartnerOperations(request, url.pathname, env);
+    if (partnerOperationsResponse) return partnerOperationsResponse;
 
     const purchaseResponse = await handleInsightsPurchaseRequest(request, url, env, purchaseDependencies);
     if (purchaseResponse) return purchaseResponse;
