@@ -1,12 +1,14 @@
 import { ADMIN_PAGE } from "./admin-page";
 import { enhanceAdminPage } from "./admin-page-enhancements";
 import { enhanceAdminAnalyticsPage } from "./admin-analytics-page";
+import { enhanceAdminShopifySyncRetry } from "./admin-shopify-sync-retry";
 import { handleAdminAnalyticsRequest } from "./admin-analytics";
 import {
   createShopifyProgrammingDependencies,
   handleAdminProvisioningRequest,
   type AdminProvisioningDependencies
 } from "./admin-provisioning";
+import { handleAdminShopifySyncRetryRequest } from "./admin-shopify-sync-retry-api";
 import { handleShopifyOrdersPaidWebhook, type BillingDependencies } from "./billing-service";
 import { handleCustomerRequest, type CustomerAuthDependencies } from "./customer-auth";
 import { queueCustomerUsageTracking } from "./customer-usage";
@@ -30,7 +32,9 @@ const HTML_HEADERS = {
   "Referrer-Policy": "no-referrer",
   "X-Content-Type-Options": "nosniff"
 };
-const ENHANCED_ADMIN_PAGE = enhanceAdminAnalyticsPage(enhanceAdminPage(ADMIN_PAGE));
+const ENHANCED_ADMIN_PAGE = enhanceAdminShopifySyncRetry(
+  enhanceAdminAnalyticsPage(enhanceAdminPage(ADMIN_PAGE))
+);
 
 function json(data: unknown, status = 200): Response {
   return Response.json(data, {
@@ -179,6 +183,15 @@ async function handleAdmin(
 
   const lifecycleResponse = await handleAdminSubscriptionLifecycleRequest(request, pathname, env.DB);
   if (lifecycleResponse) return lifecycleResponse;
+
+  const shopifySyncRetryResponse = await handleAdminShopifySyncRetryRequest(
+    request,
+    pathname,
+    env.DB,
+    env.AUTH_BASE_URL,
+    adminDependencies
+  );
+  if (shopifySyncRetryResponse) return shopifySyncRetryResponse;
 
   const provisioningResponse = await handleAdminProvisioningRequest(
     request,
