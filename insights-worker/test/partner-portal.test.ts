@@ -36,19 +36,19 @@ async function authenticated(id: string): Promise<string> {
 function setup(count = 3, requestId = crypto.randomUUID(), placeId = "ChIJ_partner_test"): PartnerSetupInput {
   return {requestId,placeId,customerEmail:"customer@example.test",physicalCardCount:count,marketingConsent:false};
 }
-async function owner(path: string, method = "GET", value?: Record<string, unknown>): Promise<Response> {
+async function owner(path: string, method = "GET", value?: object): Promise<Response> {
   return (await handleOwnerPartners(new Request(ORIGIN + path, {method,headers:{Origin:ORIGIN,"Content-Type":"application/json"},
     ...(value ? {body:JSON.stringify(value)} : {})}),new URL(ORIGIN + path).pathname,TEST_ENV,NOW,
     async () => {})) as Response;
 }
-async function ctv(path: string, cookie?: string, method = "GET", value?: Record<string, unknown>): Promise<Response> {
+async function ctv(path: string, cookie?: string, method = "GET", value?: object): Promise<Response> {
   const request=new Request(ORIGIN+path,{method,headers:{...(cookie?{Cookie:cookie}:{}),Origin:ORIGIN,"Content-Type":"application/json"},
     ...(value?{body:JSON.stringify(value)}:{})});
   return (await handlePartnerOperations(request,new URL(request.url).pathname,TEST_ENV,NOW,places)) as Response;
 }
 
- describe("Partner Portal: actual D1 and scoped API behavior", () => {
-  it("owner invitations default to Silver 45% and tier changes are owner-controlled", async () => {
+describe("Partner Portal: real D1 and scoped API behavior", () => {
+  it("owner invitations start Silver 45%; owner changes tiers to Gold 50% or Diamond 55%", async () => {
     const response=await owner("/api/admin/partners","POST",{name:"New Sales Partner",email:`${crypto.randomUUID()}@example.test`});
     expect(response.status).toBe(201);
     const created=await response.json<{partner:{id:string;tier:string;commissionPercent:number};emailSent:boolean}>();
@@ -78,9 +78,8 @@ async function ctv(path: string, cookie?: string, method = "GET", value?: Record
       .bind(id).first<{n:number}>())?.n).toBe(2);
   });
 
-  it("refuses excessive quantity without creating cards and keeps the same URLs on replay", async () => {
-    const id=await partner(3);
-    const input=setup(3);
+  it("refuses excess quantity without cards and replays exact programming URLs", async () => {
+    const id=await partner(3),input=setup(3);
     const first=await provisionPartnerCards(env.DB,id,input,()=>places.getDetails(input.placeId,"key"),NOW);
     expect(first.replayed).toBe(false);
     const second=await provisionPartnerCards(env.DB,id,input,()=>places.getDetails(input.placeId,"key"),NOW);
@@ -96,7 +95,7 @@ async function ctv(path: string, cookie?: string, method = "GET", value?: Record
       .rejects.toMatchObject({status:409});
   });
 
-  it("enforces remaining allowance for simultaneous requests without partial card creation", async () => {
+  it("prevents simultaneous requests from exceeding an allowance or creating partial batches", async () => {
     const id=await partner(4);
     const attempts=await Promise.allSettled([setup(3),setup(3)].map(input=>
       provisionPartnerCards(env.DB,id,input,()=>places.getDetails(input.placeId,"key"),NOW)));
@@ -129,16 +128,13 @@ async function ctv(path: string, cookie?: string, method = "GET", value?: Record
     const cookie=verified?.headers.get("Set-Cookie") as string;
     const me=await currentPartner(new Request(ORIGIN+"/ctv",{headers:{Cookie:cookie}}),env.DB,NOW);
     expect(me?.id).toBe(id);
-    const consumed=await confirm();
-    expect(consumed?.status).toBe(400);
-    const suspended=await owner(`/api/admin/partners/${id}/status`,"POST",{status:"suspended"});
-    expect(suspended.status).toBe(200);
+    expect((await confirm())?.status).toBe(400);
+    expect((await owner(`/api/admin/partners/${id}/status`,"POST",{status:"suspended"})).status).toBe(200);
     expect(await currentPartner(new Request(ORIGIN+"/ctv",{headers:{Cookie:cookie}}),env.DB,NOW)).toBeNull();
   });
 
-  it("isolates each partner's card list and rejects owner-only API access without owner token", async () => {
-    const first=await partner(3),second=await partner(3);
-    const cookie=await authenticated(first);
+  it("isolates partners' card lists and denies owner API access without the owner token", async () => {
+    const first=await partner(3),second=await partner(3),cookie=await authenticated(first);
     await provisionPartnerCards(env.DB,second,setup(2),()=>places.getDetails("ChIJ_partner_test","key"),NOW);
     const list=await ctv("/api/ctv/batches",cookie);
     expect(list.status).toBe(200);
@@ -149,22 +145,18 @@ async function ctv(path: string, cookie?: string, method = "GET", value?: Record
     expect(admin.status).toBe(401);
   });
 
-  it("tracks actual searches, selections and successful provisions separately", async () => {
+  it("separately counts actual searches, selections and successful provisions", async () => {
     const id=await partner(5),cookie=await authenticated(id);
-    const searched=await ctv("/api/ctv/places/search?q=Partner%20Cafe",cookie);
-    expect(searched.status).toBe(200);
-    const selected=await ctv("/api/ctv/places/ChIJ_partner_test",cookie);
-    expect(selected.status).toBe(200);
-    const success=await ctv("/api/ctv/provision",cookie,"POST",setup(2));
-    expect(success.status).toBe(201);
-    const rejected=await ctv("/api/ctv/provision",cookie,"POST",setup(5));
-    expect(rejected.status).toBe(409);
+    expect((await ctv("/api/ctv/places/search?q=Partner%20Cafe",cookie)).status).toBe(200);
+    expect((await ctv("/api/ctv/places/ChIJ_partner_test",cookie)).status).toBe(200);
+    expect((await ctv("/api/ctv/provision",cookie,"POST",setup(2))).status).toBe(201);
+    expect((await ctv("/api/ctv/provision",cookie,"POST",setup(5))).status).toBe(409);
     const events=await owner(`/api/admin/partners/${id}/activity?period=all&timezoneOffsetMinutes=600`);
     const data=await events.json<{totals:{searches:number;selections:number;uniqueBusinesses:number;cardsProvisioned:number}}>();
     expect(data.totals).toEqual({searches:1,selections:1,uniqueBusinesses:1,cardsProvisioned:2});
   });
 
-  it("renders the customer-view control and keeps partner credentials out of HTML", async () => {
+  it("renders the Customer View control with valid JavaScript, no admin credential", () => {
     expect(PARTNER_PAGE).toContain("Customer View");
     expect(PARTNER_PAGE).toContain("localStorage.setItem(preferenceKey");
     expect(PARTNER_PAGE).toContain("customer-view [data-internal]");
