@@ -5,6 +5,7 @@ import {
   type AdminProvisioningDependencies
 } from "../src/admin-provisioning";
 import { handleAdminShopifySyncRetryRequest } from "../src/admin-shopify-sync-retry-api";
+import { ShopifyAdminProviderError } from "../src/shopify-admin";
 import { ShopifyOrderProgrammingError } from "../src/shopify-order-programming";
 
 const ORIGIN = "https://go.tapntrust.com";
@@ -107,6 +108,31 @@ describe("admin Shopify programming sync recovery", () => {
     const batchCount = await env.DB.prepare("SELECT COUNT(*) AS count FROM provisioning_batches").first<{ count: number }>();
     expect(Number(cardCount?.count || 0)).toBe(3);
     expect(Number(batchCount?.count || 0)).toBe(1);
+  });
+
+  it("returns safe authentication diagnostics without exposing credentials", async () => {
+    const provisionResponse = await provision(shopifyBody(), {});
+    const provisionPayload = await provisionResponse.json<{ manifest: { id: string } }>();
+    const syncProgrammingManifest = vi.fn(async () => {
+      throw new ShopifyAdminProviderError("request_failed", 401);
+    });
+
+    const retryResponse = await retry(provisionPayload.manifest.id, { syncProgrammingManifest });
+    const retryPayload = await retryResponse.json<{
+      error: string;
+      shopifyOrderSync: { status: string; stage: string; reason: string; providerStatus: number | null };
+    }>();
+
+    expect(retryResponse.status).toBe(502);
+    expect(retryPayload.error).toBe("Shopify Admin authentication failed (provider status 401).");
+    expect(retryPayload.shopifyOrderSync).toEqual({
+      status: "failed",
+      stage: "authentication",
+      reason: "request_failed",
+      providerStatus: 401
+    });
+    expect(JSON.stringify(retryPayload)).not.toContain("client_secret");
+    expect(JSON.stringify(retryPayload)).not.toContain("access_token");
   });
 
   it("does not allow Shopify sync recovery for manual provisioning batches", async () => {
