@@ -98,7 +98,7 @@ describe("admin card and activity data", () => {
     const searched = await (await get("/api/admin/card-activity?period=all&search=newest&timezoneOffsetMinutes=600")).json<{ cards: Array<{ businessName: string }>; activity: { total: number } }>();
 
     expect(seven.activity.total).toBe(2);
-    expect(thirty.activity.total).toBe(2);
+    expect(thirty.activity.total).toBe(3);
     expect(all.activity.total).toBe(3);
     expect(searched.cards).toHaveLength(1);
     expect(searched.cards[0]?.businessName).toBe("Newest Business");
