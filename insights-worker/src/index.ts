@@ -310,10 +310,7 @@ export async function handleRequest(
     if (purchaseResponse) return purchaseResponse;
 
     const billingCustomerResponse = await handleCustomerBillingRequest(request, url, env);
-    if (billingCustomerResponse) {
-      queueCustomerUsageTracking(request, url, billingCustomerResponse, env, ctx);
-      return billingCustomerResponse;
-    }
+    if (billingCustomerResponse) return billingCustomerResponse;
 
     const customerResponse = await handleCustomerRequest(request, url, env, ctx, customerDependencies);
     if (customerResponse) {
