@@ -1,4 +1,4 @@
-// CRM annotations are independent of Shopify payment, NFC availability and Insights billing.
+// Owner-only CRM annotations never change Shopify billing or NFC/Insights access.
 export type CrmLabel = 'active' | 'cancel' | 'test';
 
 type CrmRow = {
@@ -13,92 +13,91 @@ type CrmRow = {
   has_manual: number;
 };
 
+// Match the existing admin analytics email/order selection, then derive source
+// for that location and email. Original Shopify orders remain separate records.
 const CRM_ROWS = `
-  SELECT l.id AS location_id,
+ WITH customer AS (
+  SELECT l.id, l.business_id, l.created_at,
     COALESCE(
       (SELECT pb.customer_email FROM provisioning_batches pb WHERE pb.location_id=l.id AND pb.customer_email IS NOT NULL ORDER BY pb.created_at DESC, pb.id DESC LIMIT 1),
       s.billing_email,
       (SELECT u.email FROM customer_business_access a JOIN customer_users u ON u.id=a.user_id WHERE a.business_id=l.business_id AND u.active=1 ORDER BY a.created_at LIMIT 1)
     ) AS email,
-    (SELECT pb.external_order_reference FROM provisioning_batches pb WHERE pb.location_id=l.id ORDER BY pb.created_at DESC, pb.id DESC LIMIT 1) AS order_reference,
-    cl.status AS label, cl.last_paid_batch_id,
-    (SELECT pb.id FROM provisioning_batches pb WHERE pb.location_id=l.id AND pb.source='shopify_webhook'
-      AND LOWER(pb.customer_email)=LOWER(COALESCE(
-        (SELECT newer.customer_email FROM provisioning_batches newer WHERE newer.location_id=l.id AND newer.customer_email IS NOT NULL ORDER BY newer.created_at DESC, newer.id DESC LIMIT 1),
-        s.billing_email,
-        (SELECT u.email FROM customer_business_access a JOIN customer_users u ON u.id=a.user_id WHERE a.business_id=l.business_id AND u.active=1 ORDER BY a.created_at LIMIT 1)
-      )) ORDER BY pb.created_at DESC, pb.id DESC LIMIT 1) AS latest_paid_batch_id,
-    EXISTS(SELECT 1 FROM provisioning_batches pb WHERE pb.location_id=l.id AND pb.source='shopify_webhook') AS has_shop,
-    EXISTS(SELECT 1 FROM provisioning_batches pb JOIN partner_provisionings pp ON pp.batch_id=pb.id WHERE pb.location_id=l.id) AS has_ctv,
-    EXISTS(SELECT 1 FROM provisioning_batches pb WHERE pb.location_id=l.id AND pb.source='admin_shopify'
-      AND pb.external_order_reference LIKE 'MANUAL-%' AND NOT EXISTS(SELECT 1 FROM partner_provisionings pp WHERE pp.batch_id=pb.id)) AS has_manual
-  FROM locations l
-  LEFT JOIN insights_subscriptions s ON s.location_id=l.id AND s.provider='shopify'
-  LEFT JOIN customer_crm_labels cl ON cl.location_id=l.id AND cl.customer_email=LOWER(COALESCE(
-    (SELECT pb.customer_email FROM provisioning_batches pb WHERE pb.location_id=l.id AND pb.customer_email IS NOT NULL ORDER BY pb.created_at DESC, pb.id DESC LIMIT 1),
-    s.billing_email,
-    (SELECT u.email FROM customer_business_access a JOIN customer_users u ON u.id=a.user_id WHERE a.business_id=l.business_id AND u.active=1 ORDER BY a.created_at LIMIT 1)
-  ))
+    (SELECT pb.external_order_reference FROM provisioning_batches pb WHERE pb.location_id=l.id ORDER BY pb.created_at DESC, pb.id DESC LIMIT 1) AS order_reference
+  FROM locations l LEFT JOIN insights_subscriptions s ON s.location_id=l.id AND s.provider='shopify'
+ )
+ SELECT c.id AS location_id, c.email, c.order_reference, cl.status AS label, cl.last_paid_batch_id,
+  (SELECT pb.id FROM provisioning_batches pb WHERE pb.location_id=c.id AND pb.source='shopify_webhook'
+    AND LOWER(pb.customer_email)=LOWER(c.email) ORDER BY pb.created_at DESC, pb.id DESC LIMIT 1) AS latest_paid_batch_id,
+  EXISTS(SELECT 1 FROM provisioning_batches pb WHERE pb.location_id=c.id
+    AND (pb.customer_email IS NULL OR LOWER(pb.customer_email)=LOWER(c.email))
+    AND (pb.source='shopify_webhook' OR (pb.source='admin_shopify' AND pb.external_order_reference NOT LIKE 'MANUAL-%'))) AS has_shop,
+  EXISTS(SELECT 1 FROM provisioning_batches pb JOIN partner_provisionings pp ON pp.batch_id=pb.id
+    WHERE pb.location_id=c.id AND LOWER(pp.customer_email)=LOWER(c.email)) AS has_ctv,
+  EXISTS(SELECT 1 FROM provisioning_batches pb WHERE pb.location_id=c.id AND pb.source='admin_shopify'
+    AND (pb.customer_email IS NULL OR LOWER(pb.customer_email)=LOWER(c.email))
+    AND pb.external_order_reference LIKE 'MANUAL-%'
+    AND NOT EXISTS(SELECT 1 FROM partner_provisionings pp WHERE pp.batch_id=pb.id)) AS has_manual
+ FROM customer c
+ LEFT JOIN customer_crm_labels cl ON cl.location_id=c.id AND cl.customer_email=LOWER(c.email)
 `;
 
-function response(value: unknown, status = 200): Response {
+function json(value: unknown, status = 200): Response {
   return Response.json(value, {status, headers:{'Cache-Control':'no-store','X-Content-Type-Options':'nosniff'}});
 }
 
-function presentation(row: CrmRow) {
+function present(row: CrmRow) {
   const sources: string[] = [];
   if (row.has_shop) sources.push('Shop');
   if (row.has_ctv) sources.push('CTV');
   if (row.has_manual) sources.push('Manual');
   if (!sources.length) sources.push('Legacy');
-  // Only a subsequent verified paid Shopify batch may revive a manually cancelled
-  // CRM label. A CTV provision alone is not evidence of a paid sale.
+  // Only a later verified paid Shopify provisioning for THIS email/location
+  // can revive Cancel. CTV provisioning alone never proves a sale.
   const revived = row.label === 'cancel' && !!row.latest_paid_batch_id &&
     row.latest_paid_batch_id !== row.last_paid_batch_id;
   return {
-    locationId:row.location_id,
-    orderReference:row.order_reference,
-    email:row.email,
+    locationId: row.location_id,
+    orderReference: row.order_reference,
+    email: row.email,
     sources,
-    status:revived ? 'active' : (row.label || 'active'),
-    autoReactivated:revived
+    status: revived ? 'active' : (row.label || 'active'),
+    autoReactivated: revived
   };
 }
 
 export async function handleAdminCrmLabelsRequest(request: Request, pathname: string, db: D1Database): Promise<Response | null> {
   if (pathname !== '/api/admin/customer-crm-labels') return null;
   if (request.method === 'GET') {
-    const result = await db.prepare(CRM_ROWS + ' ORDER BY l.created_at DESC').all<CrmRow>();
-    return response({rows:result.results.map(presentation)});
+    const result = await db.prepare(CRM_ROWS + ' ORDER BY c.created_at DESC').all<CrmRow>();
+    return json({rows: result.results.map(present)});
   }
-  if (request.method !== 'POST') return response({error:'Method not allowed'},405);
-  if (Number(request.headers.get('Content-Length') || 0) > 1024) return response({error:'Request too large'},413);
+  if (request.method !== 'POST') return json({error:'Method not allowed'},405);
+  if (Number(request.headers.get('Content-Length') || 0) > 1024) return json({error:'Request too large'},413);
   let body: Record<string, unknown>;
   try {
     const raw = await request.text();
-    if (new TextEncoder().encode(raw).byteLength > 1024) return response({error:'Request too large'},413);
+    if (new TextEncoder().encode(raw).byteLength > 1024) return json({error:'Request too large'},413);
     const parsed: unknown = JSON.parse(raw);
-    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return response({error:'Invalid request'},400);
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return json({error:'Invalid request'},400);
     body = parsed as Record<string, unknown>;
-  } catch {return response({error:'Invalid JSON'},400);}
-  const locationId = body.locationId;
-  const email = body.email;
-  const status = body.status;
+  } catch { return json({error:'Invalid JSON'},400); }
+  const locationId = body.locationId, email = body.email, status = body.status;
   if (typeof locationId !== 'string' || !/^[a-zA-Z0-9_-]{8,100}$/.test(locationId) ||
-      typeof email !== 'string' || email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ||
-      (status !== 'active' && status !== 'cancel' && status !== 'test')) {
-    return response({error:'Invalid customer label'},400);
+    typeof email !== 'string' || email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ||
+    (status !== 'active' && status !== 'cancel' && status !== 'test')) {
+    return json({error:'Invalid customer label'},400);
   }
-  const row = await db.prepare(CRM_ROWS + ' WHERE l.id=?1 LIMIT 1').bind(locationId).first<CrmRow>();
+  const row = await db.prepare(CRM_ROWS + ' WHERE c.id=?1 LIMIT 1').bind(locationId).first<CrmRow>();
   if (!row || !row.email || row.email.toLowerCase() !== email.trim().toLowerCase()) {
-    return response({error:'Customer record changed. Refresh and try again.'},409);
+    return json({error:'Customer record changed. Refresh and try again.'},409);
   }
   await db.prepare(`INSERT INTO customer_crm_labels(location_id,customer_email,status,last_paid_batch_id,updated_at)
     VALUES(?1,?2,?3,?4,?5)
     ON CONFLICT(location_id,customer_email) DO UPDATE SET status=excluded.status,
       last_paid_batch_id=excluded.last_paid_batch_id,updated_at=excluded.updated_at`)
     .bind(row.location_id,row.email.toLowerCase(),status,row.latest_paid_batch_id,new Date().toISOString()).run();
-  return response({row:presentation({...row,label:status,last_paid_batch_id:row.latest_paid_batch_id})});
+  return json({row:present({...row,label:status,last_paid_batch_id:row.latest_paid_batch_id})});
 }
 
 const CRM_LABELS_STYLE = `<style>
@@ -110,7 +109,8 @@ const CRM_LABELS_STYLE = `<style>
 .crm-status-note{font-size:.65rem;color:#647795;margin:3px 0 0}
 </style>`;
 
-const CRM_LABELS_SCRIPT = `<script>
+// Append to the existing second owner script; don't introduce a third script.
+const CRM_LABELS_SCRIPT = `
 (() => {
   const panel=document.querySelector('#crm-analytics');
   if(!panel || document.querySelector('#tnt-crm-labels-marker'))return;
@@ -143,6 +143,7 @@ const CRM_LABELS_SCRIPT = `<script>
         const option=document.createElement('option');option.value=value;option.textContent=label;select.append(option);
       }
       select.value=record.status;select.dataset.status=record.status;
+      if(!record.email){select.disabled=true;select.title='Capture a customer email before labelling';}
       select.addEventListener('change',async()=>{
         const next=select.value,previous=select.dataset.status;select.disabled=true;
         try{const result=await api('POST',{locationId:record.locationId,email:record.email,status:next});
@@ -166,10 +167,9 @@ const CRM_LABELS_SCRIPT = `<script>
   document.addEventListener('change',event=>{if(event.target.closest('[data-crm-date]'))refresh();});
   refresh();
 })();
-</script>`;
+`;
 
 export function enhanceAdminCrmLabelsPage(page: string): string {
-  // A separate script is allowed by the existing owner-only inline-script CSP.
   return page.replace('</head>', CRM_LABELS_STYLE+'</head>')
-    .replace('</body>', CRM_LABELS_SCRIPT+'\n</body>');
+    .replace('</script>\n</body>', CRM_LABELS_SCRIPT+'</script>\n</body>');
 }
