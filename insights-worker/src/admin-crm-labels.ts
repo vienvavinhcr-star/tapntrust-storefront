@@ -130,6 +130,18 @@ const CRM_LABELS_STYLE = `<style>
 .crm-owner-label select{max-width:118px;padding:4px 6px;background:white;color:#203958;border:1px solid #cbd8e8;border-radius:7px;font:inherit;font-weight:800;cursor:pointer}
 .crm-owner-label select:disabled{opacity:.55;cursor:wait}.crm-owner-label select[data-status="active"]{color:#087a47}.crm-owner-label select[data-status="cancel"]{color:#b42318}.crm-owner-label select[data-status="test"]{color:#8656bb}
 .crm-identity-error{font-size:.68rem;color:#b42318}
+/* Status is an owner-only visual label; tint the whole row, not just the badge.
+   More-specific selectors intentionally override the paid-subscription row tint. */
+.crm-table tbody tr[data-crm-label="test"] > td{background:#f8f5ff}
+.crm-table tbody tr[data-crm-label="test"] > td:first-child{box-shadow:inset 3px 0 0 #cfb9f3}
+.crm-table tbody tr[data-crm-label="active"] > td{background:#f1faf5}
+.crm-table tbody tr[data-crm-label="active"] > td:first-child{box-shadow:inset 3px 0 0 #9bd5b5}
+.crm-table tbody tr[data-crm-label="cancel"] > td{background:#fff4f3}
+.crm-table tbody tr[data-crm-label="cancel"] > td:first-child{box-shadow:inset 3px 0 0 #f0b1ab}
+.crm-table tbody tr[hidden]{display:none!important}
+.crm-filter-field select{border:1px solid var(--line);border-radius:9px;padding:9px 10px;font:inherit;font-size:.82rem;background:#fff;color:var(--navy);min-width:132px;max-width:180px;cursor:pointer}
+.crm-filter-count{font-size:.72rem;color:var(--muted);white-space:nowrap;align-self:center}
+@media(max-width:620px){.crm-filter-field select{width:100%;min-width:0;max-width:none}}
 </style>`;
 
 const CRM_LABELS_SCRIPT = `<script>
@@ -137,35 +149,67 @@ const CRM_LABELS_SCRIPT = `<script>
   const endpoint='/api/admin/crm-labels';
   const esc=value=>String(value??'').replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
   const token=()=>sessionStorage.getItem('tnt-admin-token')||document.querySelector('#token')?.value||'';
-  let entries=[],currentBody=null,observer=null,requesting=null;
+  let entries=[],currentBody=null,observer=null,requesting=null,labelsReady=false;
   const textLine=(cell,prefix)=>Array.from(cell.querySelectorAll('.crm-sub')).find(node=>node.textContent.trim().startsWith(prefix))?.textContent.trim().slice(prefix.length).trim()||'';
+  function ensureFilters(){
+    const tools=document.querySelector('#crm-analytics .crm-tools');
+    if(!tools||tools.querySelector('[data-crm-filter-source]'))return;
+    const source=document.createElement('label');source.className='crm-field crm-filter-field';
+    source.innerHTML='<span>Order source</span><select data-crm-filter-source aria-label="Filter by order source"><option value="all">All sources</option><option value="shop">Shop</option><option value="ctv">CTV</option><option value="manual">Manual</option><option value="unknown">Unknown</option></select>';
+    const status=document.createElement('label');status.className='crm-field crm-filter-field';
+    status.innerHTML='<span>Customer status</span><select data-crm-filter-status aria-label="Filter by customer status"><option value="all">All statuses</option><option value="active">Active</option><option value="cancel">Cancel</option><option value="test">Test</option><option value="unlabelled">Unlabelled</option></select>';
+    const refresh=tools.querySelector('[data-crm-refresh]');
+    tools.insertBefore(source,refresh);tools.insertBefore(status,refresh);
+    const count=document.createElement('span');count.className='crm-filter-count';count.setAttribute('data-crm-filter-count','');count.setAttribute('role','status');count.setAttribute('aria-live','polite');tools.append(count);
+  }
+  function applyFilters(){
+    const body=document.querySelector('#crm-analytics [data-crm-body]');if(!body)return;
+    const source=document.querySelector('[data-crm-filter-source]')?.value||'all';
+    const status=document.querySelector('[data-crm-filter-status]')?.value||'all';
+    let visible=0;
+    for(const row of Array.from(body.children)){
+      const passes=!labelsReady||((source==='all'||row.dataset.crmSource===source)&&(status==='all'||row.dataset.crmLabel===status));
+      row.hidden=!passes;if(passes)visible++;
+    }
+    const table=body.closest('table');
+    const empty=document.querySelector('#crm-analytics [data-crm-empty]');
+    if(table&&empty){table.hidden=visible===0;empty.hidden=visible!==0;
+      if(visible===0)empty.textContent='No customers match the selected search or filters.';}
+    const count=document.querySelector('[data-crm-filter-count]');
+    if(count)count.textContent=labelsReady?'Showing '+visible+' of '+body.children.length+' rows':'Loading CRM labels…';
+  }
   function draw(){
     const body=document.querySelector('#crm-analytics [data-crm-body]');if(!body)return;
+    ensureFilters();
     for(const row of Array.from(body.children)){
       const cell=row.cells?.[0];if(!cell)continue;
       const order=textLine(cell,'Order:'),setup=textLine(cell,'Setup:');
       const email=cell.querySelector('.crm-title')?.textContent.trim().toLowerCase()||'';
       const entry=entries.find(item=>item.orderReference===order&&item.setupReference===setup&&item.customerEmail===email);
       const existing=cell.querySelector('.crm-identity-bar');
-      if(!entry){existing?.remove();continue;}
+      if(!entry){existing?.remove();delete row.dataset.crmSource;delete row.dataset.crmLabel;continue;}
+      row.dataset.crmSource=entry.source;row.dataset.crmLabel=entry.status;
       const bar=existing||document.createElement('div');bar.className='crm-identity-bar';
       bar.innerHTML='<span class="crm-origin '+esc(entry.source)+'" title="Most recent card provisioning source">'+esc(entry.source==='ctv'?'CTV':entry.source==='shop'?'Shop':entry.source==='manual'?'Manual':'Unknown')+'</span>'+
         '<label class="crm-owner-label">Status <select data-crm-status data-location="'+esc(entry.locationId)+'" data-email="'+esc(entry.customerEmail)+'" data-status="'+esc(entry.status)+'">'+
         [['unlabelled','Unlabelled'],['active','Active'],['cancel','Cancel'],['test','Test']].map(item=>'<option value="'+item[0]+'"'+(entry.status===item[0]?' selected':'')+'>'+item[1]+'</option>').join('')+'</select></label>';
       if(!existing)cell.prepend(bar);
     }
+    applyFilters();
   }
   async function load(){
     if(!token()||requesting)return requesting;
     requesting=(async()=>{const result=await fetch(endpoint,{headers:{Authorization:'Bearer '+token()}});
-      if(!result.ok)throw new Error('Unable to load CRM labels');const body=await result.json();entries=body.entries||[];draw();})();
-    try{await requesting;}catch(error){console.warn('CRM labels could not be loaded',error);}finally{requesting=null;}
+      if(!result.ok)throw new Error('Unable to load CRM labels');const data=await result.json();entries=data.entries||[];labelsReady=true;draw();})();
+    try{await requesting;}catch(error){console.warn('CRM labels could not be loaded',error);if(!labelsReady)applyFilters();}finally{requesting=null;}
   }
   function watch(){
     const body=document.querySelector('#crm-analytics [data-crm-body]');
-    if(!body||currentBody===body)return Boolean(body);
+    if(!body)return false;
+    ensureFilters();
+    if(currentBody===body)return true;
     observer?.disconnect();currentBody=body;
-    observer=new MutationObserver(()=>{load();draw();});observer.observe(body,{childList:true});load();return true;
+    observer=new MutationObserver(()=>{draw();load();});observer.observe(body,{childList:true});load();return true;
   }
   if(!watch()){
     const bootstrap=new MutationObserver(()=>{if(watch())bootstrap.disconnect()});
@@ -173,12 +217,14 @@ const CRM_LABELS_SCRIPT = `<script>
   }
   document.addEventListener('click',event=>{
     if(event.target instanceof Element&&event.target.closest('[data-crm-refresh],[data-crm-period]')){
-      entries=[];setTimeout(load,0);
+      setTimeout(load,0);
     }
   });
   document.addEventListener('change',async event=>{
     const select=event.target;
-    if(!(select instanceof HTMLSelectElement)||!select.matches('[data-crm-status]'))return;
+    if(!(select instanceof HTMLSelectElement))return;
+    if(select.matches('[data-crm-filter-source],[data-crm-filter-status]')){applyFilters();return;}
+    if(!select.matches('[data-crm-status]'))return;
     const current=entries.find(row=>row.locationId===select.dataset.location&&row.customerEmail===select.dataset.email);
     if(!current)return;
     const previous=current.status;select.disabled=true;
