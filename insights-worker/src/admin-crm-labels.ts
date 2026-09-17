@@ -194,6 +194,13 @@ const CRM_LABELS_SCRIPT = `<script>
 </script>`;
 
 export function enhanceAdminCrmLabelsPage(page: string): string {
-  return page.replace("</head>", CRM_LABELS_STYLE + "</head>")
-    .replace("</body>", CRM_LABELS_SCRIPT + "</body>");
+  const styled = page.replace("</head>", CRM_LABELS_STYLE + "</head>");
+  const marker = "</script>\n</body>";
+  if (styled.includes(marker)) {
+    // Append to the existing final admin script: preserve the established two-script
+    // bootstrap and its regression/security checks rather than adding a third script.
+    const inlineScript = CRM_LABELS_SCRIPT.slice("<script>\n".length, -"</script>".length);
+    return styled.replace(marker, inlineScript + "</script>\n</body>");
+  }
+  return styled.replace("</body>", CRM_LABELS_SCRIPT + "</body>");
 }
