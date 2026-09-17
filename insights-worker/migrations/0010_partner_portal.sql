@@ -79,15 +79,16 @@ CREATE TABLE partner_provisionings (
 );
 CREATE INDEX partner_provisionings_partner_idx ON partner_provisionings(partner_id, created_at DESC);
 
--- D1.batch is transactional. The last attribution insert checks and debits allowance
--- in the same transaction as the original business/location/batch/cards inserts.
+-- The attribution insert checks and debits allowance atomically with card creation.
+-- Parenthesize CASE so the remote D1 trigger statement splitter does not treat its
+-- inner END as the end of the CREATE TRIGGER statement.
 CREATE TRIGGER partner_provisioning_guard BEFORE INSERT ON partner_provisionings
 BEGIN
-  SELECT CASE WHEN NOT EXISTS (
+  SELECT (CASE WHEN NOT EXISTS (
     SELECT 1 FROM sales_partners p
     WHERE p.id = NEW.partner_id AND p.status = 'active' AND p.provision_enabled = 1
       AND p.allowance_total - p.provisioned_count >= NEW.physical_card_count
-  ) THEN RAISE(ABORT, 'partner_quota_exceeded') END;
+  ) THEN RAISE(ABORT, 'partner_quota_exceeded') END);
 END;
 CREATE TRIGGER partner_provisioning_debit AFTER INSERT ON partner_provisionings
 BEGIN
