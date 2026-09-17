@@ -30,7 +30,7 @@ describe("owner CRM status highlights and filters", () => {
   it("retains the existing admin script count and generates valid JavaScript", () => {
     const original = '<html><head></head><body><script>window.first=true;</script><script>window.second=true;</script></body></html>';
     const page = enhanceAdminCrmLabelsPage(original);
-    const scripts = Array.from(page.matchAll(/<script>([\s\S]*?)<\/script>/g), match => match[1]);
+    const scripts = Array.from(page.matchAll(/<script>([\s\S]*?)<\/script>/g), match => match[1] ?? "");
     expect(scripts).toHaveLength(2);
     for (const script of scripts) expect(() => new Function(script)).not.toThrow();
   });
