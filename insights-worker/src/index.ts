@@ -5,6 +5,7 @@ import { enhanceAdminCardActivityPage } from "./admin-card-activity-page";
 import { enhanceAdminShopifySyncRetry } from "./admin-shopify-sync-retry";
 import { enhanceAdminEmailActionsPage } from "./admin-email-actions-page";
 import { enhanceAdminPartnersPage } from "./admin-partners-page";
+import { enhanceAdminCrmLabelsPage, handleAdminCrmLabelsRequest } from "./admin-crm-labels";
 import { PARTNER_PAGE } from "./partner-page";
 import { handlePartnerAuth, type PartnerEnv } from "./partner-auth";
 import { handleOwnerPartners, handlePartnerOperations } from "./partner-operations";
@@ -42,13 +43,13 @@ const HTML_HEADERS = {
 };
 // Existing owner dashboard has two inline scripts. Append partner behaviour to the
 // second script rather than introducing an extra independent bootstrap.
-const ENHANCED_ADMIN_PAGE = enhanceAdminPartnersPage(enhanceAdminEmailActionsPage(
+const ENHANCED_ADMIN_PAGE = enhanceAdminCrmLabelsPage(enhanceAdminPartnersPage(enhanceAdminEmailActionsPage(
   enhanceAdminCardActivityPage(
     enhanceAdminShopifySyncRetry(
       enhanceAdminAnalyticsPage(enhanceAdminPage(ADMIN_PAGE))
     )
   )
-)).replace("</script>\n<script>\n(() => {", "\n(() => {");
+)).replace("</script>\n<script>\n(() => {", "\n(() => {") );
 
 function json(data: unknown, status = 200): Response {
   return Response.json(data, {
@@ -191,6 +192,9 @@ async function handleAdmin(
     if (request.method !== "GET") return methodNotAllowed("GET");
     return json(await repository.getSummary(monthStartUtc(new Date())));
   }
+
+  const crmLabelsResponse = await handleAdminCrmLabelsRequest(request, pathname, env.DB);
+  if (crmLabelsResponse) return crmLabelsResponse;
 
   const partnerAdminResponse = await handleOwnerPartners(request, pathname, env);
   if (partnerAdminResponse) return partnerAdminResponse;
