@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/wrangler/config-schema.json",
   "name": "tapntrust-insights-redirect",
-  "main": "src/index-crm.ts",
+  "main": "src/index.ts",
   "compatibility_date": "2026-09-11",
   "compatibility_flags": ["nodejs_compat"],
   "routes": [
