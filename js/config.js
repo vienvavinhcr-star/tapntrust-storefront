@@ -28,7 +28,7 @@ export const config = Object.freeze({
   INSTAGRAM_URL: "https://www.instagram.com/tapntrust.au/"
 });
 
-import("./marketing/welcome-offer.js?v=20260901-1")
+import("./marketing/welcome-offer.js?v=20260922-3")
   .then(({ initialiseWelcomeOffer }) => initialiseWelcomeOffer(config))
   .catch(() => {});
 

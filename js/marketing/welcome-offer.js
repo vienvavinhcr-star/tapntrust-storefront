@@ -10,7 +10,8 @@ const STORAGE = Object.freeze({
   addToCartAt: "tapntrust_welcome_add_to_cart_at",
   checkoutAt: "tapntrust_welcome_checkout_at"
 });
-const AUTO_PROMPT_KEY = "tapntrust_welcome_auto_prompted";
+const CHECKOUT_EXTRA_NOTICE_KEY = "tapntrust_checkout_extra_notice_seen";
+const CHECKOUT_EXTRA_NOTICE_DELAY_MS = 10000;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function getLocal(key) { try { return localStorage.getItem(key) || ""; } catch { return ""; } }
@@ -63,7 +64,7 @@ function ensureStyles() {
   if (document.querySelector('link[data-welcome-offer-styles]')) return;
   const link = document.createElement("link");
   link.rel = "stylesheet";
-  link.href = "css/welcome-offer.css?v=20260901-1";
+  link.href = "css/welcome-offer.css?v=20260922-2";
   link.dataset.welcomeOfferStyles = "";
   document.head.append(link);
 }
@@ -75,15 +76,16 @@ function buildPopup(discountCode, discountPercent) {
     <div class="welcome-offer__backdrop" data-welcome-backdrop></div>
     <section class="welcome-offer__dialog" role="dialog" aria-modal="true" aria-labelledby="welcome-offer-title" tabindex="-1" data-welcome-dialog>
       <button class="welcome-offer__close" type="button" aria-label="Close welcome offer" data-welcome-close>×</button>
-      <div class="welcome-offer__visual" aria-hidden="true"><span class="welcome-offer__eyebrow">WELCOME TO TAPNTRUST</span><strong>${discountPercent}% OFF</strong><span>your first order</span><div class="welcome-offer__tap-mark"><i></i><i></i><i></i></div></div>
+      <div class="welcome-offer__visual" aria-hidden="true"><span class="welcome-offer__eyebrow">A CHECKOUT EXTRA</span><strong>+${discountPercent}%</strong><span>off your first order</span><div class="welcome-offer__tap-mark"><i></i><i></i><i></i></div></div>
       <div class="welcome-offer__content">
         <div data-welcome-form-panel>
-          <p class="welcome-offer__kicker">A little welcome gift</p>
-          <h2 id="welcome-offer-title">Get ${discountPercent}% off your first Tapntrust order</h2>
-          <p>Enter your email and unlock your welcome discount instantly.</p>
+          <p class="welcome-offer__kicker">Exclusive welcome offer</p>
+          <h2 id="welcome-offer-title">Get an extra ${discountPercent}% off at checkout</h2>
+          <p>Enter your email once and we’ll apply your welcome discount to this cart, ready for Shopify Checkout.</p>
+          <div class="welcome-offer__assurance" aria-label="Offer details"><span>First order</span><span>Automatic cart apply</span></div>
           <form class="welcome-offer__form" data-welcome-form novalidate>
             <label for="welcome-offer-email">Email address</label>
-            <div class="welcome-offer__field-row"><input id="welcome-offer-email" name="email" type="email" inputmode="email" autocomplete="email" placeholder="you@example.com" required data-welcome-email><button type="submit">Unlock my ${discountPercent}% off</button></div>
+            <div class="welcome-offer__field-row"><input id="welcome-offer-email" name="email" type="email" inputmode="email" autocomplete="email" placeholder="you@example.com" required data-welcome-email><button type="submit">Apply my ${discountPercent}% off</button></div>
             <div class="welcome-offer__honeypot" aria-hidden="true"><label>Company<input name="company" type="text" tabindex="-1" autocomplete="off"></label></div>
             <p class="welcome-offer__status" role="status" aria-live="polite" data-welcome-status></p>
           </form>
@@ -96,6 +98,28 @@ function buildPopup(discountCode, discountPercent) {
           <p class="welcome-offer__copy-status" role="status" aria-live="polite" data-welcome-copy-status></p>
           <button class="welcome-offer__shop" type="button" data-welcome-shop>Continue to cart</button>
         </div>
+      </div>
+    </section>`;
+  document.body.append(root);
+  return root;
+}
+function buildCheckoutExtraNotice(discountPercent) {
+  const root = document.createElement("div");
+  root.className = "checkout-extra";
+  root.dataset.checkoutExtra = "";
+  root.hidden = true;
+  root.innerHTML = `
+    <div class="checkout-extra__backdrop" data-checkout-extra-close></div>
+    <section class="checkout-extra__dialog" role="dialog" aria-modal="true" aria-labelledby="checkout-extra-title" tabindex="-1" data-checkout-extra-dialog>
+      <button class="checkout-extra__close" type="button" aria-label="Close checkout offer" data-checkout-extra-close>×</button>
+      <div class="checkout-extra__mascot" aria-hidden="true">
+        <img src="assets/marketing/tapntrust-insights-popup-mascot.png" alt="" width="1222" height="1287" loading="eager" decoding="async">
+      </div>
+      <div class="checkout-extra__content">
+        <p>Something extra for you</p>
+        <h2 id="checkout-extra-title">Enjoy your extra <span>${discountPercent}% off</span> at checkout</h2>
+        <small>Available on eligible first orders.</small>
+        <button type="button" data-checkout-extra-close>Sounds good</button>
       </div>
     </section>`;
   document.body.append(root);
@@ -122,8 +146,10 @@ export function initialiseWelcomeOffer(config = {}) {
   const cooldownMs = Math.max(1, Number(config.WELCOME_POPUP_COOLDOWN_DAYS || 14)) * 86400000;
   ensureStyles();
   const root = buildPopup(discountCode, discountPercent);
+  const checkoutExtra = buildCheckoutExtraNotice(discountPercent);
   const cartOffer = buildCartOffer(discountCode, discountPercent);
   const dialog = root.querySelector("[data-welcome-dialog]");
+  const checkoutExtraDialog = checkoutExtra.querySelector("[data-checkout-extra-dialog]");
   const form = root.querySelector("[data-welcome-form]");
   const emailInput = root.querySelector("[data-welcome-email]");
   const formPanel = root.querySelector("[data-welcome-form-panel]");
@@ -134,7 +160,10 @@ export function initialiseWelcomeOffer(config = {}) {
   let latestCartState = null;
   let pendingPrimaryAdd = null;
   let appliedToCurrentCart = false;
+  let applyingDiscount = false;
+  let checkoutExtraTimer = 0;
   let lastFocused = null;
+  let checkoutExtraLastFocused = null;
 
   function claimed() {
     const at = Number(getLocal(STORAGE.claimedAt) || 0);
@@ -180,6 +209,31 @@ export function initialiseWelcomeOffer(config = {}) {
     root.classList.remove("is-open");
     window.setTimeout(() => { root.hidden = true; setBodyLock(); lastFocused?.focus?.(); }, 220);
   }
+  function closeCheckoutExtra() {
+    checkoutExtra.classList.remove("is-open");
+    window.setTimeout(() => {
+      checkoutExtra.hidden = true;
+      setBodyLock();
+      checkoutExtraLastFocused?.focus?.();
+    }, 220);
+  }
+  function openCheckoutExtra() {
+    if (getSession(CHECKOUT_EXTRA_NOTICE_KEY)) return;
+    const anotherOverlayOpen = document.body.classList.contains("is-locked")
+      || document.querySelector(".cart-drawer.is-open, .guide-modal.is-open, .welcome-offer.is-open");
+    if (anotherOverlayOpen) {
+      checkoutExtraTimer = window.setTimeout(openCheckoutExtra, 2500);
+      return;
+    }
+    setSession(CHECKOUT_EXTRA_NOTICE_KEY, "1");
+    checkoutExtraLastFocused = document.activeElement;
+    checkoutExtra.hidden = false;
+    requestAnimationFrame(() => {
+      checkoutExtra.classList.add("is-open");
+      setBodyLock();
+      checkoutExtraDialog?.focus();
+    });
+  }
   async function copyCode(target) {
     try { await navigator.clipboard.writeText(discountCode); target.textContent = `${discountCode} copied.`; }
     catch { target.textContent = `Your discount code is ${discountCode}.`; }
@@ -198,11 +252,13 @@ export function initialiseWelcomeOffer(config = {}) {
     if (subtotalValue) subtotalValue.textContent = money.format(total).replace("$", "A$");
   }
   async function applyDiscount() {
+    if (applyingDiscount || cartDiscountApplied()) return;
     const cart = latestCartState?.cart;
     if (latestCartState?.mode !== "shopify" || !cart?.id) {
       successCopy.textContent = `Copy ${discountCode} and enter it at checkout for ${discountPercent}% off.`;
       return;
     }
+    applyingDiscount = true;
     try {
       const codes = [...new Set([...(cart.discountCodes || []), discountCode])];
       const rawCart = await updateCartDiscountCodes(cart.id, codes);
@@ -216,6 +272,7 @@ export function initialiseWelcomeOffer(config = {}) {
       successCopy.textContent = `Copy ${discountCode} and enter it at checkout for ${discountPercent}% off.`;
       copyStatus.textContent = "Automatic apply was unavailable, but your code is ready.";
     }
+    applyingDiscount = false;
     renderCartOffer();
   }
 
@@ -228,15 +285,12 @@ export function initialiseWelcomeOffer(config = {}) {
   document.addEventListener("tapntrust:cart-change", (event) => {
     latestCartState = event.detail;
     renderCartOffer();
+    if (claimed() && hasPrimary(latestCartState) && !cartDiscountApplied()) void applyDiscount();
     if (!pendingPrimaryAdd || primaryQuantity(latestCartState) <= pendingPrimaryAdd.before) return;
     pendingPrimaryAdd = null;
     if (claimed()) return;
     beginLeadCycle(nowIso());
     renderCartOffer();
-    if (!getSession(AUTO_PROMPT_KEY)) {
-      setSession(AUTO_PROMPT_KEY, "1");
-      open();
-    }
   });
 
   form?.addEventListener("submit", (event) => {
@@ -262,8 +316,10 @@ export function initialiseWelcomeOffer(config = {}) {
   });
 
   root.querySelectorAll("[data-welcome-close], [data-welcome-backdrop], [data-welcome-shop]").forEach((element) => element.addEventListener("click", close));
+  checkoutExtra.querySelectorAll("[data-checkout-extra-close]").forEach((element) => element.addEventListener("click", closeCheckoutExtra));
   root.querySelector("[data-welcome-copy]")?.addEventListener("click", () => copyCode(copyStatus));
   dialog?.addEventListener("keydown", (event) => { if (event.key === "Escape") { event.preventDefault(); close(); } else trapFocus(event, dialog); });
+  checkoutExtraDialog?.addEventListener("keydown", (event) => { if (event.key === "Escape") { event.preventDefault(); closeCheckoutExtra(); } else trapFocus(event, checkoutExtraDialog); });
   cartOffer.querySelector("[data-welcome-cart-unlock]")?.addEventListener("click", open);
   cartOffer.querySelector("[data-welcome-cart-copy]")?.addEventListener("click", () => copyCode(cartOffer.querySelector("[data-welcome-cart-status]")));
 
@@ -275,4 +331,8 @@ export function initialiseWelcomeOffer(config = {}) {
     setLocal(STORAGE.checkoutAt, occurredAt);
     void postEvent(endpoint, { ...payloadBase(getLocal(STORAGE.email)), event: "checkout", occurredAt }, { beacon: true });
   }, { capture: true });
+
+  if (!getSession(CHECKOUT_EXTRA_NOTICE_KEY)) {
+    checkoutExtraTimer = window.setTimeout(openCheckoutExtra, CHECKOUT_EXTRA_NOTICE_DELAY_MS);
+  }
 }

@@ -185,9 +185,6 @@ function initialiseInsightsTracking() {
 
   document.addEventListener("click", (event) => {
     if (!(event.target instanceof Element)) return;
-    if (event.target.closest("[data-insights-promo-cta]")) {
-      trackClarityEventOnce("insights_popup_try_now");
-    }
     if (event.target.closest("[data-insights-offer-details]")) {
       trackClarityEventOnce("insights_how_it_works_clicked");
     }
@@ -199,34 +196,6 @@ function initialiseInsightsTracking() {
     if (toggle?.checked) trackClarityEventOnce("insights_selected");
   });
 
-  if (!("MutationObserver" in window) || !document.body) return;
-
-  const observePromo = (promo) => {
-    const maybeTrackShown = () => {
-      if (!promo.hidden && promo.classList.contains("is-open")) {
-        trackClarityEventOnce("insights_popup_shown");
-      }
-    };
-    new MutationObserver(maybeTrackShown).observe(promo, {
-      attributes: true,
-      attributeFilter: ["class", "hidden"]
-    });
-    maybeTrackShown();
-  };
-
-  const existingPromo = document.querySelector("[data-insights-promo]");
-  if (existingPromo) {
-    observePromo(existingPromo);
-    return;
-  }
-
-  const bodyObserver = new MutationObserver(() => {
-    const promo = document.querySelector("[data-insights-promo]");
-    if (!promo) return;
-    bodyObserver.disconnect();
-    observePromo(promo);
-  });
-  bodyObserver.observe(document.body, { childList: true, subtree: true });
 }
 
 function initialiseCheckoutTracking() {
