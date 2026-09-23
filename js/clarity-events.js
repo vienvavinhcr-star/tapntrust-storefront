@@ -229,6 +229,7 @@ function initialiseCheckoutExtraTracking() {
     bodyObserver.observe(document.body, { childList: true, subtree: true });
   }
 
+  // Capture before welcome-offer.js removes is-open on the target button click.
   document.addEventListener("click", (event) => {
     if (!(event.target instanceof Element)) return;
     const popup = event.target.closest("[data-checkout-extra]");
@@ -239,7 +240,7 @@ function initialiseCheckoutExtraTracking() {
     } else if (event.target.closest(".checkout-extra__content button[data-checkout-extra-close]")) {
       trackClarityEventOnce("checkout_extra_popup_sounds_good_clicked");
     }
-  });
+  }, { capture: true });
 }
 
 function initialiseCheckoutTracking() {
