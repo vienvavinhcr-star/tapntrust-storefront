@@ -50,8 +50,10 @@ When changing Shopify/Meta integrations, verify in Meta Test Events rather than 
 | `extra_card_added` | The visitor's manual Extra Card add-on action succeeds. |
 | `counter_stand_added` | The visitor's manual Counter Stand add-on action succeeds. The automatic free stand in a 5-card bundle never triggers this event. |
 | `begin_checkout` | A visitor clicks an enabled checkout link with a non-empty destination. This is intent, not proof that Shopify loaded or a purchase completed. |
-| `insights_popup_shown` | The Tapntrust Insights promo popup actually becomes visible. |
-| `insights_popup_try_now` | A visitor clicks the Insights popup CTA. |
+| `checkout_extra_popup_shown` | The 10% checkout-extra popup becomes visible (`is-open` and not hidden), not merely when its timer starts or markup is created. |
+| `checkout_extra_popup_close_clicked` | A visitor explicitly clicks the X close button on the visible checkout-extra popup. Backdrop clicks and Escape do not count as X clicks. |
+| `checkout_extra_popup_sounds_good_clicked` | A visitor clicks the Sounds good button on the visible checkout-extra popup. This is an acknowledgment, not proof that a discount was claimed or applied. |
+| `insights_how_it_works_clicked` | A visitor clicks See how Insights works in the product offer. |
 | `insights_selected` | A visitor turns the Tapntrust Insights selector on. |
 | `insights_added_to_cart` | Tapntrust Insights is successfully attached to the Shopify cart after the subscription line and required intro offer checks succeed. |
 | `insights_begin_checkout` | A visitor clicks an enabled checkout link while an Insights line is present in the rendered cart. This is checkout intent, not purchase completion. |
@@ -65,7 +67,8 @@ In Clarity, use API events in Smart Events / Funnels after new visitor activity 
 - Per-package funnel: `add_to_cart_2_cards` (or another package) → `begin_checkout`.
 - Optional claim branch: `add_to_cart` → `welcome_offer_claimed` → `begin_checkout`.
 - Optional upsell branches: `add_to_cart` → `extra_card_added` or `counter_stand_added` → `begin_checkout`.
-- Tapntrust Insights popup funnel: `insights_popup_shown` → `insights_popup_try_now` → `insights_selected` → `insights_added_to_cart` → `insights_begin_checkout`.
+- Checkout-extra popup decision: compare `checkout_extra_popup_shown` with `checkout_extra_popup_close_clicked` and `checkout_extra_popup_sounds_good_clicked`; these are separate alternatives, not consecutive funnel steps. The popup is not the old Insights popup.
+- Optional Insights interest branch: `insights_how_it_works_clicked` → `insights_selected` → `insights_added_to_cart` → `insights_begin_checkout`. A customer can select Insights without clicking the information link.
 
 Do not require both add-ons or a claim in the main funnel: they are optional and can happen in different orders. The storefront cannot observe email entry or other actions inside Shopify Checkout. `insights_begin_checkout` only proves the customer clicked the storefront checkout CTA while Insights was in the cart; purchase completion remains Shopify-side. These events do not backfill historical sessions and remain suppressed in owner test mode. Reference: [Clarity client API](https://learn.microsoft.com/en-us/clarity/setup-and-installation/clarity-api).
 
