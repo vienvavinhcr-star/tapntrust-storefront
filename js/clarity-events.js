@@ -195,7 +195,51 @@ function initialiseInsightsTracking() {
     const toggle = event.target.closest("[data-insights-toggle]");
     if (toggle?.checked) trackClarityEventOnce("insights_selected");
   });
+}
 
+function initialiseCheckoutExtraTracking() {
+  if (clarityTestMode) return;
+
+  // The 10% checkout-extra popup is appended dynamically by welcome-offer.js.
+  // Observe its actual visible state, rather than counting the 10-second timer.
+  const observePopup = (popup) => {
+    const trackIfShown = () => {
+      if (!popup.hidden && popup.classList.contains("is-open")) {
+        trackClarityEventOnce("checkout_extra_popup_shown");
+      }
+    };
+    if ("MutationObserver" in window) {
+      new MutationObserver(trackIfShown).observe(popup, {
+        attributes: true,
+        attributeFilter: ["hidden", "class"]
+      });
+    }
+    trackIfShown();
+  };
+
+  const existingPopup = document.querySelector("[data-checkout-extra]");
+  if (existingPopup) observePopup(existingPopup);
+  else if ("MutationObserver" in window && document.body) {
+    const bodyObserver = new MutationObserver(() => {
+      const popup = document.querySelector("[data-checkout-extra]");
+      if (!popup) return;
+      bodyObserver.disconnect();
+      observePopup(popup);
+    });
+    bodyObserver.observe(document.body, { childList: true, subtree: true });
+  }
+
+  document.addEventListener("click", (event) => {
+    if (!(event.target instanceof Element)) return;
+    const popup = event.target.closest("[data-checkout-extra]");
+    if (!popup || popup.hidden || !popup.classList.contains("is-open")) return;
+
+    if (event.target.closest(".checkout-extra__close[data-checkout-extra-close]")) {
+      trackClarityEventOnce("checkout_extra_popup_close_clicked");
+    } else if (event.target.closest(".checkout-extra__content button[data-checkout-extra-close]")) {
+      trackClarityEventOnce("checkout_extra_popup_sounds_good_clicked");
+    }
+  });
 }
 
 function initialiseCheckoutTracking() {
@@ -219,4 +263,5 @@ function initialiseCheckoutTracking() {
 
 initialiseBusinessSearchTracking();
 initialiseInsightsTracking();
+initialiseCheckoutExtraTracking();
 initialiseCheckoutTracking();
