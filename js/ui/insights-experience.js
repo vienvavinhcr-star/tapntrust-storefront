@@ -1,42 +1,61 @@
-function animateOpportunityCount(element, reducedMotion) {
-  if (!element || element.dataset.counted === "true") return;
+function createOpportunityAnimation(element, reducedMotion) {
+  if (!element) return null;
   const finalTarget = Number(element.dataset.countTo || 139);
   const fastTarget = Math.max(0, finalTarget - 5);
   const preview = element.closest("[data-insights-preview]");
   const momentum = preview?.querySelector("[data-insights-momentum]");
-  if (!Number.isFinite(finalTarget) || finalTarget < 0) return;
-  element.dataset.counted = "true";
-  if (reducedMotion) {
+  if (!preview || !Number.isFinite(finalTarget) || finalTarget < 0) return null;
+
+  let active = false;
+  let generation = 0;
+  let animationFrame = 0;
+  const timeouts = new Set();
+
+  const clearSchedule = () => {
+    cancelAnimationFrame(animationFrame);
+    timeouts.forEach((timeout) => window.clearTimeout(timeout));
+    timeouts.clear();
+  };
+
+  const schedule = (callback, delay, token) => {
+    const timeout = window.setTimeout(() => {
+      timeouts.delete(timeout);
+      if (active && token === generation) callback();
+    }, delay);
+    timeouts.add(timeout);
+  };
+
+  const showFinalState = () => {
     element.textContent = finalTarget.toLocaleString("en-AU");
     if (momentum) momentum.textContent = "+28%";
-    preview?.style.setProperty("--insights-progress", "100%");
-    preview?.style.setProperty("--insights-card-progress", "57%");
-    preview?.style.setProperty("--insights-stage", "1");
-    preview?.classList.add("is-card-ready", "is-time-ready", "is-ready");
-    return;
-  }
+    preview.style.setProperty("--insights-progress", "100%");
+    preview.style.setProperty("--insights-card-progress", "57%");
+    preview.style.setProperty("--insights-stage", "1");
+    preview.classList.add("is-card-ready", "is-time-ready", "is-ready");
+  };
 
-  const runCycle = () => {
-    if (!element.isConnected) return;
+  const runCycle = (token) => {
+    if (!active || token !== generation || !element.isConnected) return;
     const duration = 1550;
     const startedAt = performance.now();
     element.textContent = "0";
     if (momentum) momentum.textContent = "+22%";
-    preview?.style.setProperty("--insights-progress", "0%");
-    preview?.style.setProperty("--insights-card-progress", "0%");
-    preview?.style.setProperty("--insights-stage", "0");
-    preview?.classList.remove("is-card-ready", "is-time-ready", "is-ready");
+    preview.style.setProperty("--insights-progress", "0%");
+    preview.style.setProperty("--insights-card-progress", "0%");
+    preview.style.setProperty("--insights-stage", "0");
+    preview.classList.remove("is-card-ready", "is-time-ready", "is-ready");
 
     const renderFastCount = (now) => {
+      if (!active || token !== generation) return;
       const progress = Math.min(1, (now - startedAt) / duration);
       const eased = 1 - Math.pow(1 - progress, 3);
       element.textContent = Math.round(fastTarget * eased).toLocaleString("en-AU");
       if (momentum) momentum.textContent = `+${22 + Math.round(eased * 6)}%`;
-      preview?.style.setProperty("--insights-progress", `${Math.round(eased * 100)}%`);
-      preview?.style.setProperty("--insights-card-progress", `${Math.round(eased * 57)}%`);
-      preview?.style.setProperty("--insights-stage", eased.toFixed(3));
+      preview.style.setProperty("--insights-progress", `${Math.round(eased * 100)}%`);
+      preview.style.setProperty("--insights-card-progress", `${Math.round(eased * 57)}%`);
+      preview.style.setProperty("--insights-stage", eased.toFixed(3));
       if (progress < 1) {
-        requestAnimationFrame(renderFastCount);
+        animationFrame = requestAnimationFrame(renderFastCount);
         return;
       }
 
@@ -44,22 +63,37 @@ function animateOpportunityCount(element, reducedMotion) {
       const renderSlowCount = () => {
         current += 1;
         element.textContent = current.toLocaleString("en-AU");
-        if (current >= fastTarget + 2) preview?.classList.add("is-card-ready");
-        if (current >= fastTarget + 4) preview?.classList.add("is-time-ready");
+        if (current >= fastTarget + 2) preview.classList.add("is-card-ready");
+        if (current >= fastTarget + 4) preview.classList.add("is-time-ready");
         if (current < finalTarget) {
-          window.setTimeout(renderSlowCount, 760);
+          schedule(renderSlowCount, 760, token);
           return;
         }
-        preview?.classList.add("is-ready");
-        window.setTimeout(runCycle, 10000);
+        preview.classList.add("is-ready");
+        schedule(() => runCycle(token), 10000, token);
       };
-      window.setTimeout(renderSlowCount, 760);
+      schedule(renderSlowCount, 760, token);
     };
 
-    requestAnimationFrame(renderFastCount);
+    animationFrame = requestAnimationFrame(renderFastCount);
   };
 
-  runCycle();
+  return {
+    start() {
+      if (active) return;
+      active = true;
+      generation += 1;
+      clearSchedule();
+      if (reducedMotion) showFinalState();
+      else runCycle(generation);
+    },
+    stop() {
+      if (!active) return;
+      active = false;
+      generation += 1;
+      clearSchedule();
+    }
+  };
 }
 
 function emphasiseOffer() {
@@ -132,6 +166,8 @@ export function initialiseInsightsExperience() {
 
   const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   const count = root.querySelector("[data-insights-count]");
+  const preview = count?.closest("[data-insights-preview]");
+  const opportunityAnimation = createOpportunityAnimation(count, reducedMotion);
 
   document.querySelectorAll("[data-insights-sales-cta]").forEach((link) => {
     link.addEventListener("click", emphasiseOffer);
@@ -139,17 +175,18 @@ export function initialiseInsightsExperience() {
 
   initialiseCarousel(root, reducedMotion);
 
-  if (reducedMotion || !("IntersectionObserver" in window)) {
-    animateOpportunityCount(count, true);
+  if (!preview || !opportunityAnimation) return;
+
+  if (!("IntersectionObserver" in window)) {
+    opportunityAnimation.start();
     return;
   }
 
   const observer = new IntersectionObserver((entries) => {
     entries.forEach((entry) => {
-      if (!entry.isIntersecting) return;
-      animateOpportunityCount(count, false);
-      observer.unobserve(entry.target);
+      if (entry.isIntersecting) opportunityAnimation.start();
+      else opportunityAnimation.stop();
     });
-  }, { threshold: .18 });
-  observer.observe(root);
+  }, { threshold: .32, rootMargin: "0px 0px -8% 0px" });
+  observer.observe(preview);
 }

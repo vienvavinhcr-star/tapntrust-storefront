@@ -28,7 +28,7 @@ import {
 } from "./ui/site.js";
 import { initialiseConsultationForm } from "./forms/consultation.js";
 import { initialiseInsightsOffer } from "./insights-offer.js";
-import { initialiseInsightsExperience } from "./ui/insights-experience.js?v=20260922-1";
+import { initialiseInsightsExperience } from "./ui/insights-experience.js?v=20260923-1";
 
 const cartActions = createIntegrityCartActions(baseCartActions);
 const money = new Intl.NumberFormat("en-AU", { style: "currency", currency: "AUD" });
