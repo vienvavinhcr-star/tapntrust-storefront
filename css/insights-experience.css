@@ -104,17 +104,17 @@
 .insights-preview__trend {
   position: absolute;
   right: 14px;
-  bottom: 14px;
-  width: 48px;
-  height: 25px;
-  opacity: .82;
+  bottom: 12px;
+  width: 84px;
+  height: 46px;
 }
-.insights-preview__trend::before,
-.insights-preview__trend::after { position: absolute; left: 0; width: 100%; height: 1px; background: #d5e4f7; content: ""; }
-.insights-preview__trend::before { top: 7px; }
-.insights-preview__trend::after { bottom: 6px; }
-.insights-preview__trend b { position: absolute; inset: 0 auto 0 0; width: var(--insights-progress); overflow: hidden; transition: width .12s linear; }
-.insights-preview__trend b::after { position: absolute; inset: 0; width: 48px; background: linear-gradient(135deg, transparent 0 30%, #1769ed 31% 38%, transparent 39% 48%, #1769ed 49% 57%, transparent 58% 67%, #1769ed 68% 77%, transparent 78% 84%, #1769ed 85% 100%); clip-path: polygon(0 80%, 20% 61%, 37% 68%, 57% 38%, 74% 47%, 100% 8%, 100% 25%, 76% 62%, 59% 53%, 40% 83%, 21% 75%, 0 96%); content: ""; }
+.insights-preview__trend::before { position: absolute; top: 15px; right: 0; left: 0; height: 1px; background: #dbe7f6; box-shadow: 0 12px #dbe7f6; content: ""; }
+.insights-preview__trend > span { position: relative; z-index: 1; display: block; width: var(--insights-progress); height: 32px; overflow: hidden; transition: width .12s linear; }
+.insights-preview__trend svg { position: absolute; inset: 0; width: 84px; height: 32px; overflow: visible; }
+.insights-preview__trend path { fill: none; stroke: #1769ed; stroke-linecap: round; stroke-linejoin: round; stroke-width: 3; }
+.insights-preview__trend circle { fill: #fff; stroke: #1769ed; stroke-width: 2.5; }
+.insights-preview__trend > small { display: flex; justify-content: space-between; margin-top: 2px; color: #6d809f; font-size: .49rem; font-style: normal; font-weight: 800; line-height: 1; }
+.insights-preview__trend > small b:last-child { color: #1769ed; }
 
 .insights-preview__progress { display: block; height: 6px; margin-top: 12px; overflow: hidden; border-radius: 999px; background: #d7e6fa; }
 .insights-preview__progress b { display: block; width: var(--insights-card-progress); height: 100%; border-radius: inherit; background: linear-gradient(90deg, #1769ed, #63b9ff); transition: width .12s linear; }
@@ -391,8 +391,7 @@
   .insights-preview__grid article:last-child { grid-column: auto; min-height: 121px; }
   .insights-preview__grid article > strong { font-size: .93rem; }
   .insights-preview__grid article > small { font-size: .62rem; line-height: 1.4; }
-  .insights-preview__trend { right: 12px; bottom: 12px; width: 42px; }
-  .insights-preview__trend b::after { width: 42px; }
+  .insights-preview__trend { right: 13px; bottom: 11px; }
   .insights-preview__recommendation { grid-template-columns: 86px minmax(0, 1fr); min-height: 98px; padding-right: 12px; }
   .insights-mascot--hero { width: 94px; height: 94px; margin-left: -7px; }
 
