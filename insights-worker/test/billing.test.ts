@@ -53,6 +53,9 @@ async function clearDatabase(): Promise<void> {
   shopifyAdmin.orders.clear();
   shopifyAdmin.nextFailure = null;
   await env.DB.batch([
+    env.DB.prepare("DELETE FROM insights_upgrade_checkout_claims"),
+    env.DB.prepare("DELETE FROM insights_upgrade_sessions"),
+    env.DB.prepare("DELETE FROM insights_upgrade_magic_links"),
     env.DB.prepare("DELETE FROM insights_subscription_lifecycle_events"),
     env.DB.prepare("DELETE FROM insights_cancellation_requests"),
     env.DB.prepare("DELETE FROM business_insights_intro_redemptions"),
@@ -626,6 +629,74 @@ describe("billing activation, tenant resolution and idempotency", () => {
     expect(await count("insights_subscriptions")).toBe(0);
     expect(await count("customer_business_access")).toBe(0);
     expect(await count("insights_entitlements")).toBe(0);
+  });
+
+  it("activates an Insights-only order only through an unexpired email-verified upgrade claim", async () => {
+    const originalOrder = unique("#card-only-order");
+    const originalSetup = unique("card-only-setup");
+    const target = await provisionTarget({
+      orderReference: originalOrder,
+      setupReference: originalSetup,
+      businessName: "Upgrade Claim Business"
+    });
+    const batch = await env.DB.prepare(`
+      SELECT id FROM provisioning_batches
+      WHERE external_order_reference = ?1 AND external_setup_reference = ?2
+      LIMIT 1
+    `).bind(originalOrder, originalSetup).first<{ id: string }>();
+    expect(batch?.id).toBeTruthy();
+
+    const upgradeSetup = `upgrade_${crypto.randomUUID()}`;
+    await env.DB.prepare(`
+      INSERT INTO insights_upgrade_checkout_claims
+        (id, provisioning_batch_id, setup_reference, expires_at, created_at)
+      VALUES (?1, ?2, ?3, ?4, ?5)
+    `).bind(
+      crypto.randomUUID(),
+      batch?.id,
+      upgradeSetup,
+      "2027-03-01T00:00:00.000Z",
+      "2026-01-31T09:00:00.000Z"
+    ).run();
+
+    const upgradeOrder = unique("#insights-only-order");
+    const response = await deliver(orderFixture({
+      orderReference: upgradeOrder,
+      setupReference: upgradeSetup,
+      email: "upgrade-owner@example.invalid"
+    }));
+
+    expect(await response.json()).toMatchObject({ result: "activated" });
+    const subscription = await env.DB.prepare(`
+      SELECT business_id, location_id FROM insights_subscriptions LIMIT 1
+    `).first<{ business_id: string; location_id: string }>();
+    expect(subscription).toEqual({ business_id: target.businessId, location_id: target.locationId });
+    const claim = await env.DB.prepare(`
+      SELECT provider_order_reference FROM insights_upgrade_checkout_claims WHERE setup_reference = ?1
+    `).bind(upgradeSetup).first<{ provider_order_reference: string | null }>();
+    expect(claim?.provider_order_reference).toContain("gid://shopify/Order/");
+  });
+
+  it("does not let a second paid order reuse an Insights upgrade claim", async () => {
+    const originalOrder = unique("#claim-source-order");
+    const originalSetup = unique("claim-source-setup");
+    await provisionTarget({ orderReference: originalOrder, setupReference: originalSetup });
+    const batch = await env.DB.prepare(`
+      SELECT id FROM provisioning_batches WHERE external_order_reference = ?1 LIMIT 1
+    `).bind(originalOrder).first<{ id: string }>();
+    const upgradeSetup = `upgrade_${crypto.randomUUID()}`;
+    await env.DB.prepare(`
+      INSERT INTO insights_upgrade_checkout_claims
+        (id, provisioning_batch_id, setup_reference, expires_at, created_at)
+      VALUES (?1, ?2, ?3, ?4, ?5)
+    `).bind(crypto.randomUUID(), batch?.id, upgradeSetup, "2027-03-01T00:00:00.000Z", "2026-01-31T09:00:00.000Z").run();
+
+    const first = await deliver(orderFixture({ orderReference: unique("#first-claim-order"), setupReference: upgradeSetup }));
+    const second = await deliver(orderFixture({ orderReference: unique("#second-claim-order"), setupReference: upgradeSetup }));
+
+    expect(await first.json()).toMatchObject({ result: "activated" });
+    expect(await second.json()).toMatchObject({ result: "pending" });
+    expect(await count("insights_subscriptions")).toBe(1);
   });
 
   it("stores an early payment as pending and reconciles exactly after provisioning", async () => {

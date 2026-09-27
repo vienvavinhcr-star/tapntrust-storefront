@@ -83,7 +83,7 @@ Before provisioning, staff must confirm that the supplied destination passes the
 
 The browser-generated setup ID groups related Shopify lines but is not a trusted D1 business or location identifier. In the protected owner workflow, staff explicitly creates or selects the D1 business/location and confirms the total physical NFC card quantity, including Extra NFC Cards and excluding Counter Stands.
 
-Provisioning is required for card orders whether Insights is purchased or not. Non-Insights provisioning does not create a customer login or store purchaser email in D1. Later Insights activation reuses the existing business, location, cards, tokens and tap history without NFC reprogramming.
+Provisioning is required for card orders whether Insights is purchased or not. A Shopify-provisioned batch may retain the normalized checkout email for owner CRM, guide delivery and secure verification of a later Insights-only upgrade. That email does not create a customer login or grant dashboard access. Later paid Insights activation reuses the existing business, location, cards, tokens and tap history without NFC reprogramming.
 
 ## Safe edit guidance
 

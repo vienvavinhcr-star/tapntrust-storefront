@@ -52,13 +52,15 @@ Cloudflare Worker + D1 was chosen for this phase because the redirect and databa
 - `auth_magic_links`: a single-use SHA-256 token hash with a 15-minute expiry.
 - `customer_sessions`: a SHA-256 session-token hash with expiry and revocation state.
 - `auth_request_limits`: temporary SHA-256 email identifiers and per-email request counters used only for abuse control.
-- `provisioning_batches`: idempotent Shopify order/setup association for one reviewed physical-card provisioning intent; contains no purchaser email.
+- `provisioning_batches`: idempotent Shopify order/setup association for one reviewed physical-card provisioning intent; Shopify-provisioned batches may retain the normalized checkout email for owner CRM, guide delivery and secure later-upgrade verification, but that field grants no dashboard access.
 - `provisioning_batch_cards`: ordered mapping between a provisioning batch and its physical card records.
 - `insights_entitlements`: location-level dashboard state, independent of card redirects and tap recording.
 - `insights_subscriptions`: Tapntrust's location-level mirror of normalized paid billing state; it does not replace entitlement as the authorization gate.
 - `insights_billing_events`: append-only normalized Shopify payment and application history, without raw webhook payloads or card-payment data.
 - `shopify_webhook_receipts`: safe delivery IDs, hashes and outcomes used for webhook idempotency.
 - `business_insights_intro_redemptions`: one durable AUD 1.99 introductory-offer redemption per business.
+- `insights_upgrade_magic_links` / `insights_upgrade_sessions`: short-lived, hashed-token proof that the person selecting an existing Google Place can receive email at the address saved with its original order.
+- `insights_upgrade_checkout_claims`: an opaque, one-location authorization bridge from a verified upgrade session to the first paid Shopify order that uses it.
 
 Migration `0003_provisioning.sql` follows the existing D1 convention: lifecycle timestamps are ISO UTC `TEXT` values. Numeric columns such as physical-card quantity and ordinal remain `INTEGER` because they are counts, not timestamps.
 
@@ -136,7 +138,7 @@ Universal provisioning and Insights activation are separate services and lifecyc
 
 For every legitimate physical NFC card order, staff uses `/admin` to enter the Shopify order/setup reference, explicitly create or select the business/location, confirm the Google destination and confirm the physical NFC card quantity. The server generates one cryptographically random immutable token per physical card and returns the programming manifest. Extra NFC Cards receive their own tokens. Counter Stand does not create a card or token.
 
-All cards record taps from day one. Provisioning without Insights creates only the business, location, cards and order association. It does not create a customer user, grant business access, send authentication email or copy purchaser email from Shopify into D1.
+All cards record taps from day one. Provisioning without Insights creates the business, location, cards and order association, and a Shopify-provisioned batch may retain its normalized checkout email for owner CRM, guide delivery and later ownership verification. It does not create a customer user, grant business access, send an Insights sign-in email or expose dashboard data.
 
 The protected manual endpoint currently accepts between 1 and 100 physical NFC cards in one batch. This upper bound is an operational guard against accidental or abusive oversized writes; larger legitimate fulfilment runs must be split into separately referenced setup operations.
 

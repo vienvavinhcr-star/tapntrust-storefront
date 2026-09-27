@@ -1,6 +1,7 @@
 import { getShopifyAdminAccessToken } from "./shopify-admin-token";
 import {
   appendAppliedPaymentEvent,
+  claimInsightsUpgradeTarget,
   completeShopifyWebhookReceipt,
   findProvisioningTarget,
   findRenewalSubscriptionTarget,
@@ -149,6 +150,14 @@ async function applyStoredPaymentEvent(
   );
   if (resolution.ambiguous) return "review";
   let target = resolution.target;
+  if (!target) {
+    target = await claimInsightsUpgradeTarget(
+      db,
+      event.externalSetupReference,
+      event.providerOrderReference,
+      now
+    );
+  }
   if (!target && event.planCode === "standard" && event.providerCustomerReference) {
     const renewal = await findRenewalSubscriptionTarget(
       db,

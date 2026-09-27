@@ -124,3 +124,11 @@ Intro eligibility is keyed to a Google Place ID that the Worker verifies server-
 The shared code is intentionally long and unmarketed, but it is still visible to a customer once Shopify applies it at checkout. Do not treat secrecy of the code as the authorization boundary. Shopify's one-use-per-customer rule, server-side business eligibility, the paid webhook, and `business_insights_intro_redemptions` remain the abuse and entitlement controls.
 
 A cart may contain only one Insights location during Phase 4C. Physical card purchases remain available without Insights.
+
+## Existing-card Insights-only upgrade
+
+`insights-only.html` lets a customer who already owns Tapntrust cards select the exact Google Place used in the original order. The public response is enumeration-safe: card count and subscription state are not shown on the storefront. When a match exists, the Worker sends a 15-minute single-use link to the normalized checkout email already attached to the provisioning batch. Only the confirmed one-hour upgrade session may view the existing location and request checkout.
+
+The Worker creates a fresh Shopify cart containing only the configured Insights subscription variant and monthly selling plan. Before creating that cart it queries Shopify and requires `ProductVariant.requiresShipping` to be `false`; otherwise checkout is blocked. Shopify remains the payment boundary and the frontend never collects payment-card data.
+
+Each checkout receives a high-entropy `_Business Setup ID` backed by `insights_upgrade_checkout_claims`. The claim points server-side to one existing provisioning batch and binds atomically to the first verified paid Shopify order. A raw historical setup ID, Google Place ID or client-supplied business ID is never enough to activate access. The existing `orders/paid` pipeline then activates the entitlement, customer access and admin CRM status for the pre-existing location without changing its card tokens or tap history.

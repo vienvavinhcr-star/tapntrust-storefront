@@ -1,5 +1,9 @@
 import type { MagicLinkMailer } from "./auth";
 
+export interface UpgradeLinkMailer {
+  sendUpgradeLink(email: string, firstName: string, magicUrl: string): Promise<void>;
+}
+
 export const ZEPTOMAIL_AU_EMAIL_ENDPOINT = "https://api.zeptomail.com.au/v1.1/email";
 
 type ZeptoMailFetch = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
@@ -69,6 +73,48 @@ export function createZeptoMailMagicLinkMailer(
             subject: "Your Tapntrust Insights sign-in link",
             textbody: `Open your Tapntrust Insights dashboard: ${magicUrl}\n\nThis single-use link expires in 15 minutes. If you did not request it, you can ignore this email.`,
             htmlbody: `<p>Open your Tapntrust Insights dashboard:</p><p><a href="${safeUrl}">Sign in to Tapntrust Insights</a></p><p>This single-use link expires in 15 minutes. If you did not request it, you can ignore this email.</p>`,
+            track_clicks: false,
+            track_opens: false
+          })
+        });
+      } catch {
+        throw new MagicLinkDeliveryError("provider_unavailable");
+      }
+
+      if (!response.ok) {
+        throw new MagicLinkDeliveryError("provider_rejected", response.status);
+      }
+    }
+  };
+}
+
+export function createZeptoMailUpgradeLinkMailer(
+  apiKey: string,
+  fromEmail: string,
+  fetcher: ZeptoMailFetch = fetch
+): UpgradeLinkMailer {
+  return {
+    async sendUpgradeLink(email, firstName, magicUrl) {
+      if (!apiKey || !fromEmail) throw new MagicLinkDeliveryError("provider_unavailable");
+
+      const safeUrl = escapeHtml(magicUrl);
+      const safeName = escapeHtml(firstName || "there");
+      let response: Response;
+      try {
+        response = await fetcher(ZEPTOMAIL_AU_EMAIL_ENDPOINT, {
+          method: "POST",
+          headers: {
+            Accept: "application/json",
+            Authorization: `Zoho-enczapikey ${apiKey}`,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            from: { address: fromEmail, name: "Tapntrust Support" },
+            to: [{ email_address: { address: email, name: "Tapntrust customer" } }],
+            reply_to: [{ address: fromEmail, name: "Tapntrust Support" }],
+            subject: "Confirm your Tapntrust Insights upgrade",
+            textbody: `Hi ${firstName || "there"},\n\nConfirm this business and view its Tapntrust card status: ${magicUrl}\n\nThis single-use link expires in 15 minutes. If you did not request it, you can ignore this email.`,
+            htmlbody: `<p>Hi ${safeName},</p><p>Confirm this business and view its Tapntrust card status:</p><p><a href="${safeUrl}">Continue to Tapntrust Insights</a></p><p>This single-use link expires in 15 minutes. If you did not request it, you can ignore this email.</p>`,
             track_clicks: false,
             track_opens: false
           })

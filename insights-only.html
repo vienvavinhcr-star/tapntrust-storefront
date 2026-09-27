@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en-AU">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#071b45">
+  <meta name="description" content="Add Tapntrust Insights to cards you already own.">
+  <title>Add Insights to existing Tapntrust cards</title>
+  <link rel="canonical" href="https://tapntrust.com/insights-only.html">
+  <link rel="icon" href="assets/brand/tapntrust-logo-300.png">
+  <link rel="stylesheet" href="css/styles.css?v=20260927-1">
+  <link rel="stylesheet" href="css/insights-only.css?v=20260927-1">
+</head>
+<body class="insights-only-page">
+  <header class="upgrade-header">
+    <div class="container upgrade-header__inner">
+      <a class="brand-link" href="/" aria-label="Tapntrust home">
+        <img class="brand-logo" src="assets/brand/tapntrust-logo-300.png" alt="Tapntrust" width="300" height="242">
+      </a>
+      <a class="upgrade-header__shop" href="/#shop">Shop cards</a>
+    </div>
+  </header>
+
+  <main class="upgrade-main">
+    <section class="container upgrade-layout" aria-labelledby="upgrade-title">
+      <div class="upgrade-intro">
+        <p class="eyebrow">Already have Tapntrust cards?</p>
+        <h1 id="upgrade-title">See what your cards have been doing.</h1>
+        <p>Find the exact business used in your original order. We’ll send a secure confirmation link to the email saved with that order before showing card totals or Insights status.</p>
+        <ul>
+          <li><span aria-hidden="true">✓</span> Your existing cards and tap history stay connected</li>
+          <li><span aria-hidden="true">✓</span> Insights-only checkout has no physical delivery</li>
+          <li><span aria-hidden="true">✓</span> A private dashboard after verified payment</li>
+        </ul>
+        <div class="upgrade-mascot"><img src="insights-worker/assets/tapntrust-insights-mascot-transparent.png" alt="Tapntrust mascot presenting Insights" width="483" height="649"></div>
+      </div>
+
+      <div class="upgrade-form-card">
+        <div data-upgrade-form-panel>
+          <p class="upgrade-form-card__step">Step 1 of 2 · Find your order</p>
+          <h2>Which business are your cards connected to?</h2>
+          <p class="upgrade-form-card__intro">You won’t need an order number. Choose the same Google business location used when the cards were purchased.</p>
+          <form data-insights-upgrade-form novalidate>
+            <div class="field">
+              <label for="upgrade-first-name">First name <span aria-hidden="true">*</span></label>
+              <input id="upgrade-first-name" name="firstName" type="text" autocomplete="given-name" maxlength="40" placeholder="e.g. Justin" required>
+            </div>
+
+            <div class="business-finder upgrade-business-finder" data-business-finder data-mode="search">
+              <div class="business-finder__heading"><div><p class="business-finder__step">Exact location</p><h3>Find your business</h3></div><span class="business-finder__secure"><span aria-hidden="true">✓</span> Google listing</span></div>
+              <p class="business-finder__intro">Search by business name and select the correct address.</p>
+              <div class="business-search" data-business-search-panel>
+                <label for="upgrade-business-search">Business name or location <span aria-hidden="true">*</span></label>
+                <div class="business-search__control"><span class="business-search__icon" aria-hidden="true"></span><input id="upgrade-business-search" type="search" autocomplete="off" role="combobox" aria-autocomplete="list" aria-controls="upgrade-business-results" aria-expanded="false" placeholder="e.g. ABC Café, Richmond" data-business-search><span class="business-search__spinner" aria-hidden="true"></span></div>
+                <p class="field__help">Add a suburb or postcode when the business has more than one location.</p>
+                <p class="business-search__status" data-business-search-status role="status" aria-live="polite">Type at least 3 characters, then choose the exact location.</p>
+                <div class="business-results" id="upgrade-business-results" data-business-results role="listbox" aria-label="Matching Google business locations" hidden></div>
+              </div>
+              <article class="selected-business" data-selected-business hidden><span class="selected-business__check" aria-hidden="true">✓</span><div class="selected-business__copy"><span data-selected-business-category>Selected Google business listing</span><strong data-selected-business-name></strong><small data-selected-business-address></small><small class="selected-business__source" translate="no">Google Maps</small></div><button type="button" class="selected-business__change" data-change-business>Change</button></article>
+              <div class="manual-entry" data-manual-panel hidden><p data-manual-status>Choose a verified Google listing to continue.</p><input type="hidden" data-manual-business-name><input type="hidden" data-manual-business-address><input type="hidden" data-manual-review-url></div>
+              <input name="businessName" type="hidden"><input name="businessAddress" type="hidden"><input name="googlePlaceId" type="hidden"><input name="reviewUrl" type="hidden"><input name="googleMapsUrl" type="hidden"><input name="reviewLinkStatus" type="hidden"><input name="reviewLinkSource" type="hidden">
+              <button type="button" data-manual-toggle hidden>Search for the business instead</button>
+            </div>
+            <p class="upgrade-form-status" data-upgrade-status role="status" aria-live="polite"></p>
+            <button class="button button--primary button--wide" type="submit" data-upgrade-submit>Send secure confirmation link <span aria-hidden="true">→</span></button>
+          </form>
+          <p class="upgrade-privacy">For privacy, this page never reveals whether a business is in our system. Any matching link goes only to the email already saved with the original order.</p>
+        </div>
+
+        <div class="upgrade-sent" data-upgrade-sent hidden>
+          <span class="upgrade-sent__icon" aria-hidden="true">✓</span>
+          <p class="eyebrow">Secure link requested</p>
+          <h2>Check the email used for your original Tapntrust order.</h2>
+          <p>If this business matches an order, the link will arrive shortly and will work for 15 minutes.</p>
+          <button class="button button--secondary" type="button" data-upgrade-reset>Check another business</button>
+        </div>
+      </div>
+    </section>
+  </main>
+  <script type="module" src="js/insights-only.js?v=20260927-1"></script>
+</body>
+</html>

@@ -1,0 +1,31 @@
+.insights-only-page { min-height: 100vh; background: radial-gradient(circle at 12% 8%, #dcecff 0, transparent 32%), linear-gradient(145deg, #f8fbff, #e9f2ff); }
+.upgrade-header { position: relative; z-index: 5; border-bottom: 1px solid rgba(174, 197, 230, .55); background: rgba(255, 255, 255, .86); backdrop-filter: blur(18px); }
+.upgrade-header__inner { display: flex; min-height: 78px; align-items: center; justify-content: space-between; }
+.upgrade-header .brand-logo { width: 52px; height: 52px; object-fit: contain; }
+.upgrade-header__shop { padding: 10px 15px; border: 1px solid #c8d9f1; border-radius: 999px; color: var(--navy-900); background: #fff; font-size: .78rem; font-weight: 800; text-decoration: none; }
+.upgrade-main { padding: clamp(34px, 6vw, 76px) 0; }
+.upgrade-layout { display: grid; grid-template-columns: minmax(0, .88fr) minmax(420px, 1.12fr); align-items: center; gap: clamp(28px, 6vw, 76px); }
+.upgrade-intro { position: relative; }
+.upgrade-intro h1 { max-width: 650px; margin: 9px 0 20px; color: var(--navy-900); font-size: clamp(2.8rem, 6.3vw, 5.6rem); line-height: .94; letter-spacing: -.06em; }
+.upgrade-intro > p:not(.eyebrow) { max-width: 620px; margin: 0; color: var(--muted); font-size: 1.04rem; line-height: 1.7; }
+.upgrade-intro ul { display: grid; gap: 10px; margin: 26px 0 0; padding: 0; list-style: none; }
+.upgrade-intro li { display: flex; align-items: flex-start; gap: 10px; color: #3f5577; font-size: .85rem; font-weight: 700; line-height: 1.45; }
+.upgrade-intro li span { display: grid; width: 22px; height: 22px; flex: 0 0 auto; place-items: center; border-radius: 50%; color: #fff; background: #12a16c; font-size: .65rem; }
+.upgrade-mascot { position: absolute; right: -20px; bottom: -52px; width: 155px; pointer-events: none; }
+.upgrade-mascot img { display: block; width: 100%; height: auto; filter: drop-shadow(0 18px 24px rgba(7, 27, 69, .18)); }
+.upgrade-form-card { overflow: visible; border: 1px solid rgba(154, 183, 224, .65); border-radius: 28px; background: #fff; box-shadow: 0 32px 80px rgba(7, 27, 69, .15); }
+.upgrade-form-card > div { padding: clamp(24px, 5vw, 45px); }
+.upgrade-form-card__step { margin: 0 0 8px; color: var(--blue-600); font-size: .68rem; font-weight: 900; letter-spacing: .13em; text-transform: uppercase; }
+.upgrade-form-card h2 { margin: 0; color: var(--navy-900); font-size: clamp(1.55rem, 3vw, 2.35rem); line-height: 1.08; letter-spacing: -.035em; }
+.upgrade-form-card__intro { margin: 13px 0 24px; color: var(--muted); font-size: .83rem; line-height: 1.55; }
+.upgrade-form-card form { display: grid; gap: 17px; }
+.upgrade-form-card .field input { min-height: 52px; }
+.upgrade-business-finder { padding: 18px; }
+.upgrade-form-status { min-height: 22px; margin: -3px 0; color: #b33b30; font-size: .77rem; font-weight: 750; }
+.upgrade-privacy { margin: 18px 0 0; color: #71819b; font-size: .67rem; line-height: 1.55; }
+.upgrade-sent { min-height: 560px; align-content: center; text-align: center; }
+.upgrade-sent__icon { display: grid; width: 70px; height: 70px; margin: 0 auto 22px; place-items: center; border-radius: 50%; color: #fff; background: #12a16c; font-size: 1.6rem; font-weight: 900; box-shadow: 0 16px 30px rgba(18, 161, 108, .22); }
+.upgrade-sent p:not(.eyebrow) { margin: 16px auto 25px; color: var(--muted); line-height: 1.65; }
+.upgrade-sent .button { margin-inline: auto; }
+@media (max-width: 900px) { .upgrade-layout { grid-template-columns: 1fr; } .upgrade-intro { padding-right: 130px; } .upgrade-mascot { right: 0; bottom: -20px; width: 135px; } }
+@media (max-width: 620px) { .upgrade-main { padding: 25px 0 42px; } .upgrade-layout { gap: 25px; } .upgrade-intro { padding-right: 0; } .upgrade-intro h1 { font-size: clamp(2.6rem, 13vw, 4rem); } .upgrade-intro ul { padding-right: 95px; } .upgrade-mascot { right: -7px; bottom: -6px; width: 102px; } .upgrade-form-card { border-radius: 22px; } .upgrade-form-card > div { padding: 24px 17px; } .upgrade-business-finder { padding: 15px 12px; } .upgrade-sent { min-height: 430px; } }

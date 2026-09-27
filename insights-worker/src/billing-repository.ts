@@ -316,6 +316,41 @@ export async function findProvisioningTarget(
   return { target: null, ambiguous: setupMatches.results.length > 1 };
 }
 
+/**
+ * Resolves an Insights-only checkout created after the customer proved access
+ * through the original order email. The opaque setup reference belongs to a
+ * single upgrade claim, not to a public location or client-supplied business ID.
+ * Binding the claim to the first paid Shopify order makes it replay-safe while
+ * preventing the same checkout claim from authorising another order.
+ */
+export async function claimInsightsUpgradeTarget(
+  db: D1Database,
+  externalSetupReference: string,
+  providerOrderReference: string,
+  now: string
+): Promise<ProvisioningTarget | null> {
+  const result = await db.prepare(`
+    UPDATE insights_upgrade_checkout_claims
+    SET provider_order_reference = COALESCE(provider_order_reference, ?2)
+    WHERE setup_reference = ?1
+      AND expires_at > ?3
+      AND (provider_order_reference IS NULL OR provider_order_reference = ?2)
+  `).bind(externalSetupReference, providerOrderReference, now).run();
+  if (changes(result) !== 1) return null;
+
+  const row = await db.prepare(`
+    SELECT DISTINCT pb.business_id, pb.location_id
+    FROM insights_upgrade_checkout_claims claim
+    JOIN provisioning_batches pb ON pb.id = claim.provisioning_batch_id
+    JOIN locations l ON l.id = pb.location_id AND l.business_id = pb.business_id
+    WHERE claim.setup_reference = ?1
+      AND claim.provider_order_reference = ?2
+      AND claim.expires_at > ?3
+    LIMIT 1
+  `).bind(externalSetupReference, providerOrderReference, now).first<ProvisioningTargetRow>();
+  return row ? { businessId: row.business_id, locationId: row.location_id } : null;
+}
+
 export async function findRenewalSubscriptionTarget(
   db: D1Database,
   externalSetupReference: string,

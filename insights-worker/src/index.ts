@@ -29,6 +29,8 @@ import {
 } from "./subscription-lifecycle";
 import { isAllowedGoogleReviewUrl, isValidPublicToken, normalisePublicToken } from "./destinations";
 import { handleInsightsPurchaseRequest, type InsightsPurchaseDependencies } from "./insights-purchase";
+import { handleInsightsUpgradeRequest, type InsightsUpgradeDependencies } from "./insights-upgrade";
+import { createInsightsUpgradeCheckout } from "./insights-upgrade-checkout";
 import { createD1Repository, type CardUpdate, type InsightsRepository, type PlacementType } from "./repository";
 import { autoProvisionPaidShopifyOrder } from "./shopify-order-provisioning";
 
@@ -257,7 +259,8 @@ export async function handleRequest(
   customerDependencies: CustomerAuthDependencies = {},
   billingDependencies: BillingDependencies = {},
   purchaseDependencies: InsightsPurchaseDependencies = {},
-  adminDependencies: AdminProvisioningDependencies = {}
+  adminDependencies: AdminProvisioningDependencies = {},
+  upgradeDependencies: InsightsUpgradeDependencies = {}
 ): Promise<Response> {
   const url = new URL(request.url);
 
@@ -309,6 +312,16 @@ export async function handleRequest(
     if (partnerAuthResponse) return partnerAuthResponse;
     const partnerOperationsResponse = await handlePartnerOperations(request, url.pathname, env);
     if (partnerOperationsResponse) return partnerOperationsResponse;
+
+    const upgradeResponse = await handleInsightsUpgradeRequest(
+      request,
+      url,
+      env,
+      ctx,
+      upgradeDependencies,
+      createInsightsUpgradeCheckout
+    );
+    if (upgradeResponse) return upgradeResponse;
 
     const purchaseResponse = await handleInsightsPurchaseRequest(request, url, env, purchaseDependencies);
     if (purchaseResponse) return purchaseResponse;
