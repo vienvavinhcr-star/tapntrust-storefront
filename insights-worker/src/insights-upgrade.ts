@@ -55,7 +55,7 @@ export const UPGRADE_HTML_HEADERS = {
   "Content-Type": "text/html; charset=utf-8",
   "Referrer-Policy": "origin",
   "X-Content-Type-Options": "nosniff",
-  "Content-Security-Policy": "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'"
+  "Content-Security-Policy": "default-src 'none'; img-src 'self' https://tapntrust.com; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'"
 };
 
 export function cleanUpgradeValue(value: unknown, max: number): string {

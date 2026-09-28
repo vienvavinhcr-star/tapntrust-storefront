@@ -3,19 +3,20 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="theme-color" content="#071b45">
+  <meta name="theme-color" content="#f5f9ff">
   <meta name="description" content="Add Tapntrust Insights to cards you already own.">
   <title>Add Insights to existing Tapntrust cards</title>
   <link rel="canonical" href="https://tapntrust.com/insights-only.html">
   <link rel="icon" href="assets/brand/tapntrust-logo-300.png">
   <link rel="stylesheet" href="css/styles.css?v=20260927-1">
-  <link rel="stylesheet" href="css/insights-only.css?v=20260927-1">
+  <link rel="stylesheet" href="css/insights-only.css?v=20260927-4">
 </head>
 <body class="insights-only-page">
   <header class="upgrade-header">
     <div class="container upgrade-header__inner">
       <a class="brand-link" href="/" aria-label="Tapntrust home">
         <img class="brand-logo" src="assets/brand/tapntrust-logo-300.png" alt="Tapntrust" width="300" height="242">
+        <span class="upgrade-header__brand-name">Tapntrust</span>
       </a>
       <a class="upgrade-header__shop" href="/#shop">Shop cards</a>
     </div>
@@ -24,15 +25,17 @@
   <main class="upgrade-main">
     <section class="container upgrade-layout" aria-labelledby="upgrade-title">
       <div class="upgrade-intro">
-        <p class="eyebrow">Already have Tapntrust cards?</p>
-        <h1 id="upgrade-title">See what your cards have been doing.</h1>
-        <p>Find the exact business used in your original order. We’ll send a secure confirmation link to the email saved with that order before showing card totals or Insights status.</p>
-        <ul>
-          <li><span aria-hidden="true">✓</span> Your existing cards and tap history stay connected</li>
-          <li><span aria-hidden="true">✓</span> Insights-only checkout has no physical delivery</li>
-          <li><span aria-hidden="true">✓</span> A private dashboard after verified payment</li>
-        </ul>
-        <div class="upgrade-mascot"><img src="insights-worker/assets/tapntrust-insights-mascot-transparent.png" alt="Tapntrust mascot presenting Insights" width="483" height="649"></div>
+        <div class="upgrade-intro__copy">
+          <p class="eyebrow">For existing Tapntrust cards</p>
+          <h1 id="upgrade-title">Add Insights. Keep every card.</h1>
+          <p>Choose the Google business from your original order. After a secure email check, you’ll see your connected cards and Insights status.</p>
+        </div>
+        <div class="upgrade-mascot"><img src="assets/marketing/tapntrust-insights-popup-mascot.png" alt="Tapntrust mascot presenting Insights" width="1222" height="1287"></div>
+        <div class="upgrade-benefits" aria-label="Tapntrust Insights benefits">
+          <div class="upgrade-benefit"><span aria-hidden="true">01</span><strong>Keep your history</strong><small>Existing cards and taps stay connected.</small></div>
+          <div class="upgrade-benefit"><span aria-hidden="true">02</span><strong>No shipping</strong><small>Insights-only digital checkout.</small></div>
+          <div class="upgrade-benefit"><span aria-hidden="true">03</span><strong>Private dashboard</strong><small>Track activity after activation.</small></div>
+        </div>
       </div>
 
       <div class="upgrade-form-card">
@@ -40,6 +43,7 @@
           <p class="upgrade-form-card__step">Step 1 of 2 · Find your order</p>
           <h2>Which business are your cards connected to?</h2>
           <p class="upgrade-form-card__intro">You won’t need an order number. Choose the same Google business location used when the cards were purchased.</p>
+          <div class="upgrade-form-card__assurance"><span aria-hidden="true">✦</span><p><strong>Private by design</strong> Your card total and Insights status appear only after email confirmation.</p></div>
           <form data-insights-upgrade-form novalidate>
             <div class="field">
               <label for="upgrade-first-name">First name <span aria-hidden="true">*</span></label>
@@ -72,11 +76,12 @@
           <p class="eyebrow">Secure link requested</p>
           <h2>Check the email used for your original Tapntrust order.</h2>
           <p>If this business matches an order, the link will arrive shortly and will work for 15 minutes.</p>
+          <div class="upgrade-sent__next"><strong>What happens after activation?</strong><span>We’ll email you the sign-in steps for your private Tapntrust Insights dashboard, where you can track activity across your connected cards.</span></div>
           <button class="button button--secondary" type="button" data-upgrade-reset>Check another business</button>
         </div>
       </div>
     </section>
   </main>
-  <script type="module" src="js/insights-only.js?v=20260927-1"></script>
+  <script type="module" src="js/insights-only.js?v=20260927-2"></script>
 </body>
 </html>
