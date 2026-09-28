@@ -162,6 +162,9 @@ describe("existing-card Insights upgrade", () => {
     expect(html).toContain("3 Tapntrust cards");
     expect(html).toContain("Not activated");
     expect(html).toContain("no shipping");
+    expect(html).toContain("Questions? We’re here to help.");
+    expect(html).toContain("mailto:contact@tapntrust.com?subject=Tapntrust%20Insights%20support");
+    expect(html).toContain("Business%3A%20Verified%20Caf%C3%A9");
 
     const reused = await call("/insights-upgrade/confirm", {
       method: "POST",
